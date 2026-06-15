@@ -8,27 +8,33 @@
 ledger/
 ├── ledger_modules/          # 核心模块包
 │   ├── __init__.py          # 统一导出
+│   ├── config.py            # 配置管理（.env 加载）
 │   ├── db.py                # 数据库初始化/迁移
 │   ├── transactions.py      # 交易 CRUD / 搜索 / 筛选 / 导出 / 统计
 │   └── budgets.py           # 预算 / 多维度预算 / 模板
 ├── scripts/                 # 命令行入口
 │   ├── cli.py               # 统一的 CLI 入口（委托 ledger_modules）
 │   └── import_ledger.py     # CSV 导入脚本
+├── ledger-skills/           # picoclaw / AI Agent 技能
+│   ├── SKILL.md             # 技能说明文档
+│   └── scripts/
+│       └── ledger_cli.py    # JSON 接口封装
 ├── tests/                   # 自动化测试（pytest）
 │   ├── conftest.py          # 共享 fixture（自动管理临时 DB）
 │   ├── test_db.py           # 数据库表结构测试
 │   ├── test_transactions.py # 交易 CRUD / 搜索 / 筛选 / 导出 / 统计
 │   ├── test_budgets.py      # 预算 / 多维度 / 模板 CRUD
+│   ├── test_robustness.py   # 健壮性测试（边界条件、错误处理）
 │   └── test_integration.py  # 端到端工作流 + CSV 导入
 ├── data/
 │   └── sample/              # 示例数据（随手记 CSV 导出）
-├── ledger-skills/           # Claude Code 自定义技能
+├── .env.example             # 环境变量配置模板
 ├── pyproject.toml            # 项目配置 / pytest / coverage / ruff
 ├── Makefile                  # 常用命令快捷入口
 ├── .gitignore
 ├── .vscode/
-│   └── settings.json
-└── ledger.db                 # SQLite 数据库（运行时生成）
+│   └── launch.json
+└── ledger.db                 # SQLite 数据库（运行时生成，已 gitignore）
 ```
 
 ## 快速开始
@@ -37,23 +43,24 @@ ledger/
 # 1. 安装开发依赖
 pip install -e ".[dev,lint]"
 
-# 2. 导入随手记 CSV
-python scripts/import_ledger.py data/sample/mymoney_data_20260614203414.csv
+# 2. 配置环境变量（可选，留空使用默认值）
+cp .env.example .env
+# 编辑 .env 设置 LEDGER_PATH 和 LEDGER_DB_PATH
 
-# 3. 查看最近交易
+# 3. 导入随手记 CSV
+python scripts/import_ledger.py data/sample/mymoney_data.csv
+
+# 4. 查看最近交易
 python scripts/cli.py list
 
-# 4. 添加一笔支出
+# 5. 添加一笔支出
 python scripts/cli.py add --type expense --amount 100 --category 食品 --account 微信
 
-# 5. 查看本月收支汇总
-python scripts/cli.py summary --year 2026 --month 6
+# 6. 查看本月收支汇总
+python scripts/cli.py summary --year 2026 --month 7
 
-# 6. 设置预算
-python scripts/cli.py budget_set --category 食品 --amount 1000 --year 2026 --month 6
-
-# 7. 按账户维度设置预算
-python scripts/cli.py budget_set --category 餐饮 --amount 500 --dimension_type account --dimension_value xxx信用卡
+# 7. 设置预算
+python scripts/cli.py budget_set --category 食品 --amount 1000 --year 2026 --month 7
 ```
 
 ## 常用命令速查
@@ -77,7 +84,7 @@ python scripts/cli.py budget_set --category 餐饮 --amount 500 --dimension_type
 ## 测试
 
 ```bash
-# 运行所有测试
+# 运行所有测试（102 个测试，覆盖率 86%）
 make test
 
 # 运行特定测试
@@ -106,11 +113,32 @@ make format
 make clean
 ```
 
-## 环境变量
+## 环境变量配置
+
+通过 `.env` 文件配置，优先级：系统环境变量 > `.env` 文件 > 默认值
+
+```bash
+# 复制配置模板
+cp .env.example .env
+
+# 编辑配置
+LEDGER_PATH=/path/to/ledger      # 项目根目录（默认：当前目录）
+LEDGER_DB_PATH=/path/to/ledger.db  # 数据库路径（默认：./ledger.db）
+```
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `LEDGER_DB_PATH` | 数据库路径 | `./ledger.db` |
+| `LEDGER_PATH` | ledger 项目根目录 | 当前目录 |
+| `LEDGER_DB_PATH` | SQLite 数据库路径 | `./ledger.db` |
+
+## picoclaw / AI Agent 集成
+
+```bash
+# 通过 ledger-skills/scripts/ledger_cli.py 调用
+python ledger-skills/scripts/ledger_cli.py add '{"type":"expense","amount":25.5,"category":"食品酒水","account":"微信","note":"零食"}'
+python ledger-skills/scripts/ledger_cli.py list '{"limit":5}'
+python ledger-skills/scripts/ledger_cli.py summary '{"year":2026,"month":7}'
+```
 
 ## 技术栈
 
