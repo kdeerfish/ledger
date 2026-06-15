@@ -33,6 +33,7 @@ Thumbs.db
 .vscode/
 .codegraph/
 .reasonix/
+reasonix.toml
 
 # 部署目录（单独管理）
 docker-ledger/
