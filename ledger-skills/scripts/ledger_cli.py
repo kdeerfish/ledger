@@ -16,9 +16,21 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ['PYTHONUTF8'] = '1'
 
 
+def get_ledger_root():
+    """获取 ledger 项目根目录"""
+    # 优先使用环境变量
+    ledger_path = os.environ.get('LEDGER_PATH')
+    if ledger_path and os.path.isdir(ledger_path):
+        return ledger_path
+    # 回退到脚本相对路径推导
+    return os.path.dirname(os.path.dirname(SCRIPT_DIR))
+
 def run_ledger_api(action, **kwargs):
     """调用 scripts/cli.py"""
-    cli_path = os.path.join(os.path.dirname(os.path.dirname(SCRIPT_DIR)), 'scripts', 'cli.py')
+    ledger_root = get_ledger_root()
+    cli_path = os.path.join(ledger_root, 'scripts', 'cli.py')
+    if not os.path.exists(cli_path):
+        return '', f'找不到 cli.py: {cli_path}', 1
     cmd = [sys.executable, cli_path, action]
 
     for key, value in kwargs.items():
