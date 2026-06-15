@@ -7,21 +7,32 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.venv/
 
 # 测试输出 / 覆盖率
 *_output.txt
 .coverage
 htmlcov/
 .coverage.*
+.pytest_cache/
+coverage.json
 
 # 数据库（用户自己的数据）
 ledger.db
+
+# 个人隐私数据
+data/sample/*.csv
 
 # 临时文件
 *.tmp
 *.bak
 .DS_Store
 Thumbs.db
+
+# IDE / 工具配置
+.vscode/
+.codegraph/
+.reasonix/
 
 # 部署目录（单独管理）
 docker-ledger/

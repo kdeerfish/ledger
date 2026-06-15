@@ -100,7 +100,7 @@ enabled = true   # language server tools; servers launch lazily when used
 # Rules are "Tool" or "Tool(specifier)"; e.g. Bash(go test:*), Edit(src/**).
 mode  = "ask"
 # deny = ["Bash(rm -rf*)", "Bash(git push*)"]   # hard-blocked in every mode
-allow = ["Bash(cd C:\\Users\\zouzh\\Desktop\\ledger ; git remote -v)"]
+allow = ["Bash(cd C:\\Users\\zouzh\\Desktop\\ledger ; git remote -v)", "Bash(git remote:*)", "Bash(git branch:*)", "Bash(git push:*)", "Edit", "Bash(git rm:*)", "Bash(git add:*)"]
 # ask = ["Edit(src/**)"]   # force a prompt even if otherwise allowed
 
 [sandbox]
