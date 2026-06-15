@@ -68,6 +68,14 @@ install:
 deploy:
 	$(PYTHON) scripts/deploy.py
 
+.PHONY: release
+release:
+	$(PYTHON) scripts/release.py $(filter-out $@,$(MAKECMDARGV))
+
+.PHONY: release-dry
+release-dry:
+	$(PYTHON) scripts/release.py --dry-run $(filter-out $@,$(MAKECMDARGV))
+
 # ─── Help ───────────────────────────────────────────────
 .PHONY: help
 help:
@@ -86,4 +94,6 @@ help:
 	@Write-Host "make cli         CLI 入口: make cli list"
 	@Write-Host "make import      导入CSV: make import data.csv"
 	@Write-Host "make deploy      打包发布到 deploy/"
+	@Write-Host "make release     打包 + git tag + Gitea Release"
+	@Write-Host "make release-dry 只打包不发布"
 	@Write-Host "═══════════════════════════════════════"

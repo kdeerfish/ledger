@@ -7,9 +7,67 @@ from datetime import datetime
 from .db import DB_PATH, init_db
 
 
-def add_transaction(type_, amount, category, subcategory, account, project, member, merchant, note, trans_date=None):
+def check_duplicate(type_, amount, category, account, trans_date=None):
+    """
+    检查是否存在相似的重复记录
+    
+    检查条件：同一天 + 同类型 + 同金额 + 同类别 + 同账户
+    
+    返回：相似记录列表，如果无重复返回空列表
+    """
+    if trans_date is None:
+        trans_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # 只取日期部分（去掉时间）
+    date_part = trans_date.split(' ')[0] if ' ' in trans_date else trans_date
+    
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # 查询同一天、同类型、同金额、同类别的记录
+    c.execute('''SELECT id, trans_date, type, amount, category, account, note 
+                 FROM transactions 
+                 WHERE is_deleted = 0 
+                   AND type = ? 
+                   AND amount = ? 
+                   AND category = ?
+                   AND strftime('%Y-%m-%d', trans_date) = ?''',
+              (type_, amount, category, date_part))
+    
+    rows = c.fetchall()
+    conn.close()
+    
+    return [{
+        'id': row[0],
+        'date': row[1],
+        'type': row[2],
+        'amount': row[3],
+        'category': row[4],
+        'account': row[5],
+        'note': row[6]
+    } for row in rows]
+
+
+def add_transaction(type_, amount, category, subcategory, account, project, member, merchant, note, trans_date=None, force=False):
+    """
+    添加交易记录
+    
+    参数：
+        force: 如果为 True，跳过重复检查直接插入
+    """
     if trans_date is None:
         trans_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 重复检查（除非 force=True）
+    if not force:
+        duplicates = check_duplicate(type_, amount, category, account, trans_date)
+        if duplicates:
+            print(f"⚠️ 发现 {len(duplicates)} 条相似记录：")
+            for d in duplicates:
+                print(f"  ID={d['id']}: {d['date']} | {d['type']} | {d['amount']:.2f} | {d['category']} | {d['account']} | {d['note']}")
+            print("如需强制插入，请添加 --confirm 参数")
+            return None
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO transactions
@@ -19,7 +77,8 @@ def add_transaction(type_, amount, category, subcategory, account, project, memb
     new_id = c.lastrowid
     conn.commit()
     conn.close()
-    print(f"已添加记录 ID={new_id}: {type_} {amount} 元 | {category} | {account}")
+    print(f"✅ 已添加记录 ID={new_id}: {type_} {amount} 元 | {category} | {account}")
+    return new_id
 
 
 def list_transactions(limit=20, include_deleted=False):
@@ -57,8 +116,8 @@ def summary(year=None, month=None):
     c.execute(f"SELECT type, SUM(amount) FROM transactions {where} GROUP BY type", params)
     rows = c.fetchall()
     conn.close()
-    total_income = sum(amt for typ, amt in rows if typ == 'income' and amt)
-    total_expense = sum(amt for typ, amt in rows if typ == 'expense' and amt)
+    total_income = sum(amt for typ, amt in rows if typ == '收入' and amt)
+    total_expense = sum(amt for typ, amt in rows if typ == '支出' and amt)
     balance = total_income - total_expense
     period = f"{year or '所有'}-{month or '全年'}"
     print(f"📊 收支统计 ({period}):")
@@ -145,9 +204,9 @@ def import_csv(csv_file):
             total += 1
             type_raw = row.get('交易类型', '').strip()
             if type_raw == '支出':
-                tx_type = 'expense'
+                tx_type = '支出'
             elif type_raw == '收入':
-                tx_type = 'income'
+                tx_type = '收入'
             else:
                 skipped += 1
                 continue
@@ -204,7 +263,7 @@ def reconcile_guide():
 📘 数据矫正对账指南：
 1. 导出银行/支付宝流水为CSV
 2. 使用 import_csv 导入（注意去重，建议先备份数据库）
-3. 或手动添加调整记录：`add -t expense/income -a 金额 -c 账务调整 -n "对账差异"`
+3. 或手动添加调整记录：`add -t 支出/收入 -a 金额 -c 账务调整 -n "对账差异"`
 4. 如需批量软删除错误记录，请先 list 查看ID，再使用 delete --id <ID>
 5. 对于小额差异，可直接添加调整项并备注
     """)

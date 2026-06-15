@@ -1,6 +1,7 @@
 from .db import init_db, DB_PATH
 from .transactions import (
     add_transaction,
+    check_duplicate,
     list_transactions,
     summary,
     update_transaction,
@@ -26,4 +27,11 @@ from .budgets import (
     delete_budget_template,
     apply_budget_template,
     suggest_budget_templates,
+    create_record_template,
+    list_record_templates,
+    get_record_template,
+    update_record_template,
+    delete_record_template,
+    apply_record_template,
+    suggest_record_templates,
 )

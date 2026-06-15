@@ -12,9 +12,11 @@ import sys
 import subprocess
 import json
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILLS_DIR = os.path.dirname(SCRIPT_DIR)  # ledger-skills 目录
-os.environ['PYTHONUTF8'] = '1'
+# 强制 UTF-8 输出（修复 Windows 编码问题）
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    os.environ['PYTHONUTF8'] = '1'
 
 
 def load_env_file(env_path):
@@ -75,17 +77,32 @@ def run_ledger_api(action, **kwargs):
             if value is not True:
                 cmd.append(str(value))
 
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    # Windows 下设置环境变量确保子进程使用 UTF-8
+    env = os.environ.copy()
+    env['PYTHONUTF8'] = '1'
+    env['PYTHONIOENCODING'] = 'utf-8'
+    
+    result = subprocess.run(
+        cmd, 
+        capture_output=True, 
+        text=True, 
+        encoding='utf-8', 
+        errors='replace',
+        env=env,
+        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+    )
     return result.stdout, result.stderr, result.returncode
 
 
 def format_output(stdout, stderr, returncode):
     """格式化输出为JSON"""
-    return json.dumps({
+    result = {
         'success': returncode == 0,
         'data': stdout.strip() if stdout else None,
         'error': stderr.strip() if stderr else None,
-    }, ensure_ascii=False, indent=2)
+    }
+    # 确保中文正常显示，不转义为 \uXXXX
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def cmd_add(args):
@@ -100,6 +117,7 @@ def cmd_add(args):
         'merchant': args.get('merchant'),
         'note': args.get('note'),
         'date': args.get('date'),
+        'confirm': args.get('force', False),  # force 参数映射到 confirm
     }
     stdout, stderr, code = run_ledger_api('add', **kwargs)
     return format_output(stdout, stderr, code)
@@ -252,6 +270,76 @@ def cmd_budget_template_suggest(args):
     return format_output(stdout, stderr, code)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 通用记录模板命令
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def cmd_template_create(args):
+    kwargs = {
+        'template_name': args.get('name'),
+        'template_description': args.get('description'),
+        'template_type': args.get('template_type'),
+        'type': args.get('type'),
+        'template_amount': args.get('amount'),
+        'category': args.get('category'),
+        'subcategory': args.get('subcategory'),
+        'account': args.get('account'),
+        'project': args.get('project'),
+        'member': args.get('member'),
+        'merchant': args.get('merchant'),
+        'note': args.get('note'),
+    }
+    stdout, stderr, code = run_ledger_api('template_create', **kwargs)
+    return format_output(stdout, stderr, code)
+
+
+def cmd_template_list(args):
+    kwargs = {'template_type': args.get('template_type')}
+    stdout, stderr, code = run_ledger_api('template_list', **kwargs)
+    return format_output(stdout, stderr, code)
+
+
+def cmd_template_update(args):
+    kwargs = {
+        'template_id': args.get('id'),
+        'template_name': args.get('name'),
+        'template_description': args.get('description'),
+        'template_type': args.get('template_type'),
+        'type': args.get('type'),
+        'template_amount': args.get('amount'),
+        'category': args.get('category'),
+        'subcategory': args.get('subcategory'),
+        'account': args.get('account'),
+        'project': args.get('project'),
+        'member': args.get('member'),
+        'merchant': args.get('merchant'),
+        'note': args.get('note'),
+    }
+    stdout, stderr, code = run_ledger_api('template_update', **kwargs)
+    return format_output(stdout, stderr, code)
+
+
+def cmd_template_delete(args):
+    stdout, stderr, code = run_ledger_api('template_delete', template_id=args.get('id'))
+    return format_output(stdout, stderr, code)
+
+
+def cmd_template_apply(args):
+    kwargs = {
+        'template_id': args.get('id'),
+        'template_amount': args.get('amount'),
+    }
+    stdout, stderr, code = run_ledger_api('template_apply', **kwargs)
+    return format_output(stdout, stderr, code)
+
+
+def cmd_template_suggest(args):
+    kwargs = {'template_limit': args.get('limit', 5)}
+    stdout, stderr, code = run_ledger_api('template_suggest', **kwargs)
+    return format_output(stdout, stderr, code)
+
+
 def cmd_export(args):
     kwargs = {
         'output': args.get('output'),
@@ -276,6 +364,11 @@ def cmd_categories(args):
 
 def cmd_members(args):
     stdout, stderr, code = run_ledger_api('members')
+    return format_output(stdout, stderr, code)
+
+
+def cmd_schema(args):
+    stdout, stderr, code = run_ledger_api('schema')
     return format_output(stdout, stderr, code)
 
 
@@ -308,10 +401,17 @@ COMMANDS = {
     'budget_template_delete': cmd_budget_template_delete,
     'budget_template_apply': cmd_budget_template_apply,
     'budget_template_suggest': cmd_budget_template_suggest,
+    'template_create': cmd_template_create,
+    'template_list': cmd_template_list,
+    'template_update': cmd_template_update,
+    'template_delete': cmd_template_delete,
+    'template_apply': cmd_template_apply,
+    'template_suggest': cmd_template_suggest,
     'export': cmd_export,
     'accounts': cmd_accounts,
     'categories': cmd_categories,
     'members': cmd_members,
+    'schema': cmd_schema,
     'import': cmd_import,
     'reconcile': cmd_reconcile,
 }

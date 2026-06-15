@@ -39,5 +39,5 @@ Thumbs.db
 .reasonix/
 reasonix.toml
 
-# 部署目录（单独管理）
-docker-ledger/
+# 部署目录（构建产物，不纳入版本管理）
+deploy/

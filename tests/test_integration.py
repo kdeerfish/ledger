@@ -18,8 +18,8 @@ class TestEndToEnd:
     def test_full_workflow(self, temp_db):
         """完整记账流程：添加→查询→修改→删除→恢复→汇总"""
         # 1. 添加收支
-        tx_module.add_transaction("expense", 100.0, "食品", "零食", "微信", "", "本人", "", "零食", "2026-06-15")
-        tx_module.add_transaction("income", 5000.0, "工资", "", "银行", "", "本人", "", "工资", "2026-06-10")
+        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "零食", "2026-06-15")
+        tx_module.add_transaction("收入", 5000.0, "工资", "", "银行", "", "本人", "", "工资", "2026-06-10")
 
         # 2. 查询
         conn = sqlite3.connect(temp_db)
@@ -58,14 +58,14 @@ class TestEndToEnd:
         c.execute("SELECT type, SUM(amount) FROM transactions WHERE is_deleted=0 GROUP BY type")
         data = {r[0]: r[1] for r in c.fetchall()}
         conn.close()
-        assert data.get("expense") == 150.0
-        assert data.get("income") == 5000.0
+        assert data.get("支出") == 150.0
+        assert data.get("收入") == 5000.0
 
     def test_budget_with_transactions(self, temp_db):
         """设置预算 → 添加支出 → 检查预算使用情况"""
         budget_module.set_budget("食品", 1000.0, 2026, 6)
-        tx_module.add_transaction("expense", 300.0, "食品", "", "", "", "", "", "", "2026-06-15")
-        tx_module.add_transaction("expense", 200.0, "食品", "", "", "", "", "", "", "2026-06-16")
+        tx_module.add_transaction("支出", 300.0, "食品", "", "", "", "", "", "", "2026-06-15")
+        tx_module.add_transaction("支出", 200.0, "食品", "", "", "", "", "", "", "2026-06-16")
 
         conn = sqlite3.connect(temp_db)
         c = conn.cursor()
@@ -85,8 +85,8 @@ class TestEndToEnd:
         budget_module.set_budget("餐饮", 2000.0, 2026, 6, dimension_type="account", dimension_value="家庭卡")
         budget_module.set_budget("餐饮", 1000.0, 2026, 6, dimension_type="member", dimension_value="本人")
 
-        tx_module.add_transaction("expense", 50.0, "餐饮", "", "家庭卡", "", "本人", "", "买菜", "2026-06-10")
-        tx_module.add_transaction("expense", 30.0, "餐饮", "", "家庭卡", "", "fish", "", "买菜", "2026-06-11")
+        tx_module.add_transaction("支出", 50.0, "餐饮", "", "家庭卡", "", "本人", "", "买菜", "2026-06-10")
+        tx_module.add_transaction("支出", 30.0, "餐饮", "", "家庭卡", "", "fish", "", "买菜", "2026-06-11")
 
         # 按账户维度检查：家庭卡支出共80
         spent_account = budget_module._get_budget_spent("餐饮", 2026, 6, "account", "家庭卡")

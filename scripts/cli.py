@@ -10,6 +10,12 @@ import sys
 import argparse
 from datetime import datetime
 
+# 强制 UTF-8 输出（修复 Windows 编码问题）
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    os.environ['PYTHONUTF8'] = '1'
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ledger_modules.db as db_module
@@ -44,7 +50,7 @@ def cmd_add(args):
     tx_module.add_transaction(
         args.type, args.amount, args.category, args.subcategory,
         args.account, args.project, args.member, args.merchant,
-        args.note, args.date,
+        args.note, args.date, args.confirm,
     )
 
 
@@ -185,6 +191,121 @@ def cmd_budget_template_suggest(args):
         )
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 通用记录模板命令
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def cmd_template_create(args):
+    if not args.template_name:
+        print("❌ template_create 需要 --template_name")
+        return
+    _sync_db_path()
+    template_id = budget_module.create_record_template(
+        args.template_name,
+        args.template_type or '通用',
+        args.type,
+        args.template_amount or 0.0,
+        args.category,
+        args.subcategory,
+        args.account,
+        args.project,
+        args.member,
+        args.merchant,
+        args.note,
+        args.template_description or '',
+    )
+    print(f"✅ 已创建模板 ID={template_id}")
+
+
+def cmd_template_list(args):
+    _sync_db_path()
+    templates = budget_module.list_record_templates(args.template_type)
+    if not templates:
+        print("暂无模板")
+        return
+    for item in templates:
+        type_str = f" | 类型={item['type']}" if item['type'] else ""
+        amount_str = f" | 金额={item['amount']:.2f}" if item['amount'] else ""
+        usage_str = f" | 已用{item['usage_count']}次" if item['usage_count'] else ""
+        print(f"{item['id']}: {item['name']} | {item['template_type']}{type_str}{amount_str}{usage_str}")
+
+
+def cmd_template_update(args):
+    if not args.template_id:
+        print("❌ template_update 需要 --template_id")
+        return
+    _sync_db_path()
+    kwargs = {}
+    field_map = {
+        "template_name": "name",
+        "template_description": "description",
+        "template_type": "template_type",
+        "type": "type",
+        "template_amount": "amount",
+        "category": "category",
+        "subcategory": "subcategory",
+        "account": "account",
+        "project": "project",
+        "member": "member",
+        "merchant": "merchant",
+        "note": "note",
+    }
+    for k, v in field_map.items():
+        val = getattr(args, k, None)
+        if val is not None:
+            kwargs[v] = val
+    
+    success = budget_module.update_record_template(args.template_id, **kwargs)
+    print("✅ 已更新模板" if success else "❌ 未找到模板")
+
+
+def cmd_template_delete(args):
+    if not args.template_id:
+        print("❌ template_delete 需要 --template_id")
+        return
+    _sync_db_path()
+    success = budget_module.delete_record_template(args.template_id)
+    print("✅ 已删除模板" if success else "❌ 未找到模板")
+
+
+def cmd_template_apply(args):
+    if not args.template_id:
+        print("❌ template_apply 需要 --template_id")
+        return
+    _sync_db_path()
+    template = budget_module.apply_record_template(args.template_id, args.template_amount)
+    if not template:
+        print("❌ 未找到模板")
+        return
+    
+    # 输出模板信息，供调用方使用
+    print(f"📋 模板 '{template['name']}' 已加载:")
+    print(f"  类型: {template['template_type']}")
+    if template['type']:
+        print(f"  交易类型: {template['type']}")
+    if template['amount']:
+        print(f"  金额: {template['amount']:.2f}")
+    if template['category']:
+        print(f"  类别: {template['category']}")
+    if template['account']:
+        print(f"  账户: {template['account']}")
+    if template['member']:
+        print(f"  成员: {template['member']}")
+    if template['merchant']:
+        print(f"  商家: {template['merchant']}")
+    if template['note']:
+        print(f"  备注: {template['note']}")
+
+
+def cmd_template_suggest(args):
+    _sync_db_path()
+    for item in budget_module.suggest_record_templates(args.template_limit):
+        type_str = f" | 类型={item['type']}" if item['type'] else ""
+        amount_str = f" | 均额={item['amount']:.2f}" if item['amount'] else ""
+        print(f"建议: {item['name']} | {item['template_type']}{type_str}{amount_str}")
+
+
 def cmd_import_csv(args):
     if not args.file:
         print("❌ import_csv 需要 --file")
@@ -241,6 +362,17 @@ def cmd_members(args):
     tx_module.list_members()
 
 
+def cmd_schema(args):
+    """输出 schema.json 的内容"""
+    schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'schema.json')
+    if not os.path.exists(schema_path):
+        print(f"❌ schema 文件不存在: {schema_path}")
+        return
+    with open(schema_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    print(content)
+
+
 # ── 主入口 ─────────────────────────────────────────
 
 
@@ -253,13 +385,15 @@ def main():
         "budget_template_create", "budget_template_list",
         "budget_template_update", "budget_template_delete", "budget_template_apply",
         "budget_template_suggest",
+        "template_create", "template_list", "template_update", "template_delete",
+        "template_apply", "template_suggest",
         "import_csv", "reconcile_guide",
         "search", "filter", "export", "stats",
-        "accounts", "categories", "members",
+        "accounts", "categories", "members", "schema",
     ])
 
     # ── 交易参数 ──
-    parser.add_argument("--type", choices=["expense", "income"])
+    parser.add_argument("--type", choices=["支出", "收入"])
     parser.add_argument("--amount", type=float)
     parser.add_argument("--category")
     parser.add_argument("--subcategory")
@@ -295,6 +429,7 @@ def main():
     parser.add_argument("--template_name")
     parser.add_argument("--template_description")
     parser.add_argument("--template_amount", type=float)
+    parser.add_argument("--template_type")
     parser.add_argument("--template_limit", type=int, default=3)
 
     args = parser.parse_args()
@@ -322,6 +457,12 @@ def main():
         "budget_template_delete": cmd_budget_template_delete,
         "budget_template_apply": cmd_budget_template_apply,
         "budget_template_suggest": cmd_budget_template_suggest,
+        "template_create": cmd_template_create,
+        "template_list": cmd_template_list,
+        "template_update": cmd_template_update,
+        "template_delete": cmd_template_delete,
+        "template_apply": cmd_template_apply,
+        "template_suggest": cmd_template_suggest,
         "import_csv": cmd_import_csv,
         "reconcile_guide": cmd_reconcile,
         "search": cmd_search,
@@ -331,6 +472,7 @@ def main():
         "accounts": cmd_accounts,
         "categories": cmd_categories,
         "members": cmd_members,
+        "schema": cmd_schema,
     }
     dispatch[args.action](args)
 

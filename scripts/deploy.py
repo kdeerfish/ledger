@@ -27,19 +27,20 @@ def log(msg, color="white"):
 
 
 def clean_deploy():
-    """清理 deploy 目录，保留 DEPLOY.md"""
+    """清理 deploy 目录"""
     log("[1/4] 清理 deploy 目录...", "yellow")
     if not DEPLOY.exists():
         DEPLOY.mkdir(parents=True)
-        log("  deploy 目录不存在，已创建", "green")
-        return
-    for item in DEPLOY.iterdir():
-        if item.name == "DEPLOY.md":
-            continue
-        if item.is_dir():
-            shutil.rmtree(item)
-        else:
-            item.unlink()
+    else:
+        for item in DEPLOY.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+    # 从项目根目录复制 DEPLOY.md
+    src_md = ROOT / "DEPLOY.md"
+    if src_md.exists():
+        shutil.copy2(src_md, DEPLOY / "DEPLOY.md")
     log("  已清理", "green")
 
 
@@ -100,7 +101,15 @@ def create_zips(svc_dir, skl_dir):
     svc_zip = DEPLOY / "ledger-service.zip"
     skl_zip = DEPLOY / "ledger-skills.zip"
 
+    # service zip 加上 DEPLOY.md 说明书
+    deploy_md = DEPLOY / "DEPLOY.md"
     make_zip(svc_dir, svc_zip)
+    if deploy_md.exists():
+        with zipfile.ZipFile(svc_zip, "a", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(deploy_md, "DEPLOY.md")
+    else:
+        log("  DEPLOY.md 不存在，跳过", "gray")
+
     make_zip(skl_dir, skl_zip)
 
     log("  已创建 zip 包", "green")

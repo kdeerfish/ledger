@@ -23,14 +23,14 @@ class TestBudgetSetCheck:
 
     def test_budget_with_spending(self, temp_db):
         budget_module.set_budget("食品", 1000.0, 2026, 6)
-        tx_module.add_transaction("expense", 300.0, "食品", "", "", "", "", "", "", "2026-06-15 10:00:00")
+        tx_module.add_transaction("支出", 300.0, "食品", "", "", "", "", "", "", "2026-06-15 10:00:00")
 
         conn = sqlite3.connect(temp_db)
         c = conn.cursor()
         c.execute("SELECT amount FROM budgets WHERE category='食品'")
         budget_amt = c.fetchone()[0]
         c.execute("""SELECT SUM(amount) FROM transactions
-                     WHERE type='expense' AND category='食品'
+                     WHERE type='支出' AND category='食品'
                      AND strftime('%Y', trans_date)='2026'
                      AND strftime('%m', trans_date)='06' AND is_deleted=0""")
         spent = c.fetchone()[0]
@@ -51,14 +51,14 @@ class TestMultiDimensionBudget:
 
     def test_budget_by_account(self, temp_db):
         budget_module.set_budget("午餐", 500.0, 2026, 6, dimension_type="account", dimension_value="xxx信用卡")
-        tx_module.add_transaction("expense", 120.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "午餐", "2026-06-10 12:00:00")
+        tx_module.add_transaction("支出", 120.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "午餐", "2026-06-10 12:00:00")
 
         conn = sqlite3.connect(temp_db)
         c = conn.cursor()
         c.execute("SELECT amount, dimension_type, dimension_value FROM budgets WHERE category='午餐'")
         row = c.fetchone()
         c.execute("""SELECT SUM(amount) FROM transactions
-                     WHERE type='expense' AND account='xxx信用卡'
+                     WHERE type='支出' AND account='xxx信用卡'
                      AND strftime('%Y', trans_date)='2026'
                      AND strftime('%m', trans_date)='06' AND is_deleted=0""")
         spent = c.fetchone()[0]
@@ -145,8 +145,8 @@ class TestBudgetTemplates:
 
     def test_suggest_templates(self, temp_db):
         """基于历史交易自动生成模板建议"""
-        tx_module.add_transaction("expense", 20.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "午饭", "2026-06-10 12:00:00")
-        tx_module.add_transaction("expense", 22.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "晚饭", "2026-06-11 19:00:00")
+        tx_module.add_transaction("支出", 20.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "午饭", "2026-06-10 12:00:00")
+        tx_module.add_transaction("支出", 22.0, "餐饮", "", "xxx信用卡", "个人项目", "本人", "", "晚饭", "2026-06-11 19:00:00")
 
         suggestions = budget_module.suggest_budget_templates(limit=3)
         assert len(suggestions) >= 1
