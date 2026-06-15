@@ -8,12 +8,11 @@ __pycache__/
 dist/
 build/
 
-# 测试文件
-test_*.py
-run_tests.py
+# 测试输出 / 覆盖率
 *_output.txt
 .coverage
 htmlcov/
+.coverage.*
 
 # 数据库（用户自己的数据）
 ledger.db

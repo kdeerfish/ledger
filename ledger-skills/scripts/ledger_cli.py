@@ -17,9 +17,9 @@ os.environ['PYTHONUTF8'] = '1'
 
 
 def run_ledger_api(action, **kwargs):
-    """调用 ledger_api.py"""
-    ledger_api_path = os.path.join(os.path.dirname(SCRIPT_DIR), 'ledger_api.py')
-    cmd = [sys.executable, ledger_api_path, action]
+    """调用 scripts/cli.py"""
+    cli_path = os.path.join(os.path.dirname(os.path.dirname(SCRIPT_DIR)), 'scripts', 'cli.py')
+    cmd = [sys.executable, cli_path, action]
 
     for key, value in kwargs.items():
         if value is not None and value is not False and value != '':

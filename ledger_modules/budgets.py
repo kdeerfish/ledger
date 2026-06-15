@@ -59,8 +59,8 @@ def check_budget(year=None, month=None):
         print(f"{category}{suffix}: 预算 {budget_amount:.2f}, 已用 {spent:.2f}, 剩余 {remain:.2f}")
 
 
-def create_budget_template(name, description='', category=None, amount=0.0, dimension_type='category', dimension_value=None,
-                           account=None, project=None, member=None, merchant=None, note=None, year=None, month=None):
+def create_budget_template(name, description='', dimension_type='category', dimension_value=None, amount=0.0,
+                           category=None, account=None, project=None, member=None, merchant=None, note=None, year=None, month=None):
     if year is None:
         year = datetime.now().year
     if month is None:
@@ -154,10 +154,15 @@ def apply_budget_template(template_id, year=None, month=None):
     if not row:
         return None
     name, category, amount, dimension_type, dimension_value = row
-    set_budget(category or name, amount or 0.0, year, month,
+    # When dimension_type is 'category', use dimension_value as the budget category
+    if dimension_type == 'category' and dimension_value:
+        budget_category = dimension_value
+    else:
+        budget_category = category or name
+    set_budget(budget_category, amount or 0.0, year, month,
                dimension_type=dimension_type or 'category',
                dimension_value=dimension_value or None)
-    return {'category': category or name, 'amount': amount, 'dimension_type': dimension_type or 'category', 'dimension_value': dimension_value}
+    return {'category': budget_category, 'amount': amount, 'dimension_type': dimension_type or 'category', 'dimension_value': dimension_value}
 
 
 def suggest_budget_templates(limit=3):
