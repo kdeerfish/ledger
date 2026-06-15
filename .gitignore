@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 测试文件
+test_*.py
+run_tests.py
+*_output.txt
+.coverage
+htmlcov/
+
+# 数据库（用户自己的数据）
+ledger.db
+
+# 临时文件
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# 部署目录（单独管理）
+docker-ledger/
