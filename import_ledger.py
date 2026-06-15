@@ -33,29 +33,55 @@ def init_db():
         is_deleted INTEGER DEFAULT 0
     )''')
 
-    # 2. 账户表
-    c.execute('''CREATE TABLE IF NOT EXISTS accounts (
-        name TEXT PRIMARY KEY
-    )''')
+    # 2. 预算表
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'")
+    budgets_exists = c.fetchone() is not None
+    if not budgets_exists:
+        c.execute('''CREATE TABLE budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT,
+            year INTEGER,
+            month INTEGER,
+            amount REAL,
+            dimension_type TEXT DEFAULT 'category',
+            dimension_value TEXT,
+            UNIQUE(category, year, month, dimension_type, dimension_value)
+        )''')
+    else:
+        c.execute("PRAGMA table_info(budgets)")
+        columns = [row[1] for row in c.fetchall()]
+        if 'dimension_type' not in columns or 'dimension_value' not in columns:
+            c.execute('ALTER TABLE budgets RENAME TO budgets_old')
+            c.execute('''CREATE TABLE budgets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT,
+                year INTEGER,
+                month INTEGER,
+                amount REAL,
+                dimension_type TEXT DEFAULT 'category',
+                dimension_value TEXT,
+                UNIQUE(category, year, month, dimension_type, dimension_value)
+            )''')
+            c.execute("""INSERT INTO budgets (id, category, year, month, amount, dimension_type, dimension_value)
+                         SELECT id, category, year, month, amount, 'category', NULL FROM budgets_old""")
+            c.execute('DROP TABLE budgets_old')
 
-    # 3. 成员表
-    c.execute('''CREATE TABLE IF NOT EXISTS members (
-        name TEXT PRIMARY KEY
-    )''')
-
-    # 4. 项目表
-    c.execute('''CREATE TABLE IF NOT EXISTS projects (
-        name TEXT PRIMARY KEY
-    )''')
-
-    # 5. 预算表
-    c.execute('''CREATE TABLE IF NOT EXISTS budgets (
+    c.execute('''CREATE TABLE IF NOT EXISTS budget_templates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
         category TEXT,
+        amount REAL DEFAULT 0,
+        dimension_type TEXT DEFAULT 'category',
+        dimension_value TEXT,
+        account TEXT,
+        project TEXT,
+        member TEXT,
+        merchant TEXT,
+        note TEXT,
         year INTEGER,
         month INTEGER,
-        amount REAL,
-        UNIQUE(category, year, month)
+        created_at TEXT NOT NULL
     )''')
 
     # 迁移：如果 transactions 表缺少 is_deleted 列，添加它
@@ -151,16 +177,6 @@ def import_csv(csv_file):
                 (type, amount, category, subcategory, account, project, member, merchant, note, trans_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
-
-            # 6. 自动记录账户（去重）
-            if account:
-                c.execute('INSERT OR IGNORE INTO accounts (name) VALUES (?)', (account,))
-            # 7. 自动记录成员
-            if member:
-                c.execute('INSERT OR IGNORE INTO members (name) VALUES (?)', (member,))
-            # 8. 自动记录项目
-            if project:
-                c.execute('INSERT OR IGNORE INTO projects (name) VALUES (?)', (project,))
 
             imported += 1
 
