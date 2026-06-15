@@ -63,6 +63,11 @@ import:
 install:
 	pip install -e ".[dev,lint]"
 
+# ─── Deploy ────────────────────────────────────────
+.PHONY: deploy
+deploy:
+	$(PYTHON) scripts/deploy.py
+
 # ─── Help ───────────────────────────────────────────────
 .PHONY: help
 help:
@@ -80,4 +85,5 @@ help:
 	@Write-Host "make install     安装开发依赖"
 	@Write-Host "make cli         CLI 入口: make cli list"
 	@Write-Host "make import      导入CSV: make import data.csv"
+	@Write-Host "make deploy      打包发布到 deploy/"
 	@Write-Host "═══════════════════════════════════════"
