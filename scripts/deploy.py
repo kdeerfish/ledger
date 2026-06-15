@@ -71,15 +71,28 @@ def copy_skills():
     skl = DEPLOY / "ledger-skills"
     skl.mkdir(parents=True, exist_ok=True)
 
+    # 源路径：skills/ledger/
+    src = ROOT / "skills" / "ledger"
+
     # 复制 scripts
     scripts_dir = skl / "scripts"
     scripts_dir.mkdir(exist_ok=True)
-    shutil.copy2(ROOT / "ledger-skills" / "scripts" / "ledger_cli.py",
+    shutil.copy2(src / "scripts" / "ledger_cli.py",
                  scripts_dir / "ledger_cli.py")
 
-    # 复制配置文件
-    shutil.copy2(ROOT / "ledger-skills" / ".env.example", skl / ".env.example")
-    shutil.copy2(ROOT / "ledger-skills" / "SKILL.md", skl / "SKILL.md")
+    # 复制 SKILL.md 和配置文件
+    shutil.copy2(src / ".env.example", skl / ".env.example")
+    shutil.copy2(src / "SKILL.md", skl / "SKILL.md")
+
+    # 复制 references/（agent 参考文档）
+    refs_src = src / "references"
+    if refs_src.exists():
+        shutil.copytree(refs_src, skl / "references")
+
+    # 复制 examples/（对话示例）
+    ex_src = src / "examples"
+    if ex_src.exists():
+        shutil.copytree(ex_src, skl / "examples")
 
     log("  ledger-skills 准备完成", "green")
     return skl

@@ -34,10 +34,10 @@ ROOT = Path(__file__).resolve().parent.parent
 DEPLOY = ROOT / "deploy"
 
 # Gitea 配置（可通过环境变量覆盖）
-# 格式: http://192.168.31.126:8818
-GITEA_URL = __import__("os").environ.get("GITEA_URL", "http://192.168.31.126:8818")
+# 格式: http://your-nas-ip:8818
+GITEA_URL = __import__("os").environ.get("GITEA_URL", "http://your-nas-ip:8818")
 GITEA_TOKEN = __import__("os").environ.get("GITEA_TOKEN", "")
-REPO_OWNER = "zouzhenglu"
+REPO_OWNER = __import__("os").environ.get("GITEA_REPO_OWNER", "your-username")
 REPO_NAME = "ledger"
 
 

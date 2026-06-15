@@ -362,17 +362,6 @@ def cmd_members(args):
     tx_module.list_members()
 
 
-def cmd_schema(args):
-    """输出 schema.json 的内容"""
-    schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'schema.json')
-    if not os.path.exists(schema_path):
-        print(f"❌ schema 文件不存在: {schema_path}")
-        return
-    with open(schema_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    print(content)
-
-
 def cmd_analyze(args):
     """分析用户数据，输出结构化摘要供 agent 学习"""
     _sync_db_path()
@@ -395,7 +384,7 @@ def main():
         "template_apply", "template_suggest",
         "import_csv", "reconcile_guide",
         "search", "filter", "export", "stats",
-        "accounts", "categories", "members", "schema", "analyze",
+        "accounts", "categories", "members", "analyze",
     ])
 
     # ── 交易参数 ──
@@ -478,7 +467,6 @@ def main():
         "accounts": cmd_accounts,
         "categories": cmd_categories,
         "members": cmd_members,
-        "schema": cmd_schema,
         "analyze": cmd_analyze,
     }
     dispatch[args.action](args)

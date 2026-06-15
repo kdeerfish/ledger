@@ -82,12 +82,3 @@ python3 scripts/ledger_cli.py reconcile '{}'
 
 ---
 
-### 场景五：查看字段定义
-
-**用户说**：
-> 看看有哪些字段和类别可以用
-
-**Agent 执行**：
-```bash
-python3 scripts/ledger_cli.py schema '{}'
-```

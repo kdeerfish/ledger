@@ -92,3 +92,23 @@ python3 scripts/ledger_cli.py search '{"keyword":"拼多多","search_type":"merc
 python3 scripts/ledger_cli.py filter '{"category":"食品酒水","start_date":"2026-06-01","end_date":"2026-06-30"}'
 python3 scripts/ledger_cli.py stats '{"year":2026,"month":6,"group_by":"category"}'
 ```
+
+### 场景七：查看最近的记录
+
+**用户说**：
+> 看看最近记的账
+
+**Agent 执行**：
+```bash
+python3 scripts/ledger_cli.py list '{"limit":10}'
+```
+
+**输出示例**：
+```
+ID:890  2026/06/15  支出   6.80  食品酒水/零食    储蓄卡  拼多多
+ID:889  2026/06/15  支出  20.00  行车交通/打车租车  微信零钱  滴滴
+ID:888  2026/06/14  收入  5000.00  职业收入      招商银行
+...
+```
+
+> 💡 还有 `accounts`、`categories`、`members` 命令用于查看元数据列表，用法类似无参数即可。

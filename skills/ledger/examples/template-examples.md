@@ -122,3 +122,18 @@ python3 scripts/ledger_cli.py template_update '{"id":1,"amount":8}'
 
 **Agent 回复**：
 > ✅ 已更新模板"零食"：金额 6 → 8 元
+
+---
+
+### 场景八：删除模板
+
+**用户说**：
+> 把零食模板删掉，不用了
+
+**Agent 执行**：
+```bash
+python3 scripts/ledger_cli.py template_delete '{"id":1}'
+```
+
+**Agent 回复**：
+> ✅ 已删除模板"零食"

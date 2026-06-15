@@ -65,7 +65,7 @@ def sample_db(temp_db):
     tx_module.add_transaction("expense", 100.0, "食品", "零食", "微信", "项目A", "本人", "拼多多", "零食", "2026-06-15 10:00:00")
     tx_module.add_transaction("expense", 200.0, "交通", "打车", "支付宝", "项目A", "本人", "滴滴", "打车", "2026-06-14 14:30:00")
     tx_module.add_transaction("income", 5000.0, "工资", "", "银行", "", "本人", "", "6月工资", "2026-06-10 09:00:00")
-    tx_module.add_transaction("expense", 30.0, "食品", "水果", "微信", "", "fish", "水果店", "水果", "2026-06-12 18:00:00")
+    tx_module.add_transaction("expense", 30.0, "食品", "水果", "微信", "", "成员A", "水果店", "水果", "2026-06-12 18:00:00")
     tx_module.add_transaction("expense", 150.0, "餐饮", "午餐", "xxx信用卡", "个人项目", "本人", "食堂", "午餐", "2026-06-13 12:00:00")
     return temp_db
 

@@ -33,11 +33,13 @@ version: 1.3.0
 | `references/modify.md` | 修改命令 (update/delete/restore) | 修改、删除记录时 |
 | `references/budget.md` | 预算命令 (budget_set/budget_check/budget_template_*) | 设置、查看预算时 |
 | `references/template.md` | 通用记录模板 (template_*) | 使用模板快速记账时 |
-| `references/data.md` | 数据命令 (import/export/schema/analyze) | 导入、导出、分析数据时 |
+| `references/data.md` | 数据命令 (import/export/analyze) | 导入、导出、分析数据时 |
 | `references/field-guide.md` | 字段用途说明、场景示例 | 不确定字段怎么填时 |
 
 > 💡 每个参考文档都有对应的日常操作示例，见 `examples/` 目录下同名 `-examples` 文件。
 > 例如：读取 `references/basic.md` 时，同时看 `examples/basic-examples.md` 了解真实场景。
+> 
+> 完整流程示例见 `examples/import-workflow.md`（导入）和 `examples/learn-workflow.md`（学习）。
 
 ## 核心工作流程
 

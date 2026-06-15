@@ -203,47 +203,6 @@ class TestRecordTemplate:
         assert "食品" in categories
 
 
-class TestSchema:
-    """Schema 测试"""
-
-    def test_schema_file_exists(self):
-        """schema.json 文件存在"""
-        schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'schema.json')
-        assert os.path.exists(schema_path)
-
-    def test_schema_valid_json(self):
-        """schema.json 是有效的 JSON"""
-        schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'schema.json')
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            schema = json.load(f)
-        assert 'transactions' in schema
-        assert 'record_templates' in schema
-        assert 'commands' in schema
-
-    def test_schema_has_required_fields(self):
-        """schema 包含必要字段定义"""
-        schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'schema.json')
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            schema = json.load(f)
-        
-        # 检查 transactions 表字段
-        tx_fields = schema['transactions']['fields']
-        assert 'type' in tx_fields
-        assert 'amount' in tx_fields
-        assert 'category' in tx_fields
-        
-        # 检查 type 字段的合法值
-        type_values = tx_fields['type']['values']
-        assert '收入' in type_values
-        assert '支出' in type_values
-        
-        # 检查 analyze 命令
-        assert 'analyze' in schema['commands']
-        
-        # 检查 field_guide
-        assert 'field_guide' in schema
-
-
 class TestAnalyze:
     """analyze 数据分析测试"""
 

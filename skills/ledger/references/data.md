@@ -41,12 +41,6 @@ python3 scripts/ledger_cli.py export '{"output":"report.csv","format":"csv","sta
 - `start_date`: 开始日期 - 可选
 - `end_date`: 结束日期 - 可选
 
-## 字段定义查询 (schema)
-
-```bash
-python3 scripts/ledger_cli.py schema '{}'
-```
-
 ## 数据分析 (analyze)
 
 ```bash

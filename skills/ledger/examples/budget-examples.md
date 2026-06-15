@@ -79,3 +79,33 @@ python3 scripts/ledger_cli.py budget_template_apply '{"id":2,"year":2026,"month"
 
 **Agent 回复**：
 > ✅ 已为7月套用"吃饭模板"：信用卡餐饮预算 400 元
+
+---
+
+### 场景五：创建预算模板
+
+**用户说**：
+> 创建一个吃饭预算模板，餐饮每个月400
+
+**Agent 执行**：
+```bash
+python3 scripts/ledger_cli.py budget_template_create '{"name":"吃饭模板","description":"日常吃饭","category":"餐饮","amount":400,"dimension_type":"account","dimension_value":"信用卡"}'
+```
+
+**Agent 回复**：
+> ✅ 已创建预算模板"吃饭模板"：信用卡餐饮 400 元/月
+
+---
+
+### 场景六：删除预算模板
+
+**用户说**：
+> 把吃饭模板删掉
+
+**Agent 执行**：
+```bash
+python3 scripts/ledger_cli.py budget_template_delete '{"id":1}'
+```
+
+**Agent 回复**：
+> ✅ 已删除预算模板 ID:1

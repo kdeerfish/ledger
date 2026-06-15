@@ -46,7 +46,7 @@ cp .env.example .env
 
 ```bash
 # 测试添加
-python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py add '{"type":"expense","amount":25.5,"category":"食品酒水","account":"微信","note":"测试"}'
+python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py add '{"type":"支出","amount":25.5,"category":"食品酒水","account":"微信零钱","note":"测试"}'
 
 # 测试查询
 python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py list '{"limit":5}'
@@ -116,8 +116,24 @@ EOF
 ~/.picoclaw/skills/ledger/
 ├── .env                    # 指向服务路径
 ├── SKILL.md
-└── scripts/
-    └── ledger_cli.py
+├── scripts/
+│   └── ledger_cli.py
+├── references/             # 命令参考文档
+│   ├── basic.md
+│   ├── budget.md
+│   ├── data.md
+│   ├── field-guide.md
+│   ├── modify.md
+│   └── template.md
+└── examples/               # 日常操作示例
+    ├── basic-examples.md
+    ├── budget-examples.md
+    ├── data-examples.md
+    ├── field-guide-examples.md
+    ├── import-workflow.md
+    ├── learn-workflow.md
+    ├── modify-examples.md
+    └── template-examples.md
 ```
 
 ---

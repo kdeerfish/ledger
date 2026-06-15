@@ -107,8 +107,3 @@ python3 scripts/ledger_cli.py template_list '{}'
 python3 scripts/ledger_cli.py template_suggest '{"limit":5}'
 ```
 
-### 用户说"我想查看字段定义"
-```bash
-python3 scripts/ledger_cli.py schema '{}'
-```
-
