@@ -2,7 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-from .config import get_db_path, load_config
+from .config import get_db_path
 
 # 从配置文件获取数据库路径
 DB_PATH = get_db_path()

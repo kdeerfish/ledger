@@ -1,96 +1,69 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-配置管理模块 - 统一管理所有配置项
+配置管理模块 - 从环境变量和 .env 文件加载配置
+优先级：系统环境变量 > .env 文件 > 默认值
 """
 
 import os
-import json
 
 # 项目根目录（自动检测）
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 配置文件路径
-CONFIG_FILE = os.path.join(ROOT_DIR, 'config.json')
+# .env 文件路径
+ENV_FILE = os.path.join(ROOT_DIR, '.env')
 
 
-def load_config():
-    """加载配置文件"""
-    if not os.path.exists(CONFIG_FILE):
-        return get_default_config()
+def load_env_file():
+    """加载 .env 文件到 os.environ（如果存在）"""
+    if not os.path.exists(ENV_FILE):
+        return
     
     try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        return config
-    except Exception as e:
-        print(f"⚠️ 加载配置文件失败: {e}，使用默认配置")
-        return get_default_config()
+        with open(ENV_FILE, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # 跳过空行和注释
+                if not line or line.startswith('#'):
+                    continue
+                # 解析 KEY=VALUE
+                if '=' in line:
+                    key, _, value = line.partition('=')
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    # 只在环境变量不存在时设置
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+    except Exception:
+        pass  # .env 文件加载失败静默处理
 
 
-def get_default_config():
-    """获取默认配置"""
-    return {
-        "database": {
-            "name": "ledger.db"
-        },
-        "defaults": {
-            "currency": "CNY",
-            "language": "zh",
-            "date_format": "%Y-%m-%d %H:%M:%S"
-        },
-        "categories": {
-            "expense": [
-                "食品酒水", "居家物业", "行车交通", "服饰饰品",
-                "医疗保健", "休闲娱乐", "交流通讯", "学习进修",
-                "人情往来", "其他杂项", "金融保险", "自由职业",
-                "外贸电商", "项目投入"
-            ],
-            "income": [
-                "职业收入", "其他收入"
-            ]
-        },
-        "members": ["本人", "fish", "妈妈", "家庭公用"]
-    }
-
-
-def get_db_path():
-    """获取数据库路径（相对于项目根目录）"""
-    config = load_config()
-    db_name = config.get('database', {}).get('name', 'ledger.db')
-    return os.path.join(ROOT_DIR, db_name)
-
-
-def get_root_dir():
-    """获取项目根目录"""
+def get_ledger_path():
+    """获取 ledger 项目根目录"""
+    load_env_file()
+    path = os.environ.get('LEDGER_PATH', '').strip()
+    if path and os.path.isdir(path):
+        return path
     return ROOT_DIR
 
 
-def get_config():
-    """获取完整配置"""
-    return load_config()
-
-
-def get_categories(category_type=None):
-    """获取类别列表"""
-    config = load_config()
-    categories = config.get('categories', {})
-    if category_type:
-        return categories.get(category_type, [])
-    return categories
-
-
-def get_members():
-    """获取成员列表"""
-    config = load_config()
-    return config.get('members', [])
-
-
-def get_defaults():
-    """获取默认设置"""
-    config = load_config()
-    return config.get('defaults', {})
+def get_db_path():
+    """获取数据库路径"""
+    load_env_file()
+    db_path = os.environ.get('LEDGER_DB_PATH', '').strip()
+    if db_path:
+        # 如果是相对路径，基于项目根目录解析
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(ROOT_DIR, db_path)
+        # 确保目录存在
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        return db_path
+    # 默认：项目根目录下的 ledger.db
+    return os.path.join(ROOT_DIR, 'ledger.db')
 
 
 # 兼容旧代码：导出 DB_PATH
 DB_PATH = get_db_path()
+

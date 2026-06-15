@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import ledger_modules.db as db_module
 import ledger_modules.transactions as tx_module
 import ledger_modules.budgets as budget_module
-from ledger_modules.config import get_db_path, load_config, get_categories, get_members
+from ledger_modules.config import get_db_path
 
 # ── 数据库路径（从配置文件获取）──
 DB_PATH = get_db_path()

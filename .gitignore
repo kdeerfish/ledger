@@ -24,6 +24,9 @@ ledger.db
 # 个人隐私数据
 data/sample/*.csv
 
+# 环境变量配置
+.env
+
 # 临时文件
 *.tmp
 *.bak
