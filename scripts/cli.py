@@ -373,6 +373,12 @@ def cmd_schema(args):
     print(content)
 
 
+def cmd_analyze(args):
+    """分析用户数据，输出结构化摘要供 agent 学习"""
+    _sync_db_path()
+    tx_module.analyze_data()
+
+
 # ── 主入口 ─────────────────────────────────────────
 
 
@@ -389,7 +395,7 @@ def main():
         "template_apply", "template_suggest",
         "import_csv", "reconcile_guide",
         "search", "filter", "export", "stats",
-        "accounts", "categories", "members", "schema",
+        "accounts", "categories", "members", "schema", "analyze",
     ])
 
     # ── 交易参数 ──
@@ -473,6 +479,7 @@ def main():
         "categories": cmd_categories,
         "members": cmd_members,
         "schema": cmd_schema,
+        "analyze": cmd_analyze,
     }
     dispatch[args.action](args)
 

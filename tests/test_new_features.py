@@ -236,3 +236,47 @@ class TestSchema:
         type_values = tx_fields['type']['values']
         assert '收入' in type_values
         assert '支出' in type_values
+        
+        # 检查 analyze 命令
+        assert 'analyze' in schema['commands']
+        
+        # 检查 field_guide
+        assert 'field_guide' in schema
+
+
+class TestAnalyze:
+    """analyze 数据分析测试"""
+
+    def test_analyze_empty_db(self, temp_db):
+        """空数据库的分析"""
+        result = tx_module.analyze_data()
+        assert '总览' in result
+        assert '0 笔记录' in result
+
+    def test_analyze_with_data(self, sample_db):
+        """有数据的分析"""
+        result = tx_module.analyze_data()
+        assert '总览' in result
+        assert '4128' not in result  # sample_db 只有5条记录
+        assert '账户' in result
+        assert '商家' in result
+        assert '类别' in result
+        assert '成员' in result
+        assert '字段使用率' in result
+
+    def test_analyze_cross_correlation(self, temp_db):
+        """交叉关联分析"""
+        # 添加数据
+        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "拼多多", "测试", "2026-06-15 10:00:00", force=True)
+        tx_module.add_transaction("支出", 50.0, "食品", "零食", "微信", "", "本人", "拼多多", "测试", "2026-06-15 11:00:00", force=True)
+        tx_module.add_transaction("支出", 30.0, "交通", "打车", "支付宝", "", "本人", "滴滴", "测试", "2026-06-15 12:00:00", force=True)
+        
+        result = tx_module.analyze_data()
+        assert '拼多多' in result
+        assert '微信' in result
+        assert '食品' in result
+
+    def test_analyze_returns_string(self, temp_db):
+        """analyze 返回字符串"""
+        result = tx_module.analyze_data()
+        assert isinstance(result, str)

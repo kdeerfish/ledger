@@ -17,6 +17,7 @@ from .transactions import (
     list_accounts,
     list_categories,
     list_members,
+    analyze_data,
 )
 from .budgets import (
     set_budget,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-picoclaw 调用入口 - 统一接口脚本
+agent 调用入口 - 统一接口脚本
 用法: python3 ledger_cli.py <command> [options]
 
 所有命令都会自动处理路径问题，适用于飞牛NAS环境。
@@ -17,6 +17,9 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     os.environ['PYTHONUTF8'] = '1'
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILLS_DIR = os.path.dirname(SCRIPT_DIR)  # skills/ledger 目录
 
 
 def load_env_file(env_path):
@@ -372,6 +375,11 @@ def cmd_schema(args):
     return format_output(stdout, stderr, code)
 
 
+def cmd_analyze(args):
+    stdout, stderr, code = run_ledger_api('analyze')
+    return format_output(stdout, stderr, code)
+
+
 def cmd_import(args):
     kwargs = {'file': args.get('file')}
     stdout, stderr, code = run_ledger_api('import_csv', **kwargs)
@@ -412,6 +420,7 @@ COMMANDS = {
     'categories': cmd_categories,
     'members': cmd_members,
     'schema': cmd_schema,
+    'analyze': cmd_analyze,
     'import': cmd_import,
     'reconcile': cmd_reconcile,
 }

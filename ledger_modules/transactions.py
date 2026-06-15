@@ -481,3 +481,134 @@ def list_members():
             current_member = member
             print(f"\n  {member}:")
         print(f"    - {typ}: {count}笔, {total:.2f}元")
+
+
+def analyze_data():
+    """
+    分析数据库中的用户数据，输出结构化摘要供 agent 学习。
+    使用交叉聚合查询，让 agent 学到字段间的关系。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    output = []
+    output.append("═══════════════════════════════════════════════════")
+    output.append("📊 用户数据分析报告（供 agent 学习用）")
+    output.append("═══════════════════════════════════════════════════")
+    
+    # 1. 基本统计
+    c.execute("SELECT COUNT(*), SUM(amount) FROM transactions WHERE is_deleted=0")
+    total_count, total_amount = c.fetchone()
+    output.append(f"\n【总览】共 {total_count or 0} 笔记录，总金额 {total_amount or 0:.2f} 元")
+    
+    # 2. 按类型统计
+    c.execute("SELECT type, COUNT(*), SUM(amount) FROM transactions WHERE is_deleted=0 GROUP BY type")
+    rows = c.fetchall()
+    output.append("\n【收支类型】")
+    for typ, count, amount in rows:
+        output.append(f"  {typ}: {count}笔 {amount:.2f}元")
+    
+    # 3. 账户列表（钱从哪里扣/收到哪里）
+    c.execute('''SELECT account, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 AND account != '' 
+                 GROUP BY account ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    output.append("\n【账户】（= 付款方式/资金来源，钱从哪里扣或收到哪里）")
+    for account, count, amount in rows:
+        output.append(f"  {account}: {count}笔 {amount:.2f}元")
+    
+    # 4. 商家列表（在哪里花的钱）
+    c.execute('''SELECT merchant, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 AND merchant != '' 
+                 GROUP BY merchant ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    output.append("\n【商家】（= 消费场所/平台，在哪里花的钱）")
+    for merchant, count, amount in rows:
+        output.append(f"  {merchant}: {count}笔 {amount:.2f}元")
+    
+    # 5. 类别→子类别层级
+    c.execute('''SELECT category, subcategory, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 
+                 GROUP BY category, subcategory 
+                 ORDER BY category, COUNT(*) DESC''')
+    rows = c.fetchall()
+    output.append("\n【类别→子类别】（= 花在什么类型的东西上）")
+    current_cat = None
+    for cat, subcat, count, amount in rows:
+        if cat != current_cat:
+            current_cat = cat
+            output.append(f"  {cat}:")
+        if subcat:
+            output.append(f"    - {subcat} ({count}笔 {amount:.2f}元)")
+        else:
+            output.append(f"    - [无子类别] ({count}笔 {amount:.2f}元)")
+    
+    # 6. 成员列表
+    c.execute('''SELECT member, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 AND member != '' 
+                 GROUP BY member ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    output.append("\n【成员】（= 谁花了这笔钱/谁收到这笔钱）")
+    for member, count, amount in rows:
+        output.append(f"  {member}: {count}笔 {amount:.2f}元")
+    
+    # 7. 项目列表
+    c.execute('''SELECT project, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 AND project != '' 
+                 GROUP BY project ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    output.append("\n【项目】（= 归属的长期项目/生意）")
+    for project, count, amount in rows:
+        output.append(f"  {project}: {count}笔 {amount:.2f}元")
+    
+    # 8. 交叉分析：商家→类别（判断商家该填哪里）
+    c.execute('''SELECT merchant, category, COUNT(*) 
+                 FROM transactions WHERE is_deleted=0 AND merchant != '' 
+                 GROUP BY merchant, category 
+                 HAVING COUNT(*) >= 3
+                 ORDER BY merchant, COUNT(*) DESC''')
+    rows = c.fetchall()
+    if rows:
+        output.append("\n【商家→类别关联】（商家常出现在哪些类别）")
+        current_merchant = None
+        for merchant, category, count in rows:
+            if merchant != current_merchant:
+                current_merchant = merchant
+                output.append(f"  {merchant}:")
+            output.append(f"    - {category} ({count}笔)")
+    
+    # 9. 交叉分析：账户→商家（判断账户和商家的区别）
+    c.execute('''SELECT account, merchant, COUNT(*) 
+                 FROM transactions WHERE is_deleted=0 AND account != '' AND merchant != '' 
+                 GROUP BY account, merchant 
+                 HAVING COUNT(*) >= 3
+                 ORDER BY account, COUNT(*) DESC''')
+    rows = c.fetchall()
+    if rows:
+        output.append("\n【账户→商家关联】（账户用于哪些商家的支付）")
+        current_account = None
+        for account, merchant, count in rows:
+            if account != current_account:
+                current_account = account
+                output.append(f"  {account}:")
+            output.append(f"    - {merchant} ({count}笔)")
+    
+    # 10. 字段空值率
+    c.execute("SELECT COUNT(*) FROM transactions WHERE is_deleted=0")
+    total = c.fetchone()[0] or 1
+    
+    fields_to_check = ['account', 'merchant', 'project', 'member', 'subcategory', 'note']
+    output.append("\n【字段使用率】（哪些字段经常填，哪些经常空）")
+    for field in fields_to_check:
+        c.execute(f"SELECT COUNT(*) FROM transactions WHERE is_deleted=0 AND {field} != '' AND {field} IS NOT NULL")
+        filled = c.fetchone()[0]
+        rate = filled / total * 100
+        output.append(f"  {field}: {filled}/{total} ({rate:.1f}%)")
+    
+    output.append("\n═══════════════════════════════════════════════════")
+    
+    conn.close()
+    
+    result = "\n".join(output)
+    print(result)
+    return result
