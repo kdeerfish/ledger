@@ -135,6 +135,10 @@ def import_csv(csv_file):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     total, imported, skipped = 0, 0, 0
+
+    # 先收集所有行，按日期排序后再插入（确保最早的数据 ID 最小）
+    rows_to_import = []
+
     with open(csv_file, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -176,11 +180,19 @@ def import_csv(csv_file):
             member = row.get('成员', '').strip()
             merchant = row.get('商家', '').strip()
             note = row.get('备注', '').strip()
-            c.execute('''INSERT INTO transactions
-                (type, amount, category, subcategory, account, project, member, merchant, note, trans_date, is_deleted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)''',
-                (tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
-            imported += 1
+            rows_to_import.append((tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
+
+    # 按日期升序排序（最早在前）
+    rows_to_import.sort(key=lambda x: x[9])
+
+    # 按排序后的顺序插入
+    for tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date in rows_to_import:
+        c.execute('''INSERT INTO transactions
+            (type, amount, category, subcategory, account, project, member, merchant, note, trans_date, is_deleted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)''',
+            (tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
+        imported += 1
+
     conn.commit()
     conn.close()
     print(f"✅ 导入完成: 总行 {total}, 成功 {imported}, 跳过 {skipped}")
