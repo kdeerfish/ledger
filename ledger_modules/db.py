@@ -2,7 +2,10 @@ import os
 import sqlite3
 from datetime import datetime
 
-DB_PATH = os.environ.get('LEDGER_DB_PATH', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ledger.db'))
+from .config import get_db_path, load_config
+
+# 从配置文件获取数据库路径
+DB_PATH = get_db_path()
 
 
 def init_db():

@@ -19,6 +19,7 @@ coverage.json
 
 # 数据库（用户自己的数据）
 ledger.db
+*.db
 
 # 个人隐私数据
 data/sample/*.csv

@@ -1,0 +1,43 @@
+{
+  "_comment": "Ledger 配置文件 - 所有用户可配置项都在这里",
+  "database": {
+    "name": "ledger.db",
+    "_comment_db": "数据库文件名，相对于项目根目录"
+  },
+  "defaults": {
+    "currency": "CNY",
+    "language": "zh",
+    "date_format": "%Y-%m-%d %H:%M:%S",
+    "_comment": "默认设置"
+  },
+  "categories": {
+    "expense": [
+      "食品酒水",
+      "居家物业",
+      "行车交通",
+      "服饰饰品",
+      "医疗保健",
+      "休闲娱乐",
+      "交流通讯",
+      "学习进修",
+      "人情往来",
+      "其他杂项",
+      "金融保险",
+      "自由职业",
+      "外贸电商",
+      "项目投入"
+    ],
+    "income": [
+      "职业收入",
+      "其他收入"
+    ],
+    "_comment": "收支类别定义"
+  },
+  "members": [
+    "本人",
+    "fish",
+    "妈妈",
+    "家庭公用"
+  ],
+  "_comment_members": "家庭成员列表"
+}

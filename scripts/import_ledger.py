@@ -12,11 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ledger_modules.db as db_module
 import ledger_modules.transactions as tx_module
+from ledger_modules.config import get_db_path
 
-DB_PATH = os.environ.get(
-    "LEDGER_DB_PATH",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ledger.db"),
-)
+DB_PATH = get_db_path()
 
 
 def main():
