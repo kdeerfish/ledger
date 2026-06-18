@@ -124,6 +124,27 @@ body {
 .amount-income { color: var(--success); font-weight: 600; }
 .amount-expense { color: var(--danger); font-weight: 600; }
 
+/* ── Chart containers ── */
+.chart-container {
+  position: relative;
+  width: 100%;
+  max-height: 300px;
+  min-height: 200px;
+}
+
+.chart-container canvas {
+  max-height: 300px !important;
+  min-height: 200px !important;
+}
+
+/* ── Table cell text overflow ── */
+.table-ledger td {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Stats Panel ── */
 .stats-table td {
   border: none;

@@ -103,7 +103,9 @@
           <div class="card shadow-sm">
             <div class="card-body">
               <h6 class="card-title mb-3"><i class="bi bi-bar-chart"></i> 月度趋势</h6>
-              <canvas id="trendChart" height="250"></canvas>
+              <div class="chart-container">
+                <canvas id="trendChart" class="trend-chart"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -241,7 +243,9 @@
         <div class="col-lg-6">
           <div class="card shadow-sm">
             <div class="card-body">
-              <canvas id="statsChart" height="300"></canvas>
+              <div class="chart-container">
+                <canvas id="statsChart" height="300"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -265,7 +269,7 @@
 
   <!-- ── Footer ── -->
   <div class="footer-ledger">
-    <small>Ledger v1.4.0 · 个人记账系统 · 在飞牛OS上使用</small>
+    <small>Ledger · 个人记账系统 · <span id="footerRecords">-</span> 条记录</small>
   </div>
 
   <!-- ══════════ Modals ══════════ -->
@@ -427,8 +431,15 @@
     return Number(v || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   }
 
+  function escapeHtml(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
   function truncate(s, n=15) {
-    return s && s.length > n ? s.slice(0, n) + '...' : (s || '-');
+    return s && s.length > n ? escapeHtml(s.slice(0, n)) + '...' : escapeHtml(s || '-');
   }
 
   function nowISO() {
@@ -452,6 +463,16 @@
     const t = new bootstrap.Toast(el, {delay: 3000});
     t.show();
     el.addEventListener('hidden.bs.toast', () => el.remove());
+  }
+
+  async function updateNavCount() {
+    try {
+      const info = await api('/info');
+      if (info.data) {
+        $('txCount').textContent = info.data.active_records || 0;
+        $('footerRecords').textContent = info.data.active_records || 0;
+      }
+    } catch(e) {}
   }
 
   // ── Navigation ──
@@ -557,7 +578,11 @@
       const txRes = await api('/transactions?limit=5');
       if (txRes.data) {
         renderRecentTx(txRes.data.transactions || []);
+        $('footerRecords').textContent = txRes.data.total || txRes.data.transactions.length;
       }
+
+      // Update footer & navbar record count
+      updateNavCount();
 
       // Trend chart
       loadTrendChart(year);
@@ -623,7 +648,14 @@
           maintainAspectRatio: false,
           plugins: { legend: { position: 'top' } },
           scales: {
-            y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } }
+            y: {
+              beginAtZero: true,
+              grace: '10%',
+              ticks: {
+                callback: v => '¥' + v.toLocaleString(),
+                maxTicksLimit: 8,
+              },
+            },
           },
         },
       });
@@ -749,6 +781,11 @@
 
   async function saveTransaction() {
     const id = $('txId').value;
+    const amount = parseFloat($('txAmount').value) || 0;
+    if (amount <= 0) {
+      toast('金额必须大于零', 'warning');
+      return;
+    }
     const data = {
       type: $('txType').value,
       amount: parseFloat($('txAmount').value) || 0,
@@ -795,9 +832,12 @@
         toast('添加成功');
       }
       bootstrap.Modal.getInstance($('txModal')).hide();
+      updateNavCount();
       loadTransactions();
       loadSuggestions();
-    } catch(e) {}
+    } catch(e) {
+      toast('操作失败: ' + (e.message || '请重试'), 'danger');
+    }
   }
 
   // ── Delete ──
@@ -817,6 +857,7 @@
       try {
         await api('/transactions/' + deleteTargetId, {method: 'DELETE'});
         toast('已删除（可恢复）');
+        updateNavCount();
         loadTransactions();
         loadDashboard();
       } catch(e) {}
@@ -999,7 +1040,7 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } } },
+            scales: { y: { beginAtZero: true, grace: '10%', ticks: { callback: v => '¥' + v.toLocaleString(), maxTicksLimit: 8 } } },
           },
         });
       } else {
