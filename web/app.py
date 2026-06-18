@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Ledger Web 服务 - Flask 后端 API
-在飞牛OS (FnOS) 上通过 Python3 + Flask 直接运行，无需 Docker
+Ledger Web 服务 - Flask 后端 API (v2)
+增强版：支持 Tags、Templates、多维统计、自动建议
 """
 
 import os
@@ -11,17 +11,16 @@ import json
 from datetime import datetime
 from functools import wraps
 
-# 修复 Windows GBK 编码问题（否则 print(emoji) 会崩）
+# 修复 Windows GBK 编码问题
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     os.environ['PYTHONUTF8'] = '1'
 
-# 添加项目根目录到路径
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 
 import ledger_modules.db as db_module
@@ -29,15 +28,11 @@ import ledger_modules.transactions as tx_module
 import ledger_modules.budgets as budget_module
 from ledger_modules.config import get_db_path, load_env_file
 
-# 加载 .env 配置
 load_env_file()
-
-# 数据库路径
 DB_PATH = get_db_path()
 
 
 def sync_db_path():
-    """确保所有模块使用同一数据库路径"""
     db_module.DB_PATH = DB_PATH
     tx_module.DB_PATH = DB_PATH
     budget_module.DB_PATH = DB_PATH
@@ -46,25 +41,21 @@ def sync_db_path():
 sync_db_path()
 db_module.init_db()
 
-# 创建 Flask 应用
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 
-# CORS 安全配置：默认只允许同源访问
-# 通过环境变量 WEB_CORS_ORIGINS 可放开指定域名（逗号分隔）
+# CORS
 cors_origins = os.environ.get('WEB_CORS_ORIGINS', '').strip()
 if cors_origins:
     CORS(app, origins=[o.strip() for o in cors_origins.split(',') if o.strip()], supports_credentials=True)
 else:
     CORS(app, resources={r"/api/*": {"origins": []}})
 
-# Web 配置
 WEB_HOST = os.environ.get('WEB_HOST', '0.0.0.0')
 WEB_PORT = int(os.environ.get('WEB_PORT', '5800'))
 WEB_DEBUG = os.environ.get('WEB_DEBUG', '').lower() in ('true', '1', 'yes')
 
 
 def _get_version():
-    """从 pyproject.toml 读取版本号"""
     try:
         import tomllib
         pyproject = os.path.join(ROOT_DIR, 'pyproject.toml')
@@ -79,6 +70,7 @@ def _get_version():
 def api_error(msg, status=400):
     return jsonify({'success': False, 'error': msg}), status
 
+
 def api_success(data=None, message=None):
     result = {'success': True}
     if data is not None:
@@ -88,19 +80,56 @@ def api_success(data=None, message=None):
     return jsonify(result)
 
 
+def require_json(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        data = request.get_json(silent=True)
+        if data is None:
+            return api_error('请求数据不能为空（需要 JSON body）')
+        return f(data, *args, **kwargs)
+    return wrapper
+
+
+def parse_date_params():
+    year = request.args.get('year', type=int)
+    month = request.args.get('month', type=int)
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    return year, month, start_date, end_date
+
+
+def build_time_where(params, date_field='trans_date'):
+    """构建时间筛选 WHERE 子句"""
+    year, month, start_date, end_date = parse_date_params()
+    clauses = []
+    if year:
+        clauses.append(f"strftime('%Y', {date_field}) = ?")
+        params.append(str(year))
+        if month:
+            clauses.append(f"strftime('%m', {date_field}) = ?")
+            params.append(f"{month:02d}")
+    if start_date:
+        clauses.append(f"{date_field} >= ?")
+        params.append(start_date)
+    if end_date:
+        clauses.append(f"{date_field} <= ?")
+        params.append(end_date)
+    return clauses
+
+
 # ─── 页面路由 ──────────────────────────────────────────
 
 @app.route('/')
 def index():
+    # 尝试从 React 构建目录提供
+    dist_index = os.path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
+    if os.path.exists(dist_index):
+        return send_from_directory(os.path.join(ROOT_DIR, 'frontend', 'dist'), 'index.html')
     return render_template('index.html')
 
 
-# ─── 健康检查 ──────────────────────────────────────────
-
-@app.route('/health')
 @app.route('/api/health')
 def health():
-    """Docker 健康检查端点"""
     try:
         conn = db_module.sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -117,7 +146,9 @@ def health():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# ─── 交易 API ──────────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# 交易 API
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/transactions', methods=['GET'])
 def list_transactions():
@@ -125,46 +156,88 @@ def list_transactions():
     limit = request.args.get('limit', 50, type=int)
     offset = request.args.get('offset', 0, type=int)
     include_deleted = request.args.get('include_deleted', '').lower() in ('true', '1')
+    type_filter = request.args.get('type', '')
+    category_filter = request.args.get('category', '')
+    subcategory_filter = request.args.get('subcategory', '')
+    account_filter = request.args.get('account', '')
+    project_filter = request.args.get('project', '')
+    member_filter = request.args.get('member', '')
+    merchant_filter = request.args.get('merchant', '')
+    tag_ids = request.args.get('tag_ids', '')
+    keyword = request.args.get('keyword', '')
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    if include_deleted:
-        c.execute('''SELECT id, trans_date, type, amount, category, subcategory, account,
-                            project, member, merchant, note, is_deleted
-                     FROM transactions ORDER BY trans_date DESC LIMIT ? OFFSET ?''', (limit, offset))
-    else:
-        c.execute('''SELECT id, trans_date, type, amount, category, subcategory, account,
-                            project, member, merchant, note
-                     FROM transactions WHERE is_deleted = 0 ORDER BY trans_date DESC LIMIT ? OFFSET ?''', (limit, offset))
-    rows = c.fetchall()
 
-    # 总记录数
-    if include_deleted:
-        c.execute("SELECT COUNT(*) FROM transactions")
-    else:
-        c.execute("SELECT COUNT(*) FROM transactions WHERE is_deleted = 0")
+    where_clauses = []
+    params = []
+
+    if not include_deleted:
+        where_clauses.append("t.is_deleted = 0")
+
+    if type_filter:
+        where_clauses.append("t.type = ?")
+        params.append(type_filter)
+    if category_filter:
+        where_clauses.append("(t.category = ? OR t.subcategory = ?)")
+        params.extend([category_filter, category_filter])
+    if subcategory_filter:
+        where_clauses.append("t.subcategory = ?")
+        params.append(subcategory_filter)
+    if account_filter:
+        where_clauses.append("t.account = ?")
+        params.append(account_filter)
+    if project_filter:
+        where_clauses.append("t.project = ?")
+        params.append(project_filter)
+    if member_filter:
+        where_clauses.append("t.member = ?")
+        params.append(member_filter)
+    if merchant_filter:
+        where_clauses.append("t.merchant = ?")
+        params.append(merchant_filter)
+    if keyword:
+        where_clauses.append("(t.note LIKE ? OR t.category LIKE ? OR t.subcategory LIKE ? OR t.merchant LIKE ? OR t.account LIKE ?)")
+        kw = f'%{keyword}%'
+        params.extend([kw, kw, kw, kw, kw])
+
+    # 时间筛选
+    time_clauses = build_time_where(params, 't.trans_date')
+    where_clauses.extend(time_clauses)
+
+    # Tag 筛选
+    if tag_ids:
+        tag_list = [int(x) for x in tag_ids.split(',') if x.strip().isdigit()]
+        if tag_list:
+            placeholders = ','.join(['?'] * len(tag_list))
+            where_clauses.append(f"t.id IN (SELECT transaction_id FROM transaction_tags WHERE tag_id IN ({placeholders}))")
+            params.extend(tag_list)
+
+    where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+    # 总数
+    c.execute(f"SELECT COUNT(*) FROM transactions t WHERE {where_sql}", params)
     total = c.fetchone()[0]
-    conn.close()
+
+    c.execute(f'''SELECT t.id, t.trans_date, t.type, t.amount, t.category, t.subcategory,
+                        t.account, t.project, t.member, t.merchant, t.note
+                 FROM transactions t
+                 WHERE {where_sql}
+                 ORDER BY t.trans_date DESC LIMIT ? OFFSET ?''', params + [limit, offset])
+    rows = c.fetchall()
 
     transactions = []
     for row in rows:
         t = {
-            'id': row[0],
-            'date': row[1],
-            'type': row[2],
-            'amount': row[3],
-            'category': row[4],
-            'subcategory': row[5],
-            'account': row[6],
-            'project': row[7],
-            'member': row[8],
-            'merchant': row[9],
-            'note': row[10],
+            'id': row[0], 'date': row[1], 'type': row[2], 'amount': row[3],
+            'category': row[4], 'subcategory': row[5], 'account': row[6],
+            'project': row[7], 'member': row[8], 'merchant': row[9], 'note': row[10],
         }
-        if len(row) > 11:
-            t['is_deleted'] = bool(row[11])
+        # 获取标签
+        t['tags'] = db_module.get_transaction_tags(t['id'])
         transactions.append(t)
 
+    conn.close()
     return api_success({'transactions': transactions, 'total': total})
 
 
@@ -180,29 +253,20 @@ def get_transaction(tid):
     conn.close()
     if not row:
         return api_error('交易不存在', 404)
-    return api_success({
-        'id': row[0],
-        'date': row[1],
-        'type': row[2],
-        'amount': row[3],
-        'category': row[4],
-        'subcategory': row[5],
-        'account': row[6],
-        'project': row[7],
-        'member': row[8],
-        'merchant': row[9],
-        'note': row[10],
-        'is_deleted': bool(row[11]),
-    })
+    t = {
+        'id': row[0], 'date': row[1], 'type': row[2], 'amount': row[3],
+        'category': row[4], 'subcategory': row[5], 'account': row[6],
+        'project': row[7], 'member': row[8], 'merchant': row[9],
+        'note': row[10], 'is_deleted': bool(row[11]),
+    }
+    t['tags'] = db_module.get_transaction_tags(tid)
+    return api_success(t)
 
 
 @app.route('/api/transactions', methods=['POST'])
-def add_transaction():
+@require_json
+def add_transaction(data):
     sync_db_path()
-    data = request.get_json()
-    if not data:
-        return api_error('请求数据不能为空')
-
     type_ = data.get('type', '支出')
     amount = data.get('amount')
     if amount is None:
@@ -223,6 +287,7 @@ def add_transaction():
     note = data.get('note', '')
     trans_date = data.get('date')
     force = data.get('force', False)
+    tag_ids = data.get('tag_ids', [])
 
     try:
         tx_module.DB_PATH = DB_PATH
@@ -233,34 +298,58 @@ def add_transaction():
         )
         if new_id is None:
             return api_error('发现重复记录，请确认后重试（设置 force=true 强制添加）')
+        # 设置标签
+        if tag_ids:
+            db_module.set_transaction_tags(new_id, tag_ids)
         return api_success({'id': new_id}, '添加成功')
     except Exception as e:
         return api_error(f'添加失败: {str(e)}')
 
 
 @app.route('/api/transactions/<int:tid>', methods=['PUT'])
-def update_transaction(tid):
+@require_json
+def update_transaction(data, tid):
     sync_db_path()
-    data = request.get_json()
-    if not data:
-        return api_error('请求数据不能为空')
 
-    field = data.get('field')
-    value = data.get('value')
-    if not field or value is None:
-        return api_error('field 和 value 不能为空')
+    # 支持批量更新
+    if 'field' in data and 'value' in data:
+        # 单字段更新（向后兼容）
+        field = data.get('field')
+        value = data.get('value')
+        allowed_fields = ['amount', 'category', 'subcategory', 'account',
+                          'project', 'member', 'merchant', 'note', 'trans_date']
+        if field not in allowed_fields:
+            return api_error(f'不支持的字段: {field}')
+        try:
+            tx_module.DB_PATH = DB_PATH
+            tx_module.update_transaction(tid, field, value)
+            return api_success(message='更新成功')
+        except Exception as e:
+            return api_error(f'更新失败: {str(e)}')
+    else:
+        # 全字段更新
+        update_fields = {}
+        for f in ['type', 'amount', 'category', 'subcategory', 'account',
+                  'project', 'member', 'merchant', 'note', 'trans_date']:
+            if f in data:
+                update_fields[f] = data[f]
+        if 'date' in data and 'trans_date' not in update_fields:
+            update_fields['trans_date'] = data['date']
 
-    allowed_fields = ['amount', 'category', 'subcategory', 'account',
-                      'project', 'member', 'merchant', 'note', 'trans_date']
-    if field not in allowed_fields:
-        return api_error(f'不支持的字段: {field}，支持的字段: {", ".join(allowed_fields)}')
+        # Tag 更新
+        if 'tag_ids' in data:
+            db_module.set_transaction_tags(tid, data['tag_ids'])
 
-    try:
-        tx_module.DB_PATH = DB_PATH
-        tx_module.update_transaction(tid, field, value)
-        return api_success(message='更新成功')
-    except Exception as e:
-        return api_error(f'更新失败: {str(e)}')
+        if not update_fields:
+            return api_error('没有需要更新的字段')
+
+        try:
+            tx_module.DB_PATH = DB_PATH
+            for field, value in update_fields.items():
+                tx_module.update_transaction(tid, field, value)
+            return api_success(message='更新成功')
+        except Exception as e:
+            return api_error(f'更新失败: {str(e)}')
 
 
 @app.route('/api/transactions/<int:tid>', methods=['DELETE'])
@@ -285,58 +374,216 @@ def restore_transaction(tid):
         return api_error(f'恢复失败: {str(e)}')
 
 
-# ─── 搜索/筛选 API ─────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# Tags API
+# ════════════════════════════════════════════════════════
 
-@app.route('/api/transactions/search', methods=['GET'])
-def search_transactions():
-    sync_db_path()
-    keyword = request.args.get('keyword', '')
-    search_type = request.args.get('search_type', 'all')
-    limit = request.args.get('limit', 50, type=int)
-
-    if not keyword:
-        return api_error('搜索关键词不能为空')
-
-    tx_module.DB_PATH = DB_PATH
+@app.route('/api/tags', methods=['GET'])
+def list_tags():
+    tags = db_module.get_all_tags()
+    # 附加使用次数
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    params = []
-    where = "is_deleted = 0 AND ("
+    for tag in tags:
+        c.execute("SELECT COUNT(*) FROM transaction_tags WHERE tag_id = ?", (tag['id'],))
+        tag['usage_count'] = c.fetchone()[0]
+    conn.close()
+    return api_success(tags)
 
-    if search_type == 'all':
-        fields = ['note', 'category', 'subcategory', 'merchant', 'account', 'project', 'member']
-        clauses = [f"{f} LIKE ?" for f in fields]
-        where += " OR ".join(clauses) + ")"
-        params = [f'%{keyword}%'] * len(fields)
-    elif search_type == 'note':
-        where += "note LIKE ?)"
-        params = [f'%{keyword}%']
-    elif search_type == 'category':
-        where += "(category LIKE ? OR subcategory LIKE ?))"
-        params = [f'%{keyword}%', f'%{keyword}%']
-    elif search_type == 'merchant':
-        where += "merchant LIKE ?)"
-        params = [f'%{keyword}%']
 
-    c.execute(f'''SELECT id, trans_date, type, amount, category, account, note
-                  FROM transactions WHERE {where} ORDER BY trans_date DESC LIMIT ?''',
-              params + [limit])
+@app.route('/api/tags', methods=['POST'])
+@require_json
+def create_tag(data):
+    name = data.get('name', '').strip()
+    if not name:
+        return api_error('标签名称不能为空')
+    color = data.get('color', '#6366f1')
+    tag_id = db_module.create_tag(name, color)
+    if tag_id:
+        return api_success({'id': tag_id}, '标签创建成功')
+    return api_error('创建标签失败')
+
+
+@app.route('/api/tags/<int:tag_id>', methods=['DELETE'])
+def delete_tag(tag_id):
+    db_module.delete_tag(tag_id)
+    return api_success(message='标签已删除')
+
+
+@app.route('/api/tags/<int:tag_id>/transactions', methods=['GET'])
+def list_tag_transactions(tag_id):
+    limit = request.args.get('limit', 50, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    txs = db_module.get_transactions_by_tag(tag_id, limit, offset)
+    return api_success(txs)
+
+
+# ════════════════════════════════════════════════════════
+# 模板 API (record_templates)
+# ════════════════════════════════════════════════════════
+
+@app.route('/api/templates', methods=['GET'])
+def list_templates():
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT id, name, description, template_type, type, amount,
+                        category, subcategory, account, project, member, merchant,
+                        note, usage_count, last_used_at, tags
+                 FROM record_templates ORDER BY usage_count DESC, name''')
     rows = c.fetchall()
     conn.close()
+    items = []
+    for r in rows:
+        item = {
+            'id': r[0], 'name': r[1], 'description': r[2], 'template_type': r[3],
+            'type': r[4], 'amount': r[5], 'category': r[6], 'subcategory': r[7],
+            'account': r[8], 'project': r[9], 'member': r[10], 'merchant': r[11],
+            'note': r[12], 'usage_count': r[13], 'last_used_at': r[14],
+            'tag_names': r[15].split(',') if r[15] else [],
+        }
+        items.append(item)
+    return api_success(items)
 
-    return api_success([{
-        'id': r[0], 'date': r[1], 'type': r[2], 'amount': r[3],
-        'category': r[4], 'account': r[5], 'note': r[6],
-    } for r in rows])
+
+@app.route('/api/templates', methods=['POST'])
+@require_json
+def create_template(data):
+    name = data.get('name', '').strip()
+    if not name:
+        return api_error('模板名称不能为空')
+    template_type = data.get('template_type', '通用')
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute('''INSERT INTO record_templates
+        (name, description, template_type, type, amount, category, subcategory,
+         account, project, member, merchant, note, tags, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+              (name, data.get('description', ''), template_type,
+               data.get('type', '支出'), data.get('amount', 0),
+               data.get('category', ''), data.get('subcategory', ''),
+               data.get('account', ''), data.get('project', ''),
+               data.get('member', ''), data.get('merchant', ''),
+               data.get('note', ''),
+               ','.join(data.get('tag_names', [])), now))
+    new_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return api_success({'id': new_id}, '模板创建成功')
 
 
-# ─── 统计/汇总 API ─────────────────────────────────────
+@app.route('/api/templates/<int:tid>', methods=['PUT'])
+@require_json
+def update_template(data, tid):
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    sets = []
+    params = []
+    fields = ['name', 'description', 'template_type', 'type', 'amount',
+              'category', 'subcategory', 'account', 'project', 'member', 'merchant', 'note']
+    for f in fields:
+        if f in data:
+            sets.append(f"{f}=?")
+            params.append(data[f])
+    if 'tag_names' in data:
+        sets.append("tags=?")
+        params.append(','.join(data['tag_names']))
+    if sets:
+        params.append(tid)
+        c.execute(f"UPDATE record_templates SET {', '.join(sets)} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return api_success(message='模板更新成功')
+
+
+@app.route('/api/templates/<int:tid>', methods=['DELETE'])
+def delete_template(tid):
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM record_templates WHERE id=?", (tid,))
+    conn.commit()
+    conn.close()
+    return api_success(message='模板已删除')
+
+
+@app.route('/api/templates/<int:tid>/use', methods=['POST'])
+def use_template(tid):
+    """使用模板（增加使用次数）"""
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute("UPDATE record_templates SET usage_count=usage_count+1, last_used_at=? WHERE id=?",
+              (now, tid))
+    conn.commit()
+    conn.close()
+    return api_success(message='ok')
+
+
+# ════════════════════════════════════════════════════════
+# 自动建议 API
+# ════════════════════════════════════════════════════════
+
+@app.route('/api/suggestions', methods=['GET'])
+def get_suggestions():
+    """获取自动建议数据：类别、子类别、账户、商家、项目、成员"""
+    sync_db_path()
+    field = request.args.get('field', 'all')
+    keyword = request.args.get('keyword', '').strip()
+
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    result = {}
+
+    fields_map = {
+        'categories': ('category', 'category'),
+        'subcategories': ('subcategory', 'subcategory'),
+        'accounts': ('account', 'account'),
+        'merchants': ('merchant', 'merchant'),
+        'projects': ('project', 'project'),
+        'members': ('member', 'member'),
+    }
+
+    for key, (db_col, _) in fields_map.items():
+        if field != 'all' and field != key:
+            continue
+        where = "WHERE is_deleted = 0 AND {} != '' AND {} IS NOT NULL".format(db_col, db_col)
+        params = []
+        if keyword:
+            where += f" AND {db_col} LIKE ?"
+            params.append(f'%{keyword}%')
+        c.execute(f'''SELECT {db_col}, COUNT(*), SUM(amount)
+                     FROM transactions {where}
+                     GROUP BY {db_col}
+                     ORDER BY COUNT(*) DESC
+                     LIMIT 20''', params)
+        rows = c.fetchall()
+        result[key] = [{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows]
+
+    # 常用（使用次数最多的前5个）
+    if field == 'all':
+        result['frequent'] = {}
+        for key, (db_col, _) in fields_map.items():
+            c.execute(f'''SELECT {db_col}, COUNT(*)
+                         FROM transactions
+                         WHERE is_deleted = 0 AND {db_col} != '' AND {db_col} IS NOT NULL
+                         GROUP BY {db_col}
+                         ORDER BY COUNT(*) DESC
+                         LIMIT 5''')
+            result['frequent'][key] = [{'name': r[0], 'count': r[1]} for r in c.fetchall()]
+
+    conn.close()
+    return api_success(result)
+
+
+# ════════════════════════════════════════════════════════
+# 摘要/统计 API (增强版)
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
     sync_db_path()
-    year = request.args.get('year', type=int)
-    month = request.args.get('month', type=int)
+    year, month, start_date, end_date = parse_date_params()
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -348,18 +595,39 @@ def get_summary():
         if month:
             where += " AND strftime('%m', trans_date) = ?"
             params.append(f"{month:02d}")
+    if start_date:
+        where += " AND trans_date >= ?"
+        params.append(start_date)
+    if end_date:
+        where += " AND trans_date <= ?"
+        params.append(end_date)
 
-    c.execute(f"SELECT type, SUM(amount) FROM transactions {where} GROUP BY type", params)
+    c.execute(f"SELECT type, SUM(amount), COUNT(*) FROM transactions {where} GROUP BY type", params)
     rows = c.fetchall()
-    total_income = sum(amt for typ, amt in rows if typ == '收入' and amt)
-    total_expense = sum(amt for typ, amt in rows if typ == '支出' and amt)
-    balance = total_income - total_expense
-    conn.close()
+    total_income = sum(amt for typ, amt, cnt in rows if typ == '收入' and amt)
+    total_expense = sum(amt for typ, amt, cnt in rows if typ == '支出' and amt)
+    income_count = sum(cnt for typ, amt, cnt in rows if typ == '收入' and amt)
+    expense_count = sum(cnt for typ, amt, cnt in rows if typ == '支出' and amt)
 
+    # 日均支出
+    if year and month:
+        import calendar
+        days_in_month = calendar.monthrange(year, month)[1]
+    elif year:
+        days_in_month = 365
+    else:
+        days_in_month = (datetime.now() - datetime(2000, 1, 1)).days or 1
+    daily_avg = round(total_expense / days_in_month, 2) if days_in_month > 0 else 0
+
+    conn.close()
     return api_success({
-        'income': total_income,
-        'expense': total_expense,
-        'balance': balance,
+        'income': total_income or 0,
+        'expense': total_expense or 0,
+        'balance': (total_income or 0) - (total_expense or 0),
+        'income_count': income_count,
+        'expense_count': expense_count,
+        'total_count': income_count + expense_count,
+        'daily_avg_expense': daily_avg,
         'year': year,
         'month': month,
     })
@@ -368,50 +636,150 @@ def get_summary():
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     sync_db_path()
-    year = request.args.get('year', type=int)
-    month = request.args.get('month', type=int)
+    year, month, start_date, end_date = parse_date_params()
     group_by = request.args.get('group_by', 'category')
+    sub_group = request.args.get('sub_group', '')  # 二级分组
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    where_clauses = ["is_deleted = 0"]
+    where_clauses = ["t.is_deleted = 0"]
     params = []
-    if year:
-        where_clauses.append("strftime('%Y', trans_date) = ?")
-        params.append(str(year))
-    if month:
-        where_clauses.append("strftime('%m', trans_date) = ?")
-        params.append(f"{month:02d}")
+    time_clauses = build_time_where(params, 't.trans_date')
+    where_clauses.extend(time_clauses)
     where_sql = " AND ".join(where_clauses)
 
     if group_by == 'category':
-        c.execute(f'''SELECT category, type, SUM(amount), COUNT(*)
-                     FROM transactions WHERE {where_sql} GROUP BY category, type ORDER BY SUM(amount) DESC''', params)
+        if sub_group == 'subcategory':
+            c.execute(f'''SELECT t.category, t.subcategory, t.type, SUM(t.amount), COUNT(*)
+                         FROM transactions t WHERE {where_sql}
+                         GROUP BY t.category, t.subcategory, t.type
+                         ORDER BY t.category, SUM(t.amount) DESC''', params)
+        else:
+            c.execute(f'''SELECT t.category, t.type, SUM(t.amount), COUNT(*)
+                         FROM transactions t WHERE {where_sql}
+                         GROUP BY t.category, t.type ORDER BY SUM(t.amount) DESC''', params)
+    elif group_by == 'subcategory':
+        c.execute(f'''SELECT t.subcategory, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql} AND t.subcategory != ''
+                     GROUP BY t.subcategory, t.type ORDER BY SUM(t.amount) DESC''', params)
     elif group_by == 'account':
-        c.execute(f'''SELECT account, type, SUM(amount), COUNT(*)
-                     FROM transactions WHERE {where_sql} GROUP BY account, type ORDER BY SUM(amount) DESC''', params)
+        c.execute(f'''SELECT t.account, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql}
+                     GROUP BY t.account, t.type ORDER BY SUM(t.amount) DESC''', params)
+    elif group_by == 'merchant':
+        c.execute(f'''SELECT t.merchant, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql} AND t.merchant != ''
+                     GROUP BY t.merchant, t.type ORDER BY SUM(t.amount) DESC''', params)
+    elif group_by == 'project':
+        c.execute(f'''SELECT t.project, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql} AND t.project != ''
+                     GROUP BY t.project, t.type ORDER BY SUM(t.amount) DESC''', params)
+    elif group_by == 'member':
+        c.execute(f'''SELECT t.member, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql} AND t.member != ''
+                     GROUP BY t.member, t.type ORDER BY SUM(t.amount) DESC''', params)
     elif group_by == 'month':
-        c.execute(f'''SELECT strftime('%Y-%m', trans_date) as month, type, SUM(amount), COUNT(*)
-                     FROM transactions WHERE {where_sql} GROUP BY month, type ORDER BY month DESC''', params)
+        c.execute(f'''SELECT strftime('%Y-%m', t.trans_date) as month, t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql}
+                     GROUP BY month, t.type ORDER BY month DESC''', params)
+    elif group_by == 'tag':
+        c.execute(f'''SELECT tg.name, tg.color, SUM(t.amount), COUNT(*)
+                     FROM transactions t
+                     JOIN transaction_tags tt ON t.id = tt.transaction_id
+                     JOIN tags tg ON tt.tag_id = tg.id
+                     WHERE {where_sql}
+                     GROUP BY tg.id ORDER BY SUM(t.amount) DESC''', params)
+        rows = c.fetchall()
+        conn.close()
+        items = [{'group': r[0], 'color': r[1], 'type': '支出', 'total': r[2], 'count': r[3]} for r in rows]
+        return api_success({'group_by': group_by, 'items': items})
+    elif group_by == 'type':
+        c.execute(f'''SELECT t.type, SUM(t.amount), COUNT(*)
+                     FROM transactions t WHERE {where_sql}
+                     GROUP BY t.type''', params)
+        rows = c.fetchall()
+        conn.close()
+        items = [{'group': r[0], 'type': r[0], 'total': r[1], 'count': r[2]} for r in rows]
+        return api_success({'group_by': group_by, 'items': items})
     else:
+        conn.close()
         return api_error(f'不支持的分组: {group_by}')
 
     rows = c.fetchall()
     conn.close()
 
-    items = []
-    for row in rows:
-        items.append({
-            'group': row[0],
-            'type': row[1],
-            'total': row[2],
-            'count': row[3],
-        })
+    if sub_group == 'subcategory':
+        items = []
+        for row in rows:
+            cat, subcat, typ, total, count = row
+            items.append({
+                'group': f"{cat}/{subcat}" if subcat else cat,
+                'parent_group': cat,
+                'sub_group': subcat,
+                'type': typ, 'total': total, 'count': count,
+            })
+    else:
+        items = []
+        for row in rows:
+            items.append({
+                'group': row[0], 'type': row[1], 'total': row[2], 'count': row[3],
+            })
 
     return api_success({'group_by': group_by, 'items': items})
 
 
-# ─── 类别/账户/成员 API ────────────────────────────────
+# ─── 趋势 API ──────────────────────────────────────────
+
+@app.route('/api/trends', methods=['GET'])
+def get_trends():
+    """获取趋势数据（日/周/月粒度）"""
+    sync_db_path()
+    year = request.args.get('year', type=int) or datetime.now().year
+    granularity = request.args.get('granularity', 'month')  # day, week, month
+
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    if granularity == 'day':
+        fmt = '%Y-%m-%d'
+    elif granularity == 'week':
+        fmt = '%Y-%W'
+    else:
+        fmt = '%Y-%m'
+
+    c.execute(f'''SELECT strftime('{fmt}', trans_date) as period,
+                         type, SUM(amount), COUNT(*)
+                  FROM transactions
+                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ?
+                  GROUP BY period, type
+                  ORDER BY period''', (str(year),))
+    rows = c.fetchall()
+
+    # 累计趋势
+    c.execute(f'''SELECT strftime('{fmt}', trans_date) as period,
+                         SUM(CASE WHEN type='收入' THEN amount ELSE 0 END),
+                         SUM(CASE WHEN type='支出' THEN amount ELSE 0 END)
+                  FROM transactions
+                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ?
+                  GROUP BY period
+                  ORDER BY period''', (str(year),))
+    cumulative = c.fetchall()
+    conn.close()
+
+    items = [{'period': r[0], 'type': r[1], 'amount': r[2], 'count': r[3]} for r in rows]
+    cum_items = [{'period': r[0], 'income': r[1], 'expense': r[2]} for r in cumulative]
+
+    return api_success({
+        'granularity': granularity,
+        'year': year,
+        'items': items,
+        'cumulative': cum_items,
+    })
+
+
+# ════════════════════════════════════════════════════════
+# 类别/账户/成员 API (增强)
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
@@ -420,7 +788,7 @@ def get_categories():
     c = conn.cursor()
     c.execute('''SELECT category, subcategory, COUNT(*), SUM(amount)
                  FROM transactions WHERE is_deleted = 0
-                 GROUP BY category, subcategory ORDER BY category, subcategory''')
+                 GROUP BY category, subcategory ORDER BY category, SUM(amount) DESC''')
     rows = c.fetchall()
     conn.close()
 
@@ -437,6 +805,22 @@ def get_categories():
         cats[cat]['total_amount'] += total
 
     return api_success(list(cats.values()))
+
+
+@app.route('/api/categories/quick', methods=['GET'])
+def get_quick_categories():
+    """获取最常用的子类别（按使用次数排序）"""
+    sync_db_path()
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT category, subcategory, COUNT(*) as cnt
+                 FROM transactions WHERE is_deleted = 0 AND subcategory != '' AND subcategory IS NOT NULL
+                 GROUP BY category, subcategory
+                 ORDER BY cnt DESC
+                 LIMIT 20''')
+    rows = c.fetchall()
+    conn.close()
+    return api_success([{'category': r[0], 'subcategory': r[1], 'count': r[2]} for r in rows])
 
 
 @app.route('/api/accounts', methods=['GET'])
@@ -465,7 +849,35 @@ def get_members():
     return api_success([{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows])
 
 
-# ─── 预算 API ──────────────────────────────────────────
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    sync_db_path()
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT project, COUNT(*), SUM(amount)
+                 FROM transactions WHERE is_deleted = 0 AND project != ''
+                 GROUP BY project ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    conn.close()
+    return api_success([{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows])
+
+
+@app.route('/api/merchants', methods=['GET'])
+def get_merchants():
+    sync_db_path()
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT merchant, COUNT(*), SUM(amount)
+                 FROM transactions WHERE is_deleted = 0 AND merchant != ''
+                 GROUP BY merchant ORDER BY COUNT(*) DESC''')
+    rows = c.fetchall()
+    conn.close()
+    return api_success([{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows])
+
+
+# ════════════════════════════════════════════════════════
+# 预算 API
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/budgets', methods=['GET'])
 def list_budgets():
@@ -485,41 +897,31 @@ def list_budgets():
         budget_id, category, byear, bmonth, amount, dim_type, dim_value = row
         spent = budget_module._get_budget_spent(category, byear, bmonth, dim_type, dim_value)
         items.append({
-            'id': budget_id,
-            'category': category,
-            'year': byear,
-            'month': bmonth,
-            'amount': amount,
-            'spent': spent,
+            'id': budget_id, 'category': category,
+            'year': byear, 'month': bmonth,
+            'amount': amount, 'spent': spent,
             'remaining': amount - spent,
-            'dimension_type': dim_type,
-            'dimension_value': dim_value,
+            'dimension_type': dim_type, 'dimension_value': dim_value,
         })
-
     return api_success(items)
 
 
 @app.route('/api/budgets', methods=['POST'])
-def set_budget():
+@require_json
+def set_budget(data):
     sync_db_path()
-    data = request.get_json()
-    if not data:
-        return api_error('请求数据不能为空')
-
     category = data.get('category', '')
     amount = data.get('amount')
-    if category and amount is None:
+    if not category or amount is None:
         return api_error('类别和金额不能为空')
     try:
         amount = float(amount)
     except (ValueError, TypeError):
         return api_error('金额格式不正确')
-
     year = data.get('year') or datetime.now().year
     month = data.get('month') or datetime.now().month
     dim_type = data.get('dimension_type', 'category')
     dim_value = data.get('dimension_value')
-
     try:
         budget_module.DB_PATH = DB_PATH
         budget_module.set_budget(category, amount, year, month, dim_type, dim_value)
@@ -533,7 +935,6 @@ def check_budget():
     sync_db_path()
     year = request.args.get('year', type=int) or datetime.now().year
     month = request.args.get('month', type=int) or datetime.now().month
-
     budget_module.DB_PATH = DB_PATH
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -541,24 +942,22 @@ def check_budget():
                  FROM budgets WHERE year=? AND month=? ORDER BY category''', (year, month))
     budgets = c.fetchall()
     conn.close()
-
     items = []
     for row in budgets:
         bid, category, amount, dim_type, dim_value = row
         spent = budget_module._get_budget_spent(category, year, month, dim_type, dim_value)
         items.append({
-            'id': bid,
-            'category': category,
-            'budget': amount,
-            'spent': spent,
+            'id': bid, 'category': category,
+            'budget': amount, 'spent': spent,
             'remaining': amount - spent,
             'percentage': round(spent / amount * 100, 1) if amount > 0 else 0,
         })
-
     return api_success(items)
 
 
-# ─── 导出 API ──────────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# 导出 API
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/export', methods=['GET'])
 def export_data():
@@ -567,10 +966,8 @@ def export_data():
     category = request.args.get('category')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
     if format_type not in ('json', 'csv'):
-        return api_error('不支持的导出格式，仅支持 json/csv')
-
+        return api_error('不支持的导出格式')
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
     where_clauses = ["is_deleted = 0"]
@@ -590,20 +987,19 @@ def export_data():
                  FROM transactions WHERE {where_sql} ORDER BY trans_date DESC''', params)
     rows = c.fetchall()
     conn.close()
-
     if not rows:
         return api_error('没有数据可导出')
-
     data = [{
         'id': r[0], 'date': r[1], 'type': r[2], 'amount': r[3],
         'category': r[4], 'subcategory': r[5], 'account': r[6],
         'project': r[7], 'member': r[8], 'merchant': r[9], 'note': r[10],
     } for r in rows]
-
     return api_success({'count': len(data), 'format': format_type, 'data': data})
 
 
-# ─── 分析 API ──────────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# 分析 API
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/analyze', methods=['GET'])
 def analyze():
@@ -613,7 +1009,9 @@ def analyze():
     return api_success({'report': result})
 
 
-# ─── 数据库信息 API ────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# 数据库信息 API
+# ════════════════════════════════════════════════════════
 
 @app.route('/api/info', methods=['GET'])
 def db_info():
@@ -628,26 +1026,25 @@ def db_info():
     oldest = c.fetchone()[0]
     c.execute("SELECT MAX(trans_date) FROM transactions WHERE is_deleted = 0")
     newest = c.fetchone()[0]
+    # 标签数
+    c.execute("SELECT COUNT(*) FROM tags")
+    tag_count = c.fetchone()[0]
     conn.close()
-
     return api_success({
-        'total_records': total,
-        'active_records': active,
+        'total_records': total, 'active_records': active,
         'date_range': {'oldest': oldest, 'newest': newest},
+        'tag_count': tag_count,
         'db_path': DB_PATH,
     })
 
 
-# ─── 启动入口 ──────────────────────────────────────────
+# ─── 启动 ──────────────────────────────────────────
 
 if __name__ == '__main__':
-    # 检测是否在 Docker 中运行
     in_docker = os.path.exists('/.dockerenv')
-
     msg = (
-        "\n"
-        + "=" * 50 + "\n"
-        + " Ledger Web Service\n"
+        "\n" + "=" * 50 + "\n"
+        + " Ledger Web Service v2\n"
         + "=" * 50 + "\n"
         + "  Database: {}\n".format(DB_PATH)
         + "  Address:  http://{}:{}\n".format(WEB_HOST, WEB_PORT)

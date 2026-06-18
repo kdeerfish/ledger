@@ -41,3 +41,8 @@ reasonix.toml
 
 # 部署目录（构建产物，不纳入版本管理）
 deploy/
+
+# Docusaurus 构建输出
+website/build/
+website/.docusaurus/
+website/node_modules/

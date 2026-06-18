@@ -1,3 +1,7 @@
+---
+sidebar_position: 15
+---
+
 # 🛠 开发指南
 
 ## 环境要求
@@ -5,8 +9,6 @@
 - Python 3.10+
 - Git
 - Docker（可选，用于容器化部署）
-
----
 
 ## 搭建开发环境
 
@@ -56,10 +58,8 @@ ledger/
 │   └── test_integration.py  # 集成测试
 ├── skills/                  # AI Agent 技能
 ├── .github/workflows/       # GitHub Actions CI/CD
-└── docs/                    # 文档
+└── website/                 # Docusaurus 文档站
 ```
-
----
 
 ## 开发流程
 
@@ -106,8 +106,6 @@ git commit -m "feat: 添加xxx功能"
 # chore: 杂项
 ```
 
----
-
 ## 运行测试
 
 ```bash
@@ -128,8 +126,6 @@ python -m pytest tests --cov=ledger_modules --cov=scripts --cov-report=term --co
 
 当前测试覆盖：**86%**（102+ 测试用例）
 
----
-
 ## 常用 Make 命令
 
 | 命令 | 说明 |
@@ -143,8 +139,6 @@ python -m pytest tests --cov=ledger_modules --cov=scripts --cov-report=term --co
 | `make install` | 安装开发依赖 |
 | `make deploy` | 打包发布到 deploy/ |
 | `make release` | 打包 + git tag + 发布 |
-
----
 
 ## 数据库
 
@@ -173,15 +167,7 @@ CREATE TABLE budgets (
     dimension_value TEXT,
     UNIQUE(category, year, month, dimension_type, dimension_value)
 );
-
--- 预算模板
-CREATE TABLE budget_templates (...);
-
--- 记录模板
-CREATE TABLE record_templates (...);
 ```
-
----
 
 ## CI/CD
 
@@ -191,8 +177,6 @@ CREATE TABLE record_templates (...);
 2. Push tag v* → 同上 + 版本标签
 
 配置见 [`.github/workflows/docker-publish.yml`](https://github.com/kdeerfish/ledger/blob/master/.github/workflows/docker-publish.yml)。
-
----
 
 ## 发布新版本
 
@@ -205,17 +189,4 @@ python scripts/release.py 1.6.0
 
 # 只打包，不发布
 python scripts/release.py --dry-run
-```
-
----
-
-## 文档
-
-文档在 `docs/` 目录下，使用 Markdown 编写，GitHub Pages 自动渲染。
-
-```bash
-# 本地预览文档
-# 安装 jekyll 后
-cd docs
-jekyll serve
 ```

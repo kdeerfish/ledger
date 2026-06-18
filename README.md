@@ -11,7 +11,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)](https://github.com/kdeerfish/ledger/actions)
 
-**[快速开始](#-快速开始) · [CLI 命令](#-cli-命令速查) · [Web 界面](#-web-管理界面) · [Docker 部署](#-docker-部署) · [API 文档](docs/api.md) · [开发指南](docs/development.md)**
+**[快速开始](#-快速开始) · [CLI 命令](#-cli-命令速查) · [Web 界面](#-web-管理界面) · [Docker 部署](#-docker-部署) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
 
 ---
 
