@@ -8,8 +8,8 @@ FROM python:3.11-slim
 # ── 元信息 ──
 LABEL org.opencontainers.image.title="Ledger"
 LABEL org.opencontainers.image.description="个人记账系统 - 收支管理、预算规划、多维度统计"
-LABEL org.opencontainers.image.version="1.4.0"
-LABEL org.opencontainers.image.source="https://github.com/zouzhenglu/ledger"
+LABEL org.opencontainers.image.version="1.5.0"
+LABEL org.opencontainers.image.source="https://github.com/kdeerfish/ledger"
 
 # ── 安装依赖 ──
 WORKDIR /build
