@@ -183,29 +183,83 @@ python web/run.py
 | **类别** | 类别/子类别层级展示、消费金额统计 |
 | **统计** | 按类别/账户/月份分组统计、图表展示 |
 
-### 飞牛OS (FnOS) 部署
+### 🐳 Docker 部署（推荐）
+
+这是最省心的方式，飞牛OS Docker 界面点几下就行。
+
+#### 方式一：飞牛OS Docker 界面（最简单）
 
 ```bash
-# SSH 到飞牛OS
+# 1. SSH 到飞牛OS，创建项目目录
 ssh admin@nas_ip
-
-# 进入项目目录
+mkdir -p /volume1/docker/ledger/data
 cd /volume1/docker/ledger
 
-# 安装依赖
-pip3 install flask flask-cors
+# 2. 下载 docker-compose.yml
+wget -O docker-compose.yml https://raw.githubusercontent.com/zouzhenglu/ledger/refactor-docker/docker-compose.yml
 
-# 后台运行（退出 SSH 后保持运行）
-nohup python3 web/run.py --port 5000 > ledger-web.log 2>&1 &
+# 3. 在飞牛OS Docker 界面 → 项目 → 新建
+#    - 选择 /volume1/docker/ledger 目录
+#    - 点击部署，稍等片刻
+#    - 访问 http://飞牛OS_IP:5000
+```
+
+#### 方式二：命令行直接跑
+
+```bash
+# 构建镜像
+docker compose build
+
+# 或者从源码构建并启动
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+
+# 停止
+docker compose down
+
+# 升级（拉取新代码后）
+git pull
+docker compose up -d --build
+```
+
+#### 方式三：使用预构建镜像（开发中）
+
+```bash
+docker run -d \
+  --name ledger \
+  -p 5000:5000 \
+  -v /path/to/data:/data \
+  --restart unless-stopped \
+  ledger:latest
+```
+
+#### 数据持久化
+
+数据库保存在 `./data/ledger.db`，删容器不会丢数据。
+如需导入老数据，把 `ledger.db` 复制到 `./data/` 目录下，重启容器即可。
+
+---
+
+### 传统方式部署（无 Docker）
+
+```bash
+# 1. 安装依赖
+pip install flask flask-cors
+
+# 2. 启动
+python web/run.py
+
+# 3. 访问 http://127.0.0.1:5000
+
+# 后台运行
+nohup python web/run.py > ledger-web.log 2>&1 &
 
 # 查看日志
 tail -f ledger-web.log
 
-# 停止服务
 kill $(pgrep -f "web/run.py")
-
-# 配置开机自启（可选），编辑 /etc/rc.local：
-# su - admin -c "cd /volume1/docker/ledger && nohup python3 web/run.py > ledger-web.log 2>&1 &"
 ```
 
 ### 环境变量

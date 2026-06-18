@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+.eggs/
+dist/
+build/
+
+# 测试
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.json
+
+# 开发工具
+.vscode/
+.codegraph/
+.reasonix/
+reasonix.toml
+
+# 文档 & 示例（运行时不需要）
+data/
+skills/
+
+# 本地数据库（用户数据，不进镜像）
+ledger.db
+*.db
+
+# 环境文件
+.env
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

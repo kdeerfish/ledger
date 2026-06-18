@@ -69,6 +69,28 @@ def index():
     return render_template('index.html')
 
 
+# ─── 健康检查 ──────────────────────────────────────────
+
+@app.route('/health')
+@app.route('/api/health')
+def health():
+    """Docker 健康检查端点"""
+    try:
+        conn = db_module.sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM transactions")
+        count = c.fetchone()[0]
+        conn.close()
+        return jsonify({
+            'status': 'ok',
+            'database': DB_PATH,
+            'records': count,
+            'version': '1.4.0',
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # ─── 交易 API ──────────────────────────────────────────
 
 @app.route('/api/transactions', methods=['GET'])
@@ -591,15 +613,19 @@ def db_info():
 # ─── 启动入口 ──────────────────────────────────────────
 
 if __name__ == '__main__':
+    # 检测是否在 Docker 中运行
+    in_docker = os.path.exists('/.dockerenv')
+
     msg = (
         "\n"
-        "=" * 50 + "\n"
-        " Ledger Web Service\n"
-        "=" * 50 + "\n"
-        "  Database: {}\n".format(DB_PATH) +
-        "  Address:  http://{}:{}\n".format(WEB_HOST, WEB_PORT) +
-        "  Press Ctrl+C to stop\n"
-        "=" * 50 + "\n"
+        + "=" * 50 + "\n"
+        + " Ledger Web Service\n"
+        + "=" * 50 + "\n"
+        + "  Database: {}\n".format(DB_PATH)
+        + "  Address:  http://{}:{}\n".format(WEB_HOST, WEB_PORT)
+        + ("  Mode:     Docker\n" if in_docker else "  Mode:     Native\n")
+        + "  Press Ctrl+C to stop\n"
+        + "=" * 50 + "\n"
     )
     print(msg, flush=True)
     app.run(host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG)
