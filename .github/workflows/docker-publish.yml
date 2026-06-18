@@ -1,0 +1,137 @@
+# ============================================================
+# Ledger CI/CD — Docker build & multi-registry publish
+# 触发条件：
+#   - push 到 master 分支 → 构建并推送 :latest
+#   - push tag v*       → 构建并推送 :<version> 和 :latest
+#   - 手动 workflow_dispatch → 指定 tag
+#
+# 推送目标：
+#   - Docker Hub       docker.io/kdeerfish/ledger
+#   - 阿里云镜像服务    registry.cn-hangzhou.aliyuncs.com/kdeerfish/ledger
+# ============================================================
+
+name: Docker CI/CD
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: '自定义镜像标签（留空自动推断）'
+        required: false
+        type: string
+
+env:
+  # ── 镜像名称 ──────────────────────────────────────
+  DOCKER_IMAGE:     kdeerfish/ledger
+  ALIYUN_IMAGE:     registry.cn-hangzhou.aliyuncs.com/kdeerfish/ledger
+
+  # ── Python ──────────────────────────────────────────
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ═══════════════════════════════════════════════════
+  # 1. 测试
+  # ═══════════════════════════════════════════════════
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: python -m pytest tests -v --tb=short
+
+  # ═══════════════════════════════════════════════════
+  # 2. 构建 & 推送 Docker 镜像
+  # ═══════════════════════════════════════════════════
+  docker:
+    name: Build & Push Docker images
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 计算镜像标签 ────────────────────────────────
+      - name: Compute image tags
+        id: tags
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+            # workflow_dispatch 手动指定
+            TAG="${{ github.event.inputs.version_tag }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # tag push: v1.5.0 → 1.5.0
+            TAG="${GITHUB_REF_NAME#v}"
+          else
+            # push to master → latest
+            TAG="latest"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Building tag: ${TAG}"
+
+      # ── 登录 Docker Hub ─────────────────────────────
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      # ── 登录阿里云镜像服务 ──────────────────────────
+      - name: Log in to Alibaba Cloud Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_PASSWORD }}
+
+      # ── 构建 & 推送（Docker Hub + 阿里云） ──────────
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ steps.tags.outputs.tag }}
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.ALIYUN_IMAGE }}:${{ steps.tags.outputs.tag }}
+            ${{ env.ALIYUN_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.version=${{ steps.tags.outputs.tag }}
+
+      # ── 输出结果 ────────────────────────────────────
+      - name: Summary
+        run: |
+          echo "### ✅ Docker 镜像已推送" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 仓库 | 标签 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ env.DOCKER_IMAGE }}\` | \`${{ steps.tags.outputs.tag }}\` \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${{ env.ALIYUN_IMAGE }}\` | \`${{ steps.tags.outputs.tag }}\` \`latest\` |" >> $GITHUB_STEP_SUMMARY
