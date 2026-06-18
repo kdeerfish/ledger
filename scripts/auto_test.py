@@ -12,6 +12,7 @@ Ledger 全自动测试脚本
 """
 
 import argparse
+import contextlib
 import json
 import os
 import signal
@@ -20,6 +21,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from io import StringIO
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 5800
@@ -50,7 +52,7 @@ sys.path.insert(0, {repr(ROOT)})
 import web.app as app_mod
 app_mod.app.run(host='127.0.0.1', port={port}, debug=False)
 '''],
-        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         cwd=ROOT
     )
 
@@ -66,6 +68,13 @@ app_mod.app.run(host='127.0.0.1', port={port}, debug=False)
             continue
 
     _print(f'  [FAIL] 服务启动超时')
+    # 读取子进程的 stderr 输出，帮助诊断
+    try:
+        stderr_out = SERVER_PROCESS.stderr.read().decode('utf-8', errors='replace')
+        if stderr_out.strip():
+            _print(f'  [STDERR] {stderr_out[:1000]}')
+    except Exception:
+        pass
     return False
 
 
@@ -102,19 +111,31 @@ def run_api_test(port):
 
 
 def run_unit_tests():
-    """运行 pytest 单元测试"""
+    """运行 pytest 单元测试（直接调用 pytest.main 避免子进程环境问题）"""
     _print(f'\n[3/3] 单元测试 (pytest) ...\n')
-    result = subprocess.run(
-        [sys.executable, '-m', 'pytest', 'tests', '-v', '--tb=short'],
-        cwd=ROOT, capture_output=True, text=True, timeout=120
-    )
-    _print(result.stdout)
-    if result.stderr:
-        _print(result.stderr[:500])
+    try:
+        import pytest
+    except ImportError:
+        _print('  [FAIL] 找不到 pytest (未安装或不在当前 Python 环境)')
+        return False, ''
 
-    # 解析结果
-    passed = 'passed' in result.stdout and 'failed' not in result.stdout
-    return passed, result.stdout
+    stdout_capture = StringIO()
+    stderr_capture = StringIO()
+    try:
+        with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
+            exit_code = pytest.main(['tests', '-v', '--tb=short'])
+    except SystemExit:
+        exit_code = 1
+
+    stdout = stdout_capture.getvalue()
+    stderr = stderr_capture.getvalue()
+
+    _print(stdout[-3000:] if len(stdout) > 3000 else stdout)
+    if stderr:
+        _print(f'  [STDERR] {stderr[:500]}')
+
+    passed = 'passed' in stdout and 'failed' not in stdout
+    return passed, stdout
 
 
 def main():
