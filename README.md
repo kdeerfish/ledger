@@ -13,10 +13,6 @@
 
 **[快速开始](#-快速开始) · [CLI 命令](#-cli-命令速查) · [Web 界面](#-web-管理界面) · [Docker 部署](#-docker-部署) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
 
----
-
-[🇨🇳 中文](#) &nbsp;|&nbsp; [🇬🇧 English](docs/en/README.md)
-
 </div>
 
 ---
