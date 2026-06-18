@@ -20,21 +20,6 @@ const config: Config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
 
-  i18n: {
-    defaultLocale: 'zh-Hans',
-    locales: ['zh-Hans', 'en'],
-    localeConfigs: {
-      'zh-Hans': {
-        label: '中文',
-        direction: 'ltr',
-      },
-      en: {
-        label: 'English',
-        direction: 'ltr',
-      },
-    },
-  },
-
   presets: [
     [
       'classic',
@@ -72,10 +57,6 @@ const config: Config = {
           label: '文档',
         },
         {to: '/docs/intro', label: '快速开始', position: 'left'},
-        {
-          type: 'localeDropdown',
-          position: 'right',
-        },
         {
           href: 'https://github.com/kdeerfish/ledger',
           position: 'right',

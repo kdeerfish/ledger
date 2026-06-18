@@ -8,6 +8,7 @@ Ledger Web 服务 - Flask 后端 API (v2)
 import os
 import sys
 import json
+import urllib.request
 from datetime import datetime
 from functools import wraps
 
@@ -119,12 +120,52 @@ def build_time_where(params, date_field='trans_date'):
 
 # ─── 页面路由 ──────────────────────────────────────────
 
-@app.route('/')
-def index():
-    # 尝试从 React 构建目录提供
-    dist_index = os.path.join(ROOT_DIR, 'frontend', 'dist', 'index.html')
+VITE_DEV_URL = 'http://localhost:5173'
+
+
+def _proxy_to_vite(path=''):
+    """调试模式下代理到 Vite 开发服务器，获得热更新"""
+    try:
+        url = f'{VITE_DEV_URL}/{path}' if path else f'{VITE_DEV_URL}/'
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req, timeout=3)
+        headers = dict(resp.headers)
+        content = resp.read()
+        # 去掉 Transfer-Encoding 让 Flask 自己处理
+        headers.pop('Transfer-Encoding', None)
+        headers.pop('Content-Encoding', None)
+        return (content, resp.status, headers)
+    except Exception:
+        return None
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    # API 请求不在此处理
+    if path.startswith('api/'):
+        return api_error('Not found', 404)
+
+    # 调试模式：代理到 Vite dev server → 获得热更新
+    if WEB_DEBUG:
+        result = _proxy_to_vite(path)
+        if result:
+            return result
+
+    # 生产模式：服务构建好的前端
+    dist_dir = os.path.join(ROOT_DIR, 'frontend', 'dist')
+    full_path = os.path.join(dist_dir, path) if path else os.path.join(dist_dir, 'index.html')
+
+    # 如果请求的是具体文件且存在，直接返回
+    if path and os.path.isfile(full_path):
+        return send_from_directory(dist_dir, path)
+
+    # 否则返回 index.html（React 路由处理）
+    dist_index = os.path.join(dist_dir, 'index.html')
     if os.path.exists(dist_index):
-        return send_from_directory(os.path.join(ROOT_DIR, 'frontend', 'dist'), 'index.html')
+        return send_from_directory(dist_dir, 'index.html')
+
+    # 最后 fallback 到旧模板
     return render_template('index.html')
 
 

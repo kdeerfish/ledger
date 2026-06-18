@@ -11,6 +11,8 @@
 
 ## 🐳 Docker 部署（推荐）
 
+Docker 镜像使用多阶段构建，自动编译 React 前端 + Python 后端，一个镜像搞定。
+
 ### 1. 准备
 
 ```bash
@@ -29,8 +31,8 @@ cd /volume1/docker/ledger
 ### 3. 启动
 
 ```bash
-# 构建并启动
-docker compose up -d
+# 构建（自动编译前端 + 打包 Python 后端）并启动
+docker compose up -d --build
 
 # 查看日志
 docker compose logs -f
@@ -38,9 +40,12 @@ docker compose logs -f
 # 访问 http://飞牛OS_IP:5800
 ```
 
-### 4. 配置 Skills
+构建过程：
+1. 第一阶段：用 Node.js 20 编译 React 前端到 `dist/`
+2. 第二阶段：用 Python 3.11 运行 Flask 后端，直接服务编译好的前端
+3. 最终镜像只包含运行所需文件，不含 Node.js
 
-解压 `ledger-skills.zip` 到 Agent 可访问的位置，编辑 `.env`：
+### 4. 配置 Skills
 
 ```bash
 # skills/ledger/.env
@@ -49,31 +54,42 @@ LEDGER_API_URL=http://192.168.31.126:5800
 
 ---
 
-## 🚀 本地测试（非 Docker）
+## 🚀 本地运行
+
+### 生产模式（直接服务构建好的前端）
 
 ```bash
-# 1. 安装依赖
+# 1. 构建前端
+cd frontend && npm install && npm run build && cd ..
+
+# 2. 安装 Python 依赖
 pip install flask flask-cors
 
-# 2. 配置环境
-cp .env.example .env
-
-# 3. 导入数据（如果有 CSV）
-python scripts/import_ledger.py data.csv
-
-# 4. 启动 Web 服务
+# 3. 启动（自动服务 frontend/dist/ 里的前端文件）
 python web/run.py
 
-# 5. 访问 http://127.0.0.1:5800
+# 4. 访问 http://127.0.0.1:5800
 ```
+
+### 开发模式（有热更新）
+
+```bash
+# 终端1：启动 Flask 后端（调试模式，代理前端请求到 Vite）
+WEB_DEBUG=true python web/run.py
+
+# 终端2：启动 Vite 开发服务器
+cd frontend && npm run dev
+
+# 访问 http://127.0.0.1:5173（或 :5800 自动代理到 Vite）
+```
+
+或直接用 VS Code launch.json 里的 **"Full Stack Dev"** compound 配置。
 
 ---
 
 ## 🔧 数据维护
 
 ### 导入 CSV
-
-Docker 部署时，CSV 需要通过容器内执行：
 
 ```bash
 # 把 CSV 放到数据目录
@@ -86,7 +102,6 @@ docker exec -it ledger python scripts/import_ledger.py /data/mydata.csv
 ### 备份数据库
 
 ```bash
-# Docker 数据在宿主机的 ./data/ 目录
 cp /volume1/docker/ledger/data/ledger.db /volume1/backup/ledger-$(date +%Y%m%d).db
 ```
 
@@ -95,6 +110,7 @@ cp /volume1/docker/ledger/data/ledger.db /volume1/backup/ledger-$(date +%Y%m%d).
 ```bash
 cd /volume1/docker/ledger
 git pull
+# 重新构建（含前端编译）+ 启动
 docker compose up -d --build
 ```
 
@@ -102,20 +118,25 @@ docker compose up -d --build
 
 ## ❓ 故障排除
 
-### 问题：Agent 连不上 API
+### 前端空白 / 404
 
-**检查**：
+**生产环境**：确认 `frontend/dist/` 存在且包含 `index.html`。Docker 部署时多阶段构建会自动生成。
+
+**本地生产模式**：
 ```bash
-# 在 Agent 所在机器上测试
+cd frontend && npm run build
+```
+
+### Agent 连不上 API
+
+```bash
 curl http://NAS_IP:5800/api/health
 ```
 
-**解决**：
-- 确认 Docker 容器在运行：`docker ps | grep ledger`
-- 确认 `.env` 中 `LEDGER_API_URL` 指向正确的 IP 和端口
-- 确认飞牛OS 防火墙未阻挡 5800 端口
+- 确认容器运行：`docker ps | grep ledger`
+- 确认 `.env` 中 `LEDGER_API_URL` 指向正确 IP 和端口
+- 确认防火墙未阻挡 5800 端口
 
-### 问题：数据库不存在
+### 数据库不存在
 
-**解决**：
-首次启动会自行创建，或通过导入 CSV 初始化。
+首次启动会自动创建，或通过导入 CSV 初始化。
