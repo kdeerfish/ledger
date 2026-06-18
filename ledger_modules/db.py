@@ -141,6 +141,15 @@ def init_db():
         except Exception:
             pass
 
+    # ── 迁移：确保 is_deleted 列存在 ──
+    c.execute("PRAGMA table_info(transactions)")
+    tx_cols = [row[1] for row in c.fetchall()]
+    if 'is_deleted' not in tx_cols:
+        try:
+            c.execute('ALTER TABLE transactions ADD COLUMN is_deleted INTEGER DEFAULT 0')
+        except Exception:
+            pass
+
     # ── 数据库迁移 ──
     current_version = _get_db_version(c)
     if current_version < 2:

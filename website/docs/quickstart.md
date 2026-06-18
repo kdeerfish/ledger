@@ -48,11 +48,32 @@ python scripts/cli.py filter --category 食品
 
 ## Web 界面
 
+### 生产模式
+
 ```bash
 pip install flask flask-cors
+cd frontend && npm install && npm run build && cd ..
 python web/run.py
 ```
 
 访问 [http://localhost:5800](http://localhost:5800)
+
+### 开发模式（热更新）
+
+```bash
+# 终端 1
+WEB_DEBUG=true python web/run.py
+
+# 终端 2
+cd frontend && npm run dev
+```
+
+访问 [http://localhost:5800](http://localhost:5800) — Flask 自动代理到 Vite 热更新。
+
+### Docker
+
+```bash
+docker run -d --name ledger -p 5800:5800 -v ./data:/data zouzhenglu/ledger:latest
+```
 
 详细的 CLI 命令参考请见 [CLI 命令参考](/docs/cli/transactions) 页面。

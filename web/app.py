@@ -170,6 +170,7 @@ def catch_all(path):
 
 
 @app.route('/api/health')
+@app.route('/health')
 def health():
     try:
         conn = db_module.sqlite3.connect(DB_PATH)
@@ -413,6 +414,50 @@ def restore_transaction(tid):
         return api_success(message='恢复成功')
     except Exception as e:
         return api_error(f'恢复失败: {str(e)}')
+
+
+# ── 搜索兼容端点（旧版 test 仍用 /api/transactions/search）─
+@app.route('/api/transactions/search', methods=['GET'])
+def search_transactions_compat():
+    """向后兼容的搜索端点"""
+    sync_db_path()
+    keyword = request.args.get('keyword', '')
+    search_type = request.args.get('search_type', 'all')
+    limit = request.args.get('limit', 50, type=int)
+
+    if not keyword:
+        return api_error('搜索关键词不能为空')
+
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    params = []
+    where = "is_deleted = 0 AND ("
+
+    fields = ['note', 'category', 'subcategory', 'merchant', 'account', 'project', 'member']
+    if search_type == 'all':
+        clauses = [f"{f} LIKE ?" for f in fields]
+        where += " OR ".join(clauses) + ")"
+        params = [f'%{keyword}%'] * len(fields)
+    elif search_type == 'note':
+        where += "note LIKE ?)" + " AND is_deleted = 0"
+        params = [f'%{keyword}%']
+    elif search_type == 'category':
+        where += "(category LIKE ? OR subcategory LIKE ?))"
+        params = [f'%{keyword}%', f'%{keyword}%']
+    elif search_type == 'merchant':
+        where += "merchant LIKE ?)" + " AND is_deleted = 0"
+        params = [f'%{keyword}%']
+
+    c.execute(f'''SELECT id, trans_date, type, amount, category, account, note
+                  FROM transactions WHERE {where} ORDER BY trans_date DESC LIMIT ?''',
+              params + [limit])
+    rows = c.fetchall()
+    conn.close()
+
+    return api_success([{
+        'id': r[0], 'date': r[1], 'type': r[2], 'amount': r[3],
+        'category': r[4], 'account': r[5], 'note': r[6],
+    } for r in rows])
 
 
 # ════════════════════════════════════════════════════════

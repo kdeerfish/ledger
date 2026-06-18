@@ -22,6 +22,7 @@ python3 scripts/ledger_cli.py template_create '{"name":"工资模板","template_
 - `member`: 成员 - 可选
 - `merchant`: 商家 - 可选
 - `note`: 备注 - 可选
+- `tag_names`: 标签名称列表 ["日常", "重要"] - 可选
 - `description`: 描述 - 可选
 
 ## 列出模板 (template_list)

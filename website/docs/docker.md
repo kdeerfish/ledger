@@ -109,11 +109,12 @@ docker compose restart
 
 ```mermaid
 graph LR
-    A[Push master/tag] --> B[Run Tests]
-    B --> C[Build Docker]
-    C --> D[Docker Hub]
-    C --> E[ghcr.io]
-    C --> F[阿里云]
+    A[Push master/tag] --> B[Run Tests (252)]
+    B --> C[Build Frontend]
+    C --> D[Build Docker]
+    D --> E[Docker Hub]
+    D --> F[ghcr.io]
+    D --> G[阿里云]
 ```
 
 ### 镜像标签规则
@@ -121,7 +122,7 @@ graph LR
 | 触发方式 | 构建标签 |
 |----------|----------|
 | push `master` | `:latest` |
-| push tag `v1.5.0` | `:1.5.0` + `:latest` |
+| push tag `v2.0.0` | `:2.0.0` + `:latest` |
 | 手动触发 | 自定义标签 + `:latest` |
 
 ## 🔧 环境变量

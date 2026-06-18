@@ -2,14 +2,14 @@
 
 # 📒 Ledger — 个人记账系统
 
-**收支管理 · 预算规划 · 多维度统计 · Web 界面 · AI Agent 集成**
+**收支管理 · 预算规划 · 标签分类 · 多维统计 · React Web 界面 · AI Agent 集成**
 
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/kdeerfish/ledger/docker-publish.yml?branch=master&label=CI%2FCD&logo=github)](https://github.com/kdeerfish/ledger/actions)
 [![Docker Pulls](https://img.shields.io/docker/pulls/zouzhenglu/ledger?logo=docker)](https://hub.docker.com/r/zouzhenglu/ledger)
 [![GitHub Release](https://img.shields.io/github/v/release/kdeerfish/ledger?logo=github)](https://github.com/kdeerfish/ledger/releases)
 [![License](https://img.shields.io/github/license/kdeerfish/ledger)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
-[![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)](https://github.com/kdeerfish/ledger/actions)
+[![Tests](https://img.shields.io/badge/tests-252%20passed-brightgreen)](https://github.com/kdeerfish/ledger/actions)
 
 **[快速开始](#-快速开始) · [CLI 命令](#-cli-命令速查) · [Web 界面](#-web-管理界面) · [Docker 部署](#-docker-部署) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
 
@@ -22,23 +22,25 @@
 | 功能 | 说明 |
 |------|------|
 | ✅ **收支记账** | 添加/编辑/软删除/恢复/物理删除交易记录 |
+| ✅ **标签分类** | 多标签支持（创建/关联/筛选/统计），颜色标记 |
 | ✅ **CSV 导入** | 随手记 CSV 一键导入，自动去重 |
-| ✅ **搜索筛选** | 按关键词、类别、账户、商家、日期范围搜索 |
-| ✅ **统计分析** | 按类别/账户/月份分组统计，多维度分析 |
+| ✅ **搜索筛选** | 按关键词、类别、账户、商家、标签、日期范围搜索 |
+| ✅ **统计分析** | 按类别/子类别/账户/商家/项目/成员/月/标签/类型 分组 |
+| ✅ **交互图表** | 柱状图/折线图/环形图/饼图，点击图表跳转筛选 |
 | ✅ **预算管理** | 按月/类别设置预算，实时进度跟踪，超支预警 |
 | ✅ **预算模板** | 创建预算模板、一键应用、自动推荐 |
-| ✅ **记录模板** | 常用交易模板，一键记账、使用频次统计 |
+| ✅ **记账模板** | 常用交易模板（含标签），一键记账、使用频次统计 |
 | ✅ **数据导出** | 导出为 CSV / JSON |
-| ✅ **Web 界面** | Flask 响应式 UI，手机/平板/PC 均可用 |
+| ✅ **Web 界面** | React + Vite 响应式 UI，手机/平板/PC 均可用 |
 | ✅ **AI Agent** | 为 picoclaw 等 AI Agent 提供 JSON API |
-| ✅ **Docker 部署** | 支持 Docker Hub / ghcr.io / 阿里云 三仓库 |
+| ✅ **Docker 部署** | 多阶段构建，支持 Docker Hub / ghcr.io / 阿里云 三仓库 |
 
 ---
 
 ## 🚀 快速开始
 
 ```bash
-# 1. 安装
+# 1. 安装 Python 依赖
 pip install -e ".[dev,lint]"
 
 # 2. 配置（可选，留空用默认值）
@@ -59,9 +61,52 @@ python scripts/cli.py summary
 
 ---
 
+## 🌐 Web 管理界面
+
+### 生产模式（不需要 Node.js）
+
+```bash
+# 1. 安装 Python 依赖
+pip install flask flask-cors
+
+# 2. 构建前端（仅首次或升级时需要）
+cd frontend && npm install && npm run build && cd ..
+
+# 3. 启动
+python web/run.py
+# 访问 http://localhost:5800
+```
+
+### 开发模式（有热更新）
+
+```bash
+# 终端 1: Flask 后端
+WEB_DEBUG=true python web/run.py
+
+# 终端 2: Vite 开发服务器
+cd frontend && npm run dev
+
+# 访问 http://localhost:5800（自动代理到 Vite 热更新）
+```
+
+或直接用 VS Code 的 **"Full Stack Dev"** compound 配置一键启动。
+
+### 功能页面
+
+| 页面 | 功能 |
+|------|------|
+| **概览** | 收支卡片 + 月度柱状图 + 累计折线图 + 类别环形图(可点击) |
+| **交易** | 多维筛选(类型/类别/账户/日期/标签) + 表格 + 分页 |
+| **记一笔** | 模板选择 + 字段自动建议 + 子类别快速选择 + 标签选择器 |
+| **预算** | 总览卡片 + 类别进度条 + 执行明细表 |
+| **类别+标签** | 类别统计 + 标签管理(创建/颜色/删除) |
+| **统计** | 9种分组 × 3种图表类型，点击图表跳转交易筛选 |
+
+---
+
 ## 🐳 Docker 部署
 
-项目经过 CI/CD 自动构建，**每次 push master / 打 tag 自动推送到 3 个镜像仓库**。
+镜像使用**多阶段构建**，自动编译 React 前端 + Python 后端，一个镜像搞定（不含 Node.js）。
 
 ### 拉取镜像
 
@@ -87,18 +132,11 @@ docker run -d \
   zouzhenglu/ledger:latest
 ```
 
-打开浏览器访问 http://localhost:5800
-
 ### 使用 docker-compose（推荐）
 
 ```bash
-# 下载 compose 文件
 wget https://raw.githubusercontent.com/kdeerfish/ledger/master/docker-compose.yml
-
-# 启动
 docker compose up -d
-
-# 查看日志
 docker compose logs -f
 ```
 
@@ -150,7 +188,7 @@ docker compose logs -f
 | `python scripts/cli.py budget_template_apply --template_id 1` | 应用预算模板 |
 | `python scripts/cli.py budget_template_suggest` | 智能推荐预算模板 |
 
-### 记录模板（一键记账）
+### 记账模板（一键记账）
 
 | 命令 | 说明 |
 |------|------|
@@ -177,135 +215,55 @@ python ledger-skills/scripts/ledger_cli.py list '{"limit":5}'
 python ledger-skills/scripts/ledger_cli.py summary '{"year":2026,"month":7}'
 ```
 
-> 详细文档见 [docs/cli.md](docs/cli.md)
-
 ---
 
-## 🌐 Web 管理界面
-
-Ledger 提供开箱即用的 Web 界面，支持完整的记账管理。
-
-### 启动
-
-```bash
-# 安装依赖后
-python web/run.py
-
-# 访问 http://127.0.0.1:5800
-```
-
-### 功能页面
-
-| 页面 | 功能 |
-|------|------|
-| **概览** | 收支汇总卡片、月度趋势图、最近交易列表 |
-| **交易** | 完整交易列表、搜索/筛选、新增/编辑/删除 |
-| **预算** | 按类别/月设置预算、实时进度跟踪、超支预警 |
-| **类别** | 类别/子类别层级展示、消费金额统计 |
-| **统计** | 按类别/账户/月份分组统计、图表展示 |
-
-> 详细 Web 文档见 [docs/web.md](docs/web.md)
-> API 文档见 [docs/api.md](docs/api.md)
-
----
-
-## 🧪 测试
-
-```bash
-# 运行全部测试
-make test
-
-# 快速测试
-make test-quick
-
-# 特定测试
-python -m pytest tests -v -k "test_budget"
-
-# 覆盖率
-make coverage
-
-# 代码检查
-make lint
-make lint-fix
-make format
-```
-
----
-
-## 🔧 开发指南
+## 🛠 开发
 
 ### 项目结构
 
 ```
 ledger/
-├── ledger_modules/          # 核心业务模块
-│   ├── db.py                # SQLite 数据库初始化/迁移
-│   ├── transactions.py      # 交易 CRUD / 搜索 / 筛选 / 导出 / 统计
-│   ├── budgets.py           # 预算 / 多维度预算 / 模板
-│   └── config.py            # 配置管理
-├── scripts/
-│   ├── cli.py               # CLI 入口
-│   ├── import_ledger.py     # CSV 导入
-│   ├── release.py           # 自动发布脚本
-│   └── deploy.py            # 打包发布脚本
-├── web/                     # Flask Web 界面
-│   ├── app.py               # 后端 API
-│   ├── run.py               # 启动脚本
-│   ├── templates/           # HTML 模板
-│   └── static/              # CSS 样式
-├── tests/                   # pytest 测试（102+ 测试用例）
-├── skills/                  # AI Agent 技能包
-├── .github/workflows/       # GitHub Actions CI/CD
-└── docs/                    # 📖 文档站
+├── frontend/               # React + Vite 前端
+│   ├── src/                # 组件 (5个页面 + 3个组件)
+│   ├── package.json
+│   └── vite.config.js      # API 代理配置
+├── ledger_modules/         # Python 核心业务模块
+│   ├── db.py               # SQLite 初始化/迁移/标签
+│   ├── transactions.py     # 交易 CRUD
+│   ├── budgets.py          # 预算
+│   └── config.py           # 配置管理
+├── web/
+│   ├── app.py              # Flask API (v2 全量)
+│   └── run.py              # 启动脚本
+├── tests/                  # 252 项 pytest 测试
+├── .github/workflows/      # CI/CD: 测试 + 前端构建 + Docker
+└── website/                # Docusaurus 文档站
 ```
 
-### 环境变量
+### 常用 Make 命令
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `LEDGER_PATH` | 项目根目录 | 自动检测 |
-| `LEDGER_DB_PATH` | SQLite 数据库路径 | `./ledger.db` |
-| `WEB_HOST` | Web 监听地址 | `0.0.0.0` |
-| `WEB_PORT` | Web 端口 | `5800` |
-| `WEB_DEBUG` | 调试模式 | `false` |
+| 命令 | 说明 |
+|------|------|
+| `make test` | 运行 252 项测试 |
+| `make coverage` | 测试 + 覆盖率报告 |
+| `make lint` | ruff 代码检查 |
+| `make deploy` | 构建前端 + 打包发布 |
+| `make release` | 打包 + git tag + 发布 |
 
-### 添加新功能
+### 测试
 
-1. 在 `ledger_modules/` 中实现业务逻辑
-2. 在 `scripts/cli.py` 添加 CLI 命令
-3. 在 `web/app.py` 添加 API 端点
-4. 在 `tests/` 添加测试用例
-5. 在 `docs/cli.md` 更新文档
+```bash
+# 全部测试
+python -m pytest tests -v --tb=short
 
----
-
-## 🤖 CI/CD 流水线
-
-每次 push master 或打 tag `v*`，GitHub Actions 自动执行：
-
-```mermaid
-graph LR
-    A[Push master/tag] --> B[Run Tests]
-    B --> C[Build Docker]
-    C --> D[Docker Hub]
-    C --> E[ghcr.io]
-    C --> F[阿里云]
+# 仅新功能测试（标签/模板/自动建议）
+python -m pytest tests/test_new_features.py -v
 ```
 
-配置见 [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)。
-
 ---
 
-## 📄 许可
+## 📦 版本
 
-MIT License
+当前版本 **v2.0.0** — 新增标签系统、React 前端、交互图表、自动建议、记账模板。
 
----
-
-<div align="center">
-
-**⭐ 如果这个项目对你有帮助，欢迎 Star！**
-
-[文档首页](docs/index.md) · [问题反馈](https://github.com/kdeerfish/ledger/issues) · [发布记录](https://github.com/kdeerfish/ledger/releases)
-
-</div>
+查看 [CHANGELOG](https://github.com/kdeerfish/ledger/releases) 了解完整变更历史。

@@ -76,7 +76,8 @@ def reset_db():
     # 重建表（删掉所有数据）
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    tables = ["transactions", "budgets", "budget_templates", "record_templates"]
+    tables = ["transactions", "budgets", "budget_templates", "record_templates",
+               "transaction_tags", "tags"]
     for t in tables:
         c.execute(f"DROP TABLE IF EXISTS {t}")
     conn.commit()

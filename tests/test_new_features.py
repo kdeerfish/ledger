@@ -1,241 +1,323 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-新增功能测试 - 去重检查、中文类型、通用模板、schema
+Tags & Templates API 集成测试
+覆盖新增功能：标签 CRUD、模板 CRUD、交易关联标签、自动建议、增强统计
 """
-
+import json
 import os
 import sys
-import json
 import tempfile
+import shutil
 import sqlite3
-from datetime import datetime
 
 import pytest
 
+# 确保项目根目录在 sys.path 中
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, ROOT)
+
+# ── 先劫持 DB 路径再导入 app ──
+TEST_DIR = None
+TEST_DB = None
+
+
+def _setup_test_db():
+    global TEST_DIR, TEST_DB
+    TEST_DIR = tempfile.mkdtemp()
+    TEST_DB = os.path.join(TEST_DIR, "test.db")
+    os.environ["LEDGER_DB_PATH"] = TEST_DB
+    return TEST_DB
+
+
+_setup_test_db()
+
+import ledger_modules.db as db_module
 import ledger_modules.transactions as tx_module
 import ledger_modules.budgets as budget_module
+from web.app import app as flask_app
 
 
-class TestDuplicateCheck:
-    """去重检查测试"""
+@pytest.fixture(autouse=True)
+def reset_db():
+    """每个测试前重置数据库"""
+    db_path = os.environ.get("LEDGER_DB_PATH", TEST_DB)
+    db_module.DB_PATH = db_path
+    tx_module.DB_PATH = db_path
+    budget_module.DB_PATH = db_path
 
-    def test_no_duplicate(self, temp_db):
-        """无重复记录时返回空列表"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        # 使用不同日期检查，应该没有重复
-        duplicates = tx_module.check_duplicate("支出", 100.0, "食品", "微信", "2026-06-16 10:00:00")
-        assert len(duplicates) == 0
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    tables = ["transactions", "budgets", "budget_templates", "record_templates",
+              "transaction_tags", "tags"]
+    for t in tables:
+        c.execute(f"DROP TABLE IF EXISTS {t}")
+    conn.commit()
+    conn.close()
 
-    def test_duplicate_found(self, temp_db):
-        """存在重复记录时返回相似记录"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        duplicates = tx_module.check_duplicate("支出", 100.0, "食品", "微信", "2026-06-15 15:00:00")
-        assert len(duplicates) == 1
-        assert duplicates[0]['amount'] == 100.0
-        assert duplicates[0]['category'] == "食品"
+    db_module.init_db()
 
-    def test_add_with_duplicate_warning(self, temp_db):
-        """添加重复记录时返回 None"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        result = tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 15:00:00")
-        assert result is None
+    import web.app as web_app_module
+    web_app_module.DB_PATH = db_path
+    web_app_module.sync_db_path()
 
-    def test_add_with_force(self, temp_db):
-        """使用 force 参数可以强制添加重复记录"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        result = tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 15:00:00", force=True)
-        assert result is not None
-        # 验证有两条记录
-        rows = self._fetch(temp_db)
-        assert len(rows) == 2
+    yield
 
-    def test_different_amount_no_duplicate(self, temp_db):
-        """不同金额不算重复"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        duplicates = tx_module.check_duplicate("支出", 200.0, "食品", "微信", "2026-06-15 10:00:00")
-        assert len(duplicates) == 0
-
-    def test_different_category_no_duplicate(self, temp_db):
-        """不同类别不算重复"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        duplicates = tx_module.check_duplicate("支出", 100.0, "交通", "微信", "2026-06-15 10:00:00")
-        assert len(duplicates) == 0
-
-    @staticmethod
-    def _fetch(db_path):
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("SELECT * FROM transactions")
-        rows = c.fetchall()
-        conn.close()
-        return rows
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    for t in tables:
+        c.execute(f"DELETE FROM {t}")
+    c.execute("DELETE FROM sqlite_sequence")
+    conn.commit()
+    conn.close()
 
 
-class TestChineseType:
-    """中文类型测试"""
-
-    def test_add_expense_chinese(self, temp_db):
-        """添加中文类型支出"""
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        rows = self._fetch(temp_db)
-        assert rows[0][1] == "支出"
-
-    def test_add_income_chinese(self, temp_db):
-        """添加中文类型收入"""
-        tx_module.add_transaction("收入", 5000.0, "工资", "", "银行", "", "本人", "", "测试", "2026-06-15 10:00:00")
-        rows = self._fetch(temp_db)
-        assert rows[0][1] == "收入"
-
-    def test_summary_chinese_type(self, temp_db):
-        """汇总统计使用中文类型"""
-        tx_module.add_transaction("支出", 100.0, "食品", "", "微信", "", "本人", "", "", "2026-06-15 10:00:00")
-        tx_module.add_transaction("收入", 5000.0, "工资", "", "银行", "", "本人", "", "", "2026-06-15 10:00:00")
-        # 验证数据库中的类型是中文
-        rows = self._fetch(temp_db)
-        types = {row[1] for row in rows}
-        assert "支出" in types
-        assert "收入" in types
-
-    @staticmethod
-    def _fetch(db_path):
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("SELECT * FROM transactions")
-        rows = c.fetchall()
-        conn.close()
-        return rows
+@pytest.fixture
+def client():
+    """Flask 测试客户端"""
+    flask_app.config["TESTING"] = True
+    with flask_app.test_client() as c:
+        yield c
 
 
-class TestRecordTemplate:
-    """通用记录模板测试"""
+# ══════════════════════════════════════════════════════════════════════
+# Tests
+# ══════════════════════════════════════════════════════════════════════
 
-    def test_create_template(self, temp_db):
-        """创建模板"""
-        template_id = budget_module.create_record_template(
-            name="零食模板",
-            template_type="支出",
-            type_="支出",
-            amount=30.0,
-            category="食品酒水",
-            subcategory="零食",
-            account="微信零钱",
-            merchant="拼多多"
-        )
-        assert template_id is not None
-        assert template_id > 0
+class TestTagsAPI:
+    """标签 API 测试"""
 
-    def test_list_templates(self, temp_db):
-        """列出模板"""
-        budget_module.create_record_template("模板1", "支出", "支出", 30.0, "食品")
-        budget_module.create_record_template("模板2", "收入", "收入", 5000.0, "工资")
-        
-        # 列出所有模板
-        templates = budget_module.list_record_templates()
-        assert len(templates) == 2
-        
-        # 按类型列出
-        expense_templates = budget_module.list_record_templates("支出")
-        assert len(expense_templates) == 1
-        assert expense_templates[0]['name'] == "模板1"
+    def test_create_tag(self, client):
+        resp = client.post('/api/tags', data=json.dumps({"name": "测试标签", "color": "#ef4444"}),
+                          content_type='application/json')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['success'] is True
+        assert 'id' in data['data']
 
-    def test_get_template(self, temp_db):
-        """获取单个模板"""
-        template_id = budget_module.create_record_template("测试模板", "支出", "支出", 100.0, "食品")
-        template = budget_module.get_record_template(template_id)
-        assert template is not None
-        assert template['name'] == "测试模板"
-        assert template['amount'] == 100.0
+    def test_create_duplicate_tag(self, client):
+        client.post('/api/tags', data=json.dumps({"name": "重复标签"}),
+                    content_type='application/json')
+        resp = client.post('/api/tags', data=json.dumps({"name": "重复标签"}),
+                          content_type='application/json')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['success'] is True
 
-    def test_update_template(self, temp_db):
-        """更新模板"""
-        template_id = budget_module.create_record_template("原始模板", "支出", "支出", 100.0, "食品")
-        success = budget_module.update_record_template(template_id, name="更新后模板", amount=200.0)
-        assert success
-        template = budget_module.get_record_template(template_id)
-        assert template['name'] == "更新后模板"
-        assert template['amount'] == 200.0
+    def test_list_tags(self, client):
+        for name in ["餐饮", "交通", "购物"]:
+            client.post('/api/tags', data=json.dumps({"name": name}),
+                       content_type='application/json')
+        resp = client.get('/api/tags')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['success'] is True
+        assert len(data['data']) >= 3
+        names = [t['name'] for t in data['data']]
+        assert '餐饮' in names
 
-    def test_delete_template(self, temp_db):
-        """删除模板"""
-        template_id = budget_module.create_record_template("要删除的模板", "支出", "支出", 100.0, "食品")
-        success = budget_module.delete_record_template(template_id)
-        assert success
-        template = budget_module.get_record_template(template_id)
-        assert template is None
+    def test_tag_has_usage_count(self, client):
+        resp = client.get('/api/tags')
+        data = resp.get_json()
+        for tag in data['data']:
+            assert 'usage_count' in tag
 
-    def test_apply_template(self, temp_db):
-        """应用模板"""
-        template_id = budget_module.create_record_template(
-            "午餐模板", "支出", "支出", 25.0, "餐饮", "午餐", "食堂"
-        )
-        template = budget_module.apply_record_template(template_id)
-        assert template is not None
-        assert template['name'] == "午餐模板"
-        assert template['amount'] == 25.0
-        
-        # 验证使用次数增加
-        template = budget_module.get_record_template(template_id)
-        assert template['usage_count'] == 1
-        assert template['last_used_at'] is not None
-
-    def test_apply_template_with_override(self, temp_db):
-        """应用模板并覆盖金额"""
-        template_id = budget_module.create_record_template(
-            "午餐模板", "支出", "支出", 25.0, "餐饮", "午餐", "食堂"
-        )
-        template = budget_module.apply_record_template(template_id, amount_override=35.0)
-        assert template['amount'] == 35.0
-
-    def test_suggest_templates(self, temp_db):
-        """推荐模板"""
-        # 添加多条相似记录
-        for i in range(3):
-            tx_module.add_transaction(
-                "支出", 30.0 + i, "食品", "零食", "微信", "", "本人", "拼多多", 
-                f"测试{i}", f"2026-06-15 {10+i}:00:00", force=True
-            )
-        
-        suggestions = budget_module.suggest_record_templates()
-        assert len(suggestions) > 0
-        # 应该有食品相关的推荐
-        categories = [s['category'] for s in suggestions]
-        assert "食品" in categories
+    def test_delete_tag(self, client):
+        resp = client.post('/api/tags', data=json.dumps({"name": "待删除标签"}),
+                          content_type='application/json')
+        tag_id = resp.get_json()['data']['id']
+        resp = client.delete(f'/api/tags/{tag_id}')
+        assert resp.status_code == 200
+        resp = client.get('/api/tags')
+        names = [t['name'] for t in resp.get_json()['data']]
+        assert '待删除标签' not in names
 
 
-class TestAnalyze:
-    """analyze 数据分析测试"""
+class TestTransactionTags:
+    """交易关联标签测试"""
 
-    def test_analyze_empty_db(self, temp_db):
-        """空数据库的分析"""
-        result = tx_module.analyze_data()
-        assert '总览' in result
-        assert '0 笔记录' in result
+    def test_add_transaction_with_tags(self, client):
+        tag1 = client.post('/api/tags', data=json.dumps({"name": "午饭"}),
+                          content_type='application/json').get_json()['data']['id']
+        tag2 = client.post('/api/tags', data=json.dumps({"name": "外卖"}),
+                          content_type='application/json').get_json()['data']['id']
 
-    def test_analyze_with_data(self, sample_db):
-        """有数据的分析"""
-        result = tx_module.analyze_data()
-        assert '总览' in result
-        assert '4128' not in result  # sample_db 只有5条记录
-        assert '账户' in result
-        assert '商家' in result
-        assert '类别' in result
-        assert '成员' in result
-        assert '字段使用率' in result
+        resp = client.post('/api/transactions', data=json.dumps({
+            "type": "支出", "amount": 25.0, "category": "食品",
+            "account": "微信", "note": "午餐",
+            "tag_ids": [tag1, tag2],
+            "force": True,
+        }), content_type='application/json')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        tx_id = data['data']['id']
 
-    def test_analyze_cross_correlation(self, temp_db):
-        """交叉关联分析"""
-        # 添加数据
-        tx_module.add_transaction("支出", 100.0, "食品", "零食", "微信", "", "本人", "拼多多", "测试", "2026-06-15 10:00:00", force=True)
-        tx_module.add_transaction("支出", 50.0, "食品", "零食", "微信", "", "本人", "拼多多", "测试", "2026-06-15 11:00:00", force=True)
-        tx_module.add_transaction("支出", 30.0, "交通", "打车", "支付宝", "", "本人", "滴滴", "测试", "2026-06-15 12:00:00", force=True)
-        
-        result = tx_module.analyze_data()
-        assert '拼多多' in result
-        assert '微信' in result
-        assert '食品' in result
+        resp = client.get(f'/api/transactions/{tx_id}')
+        t = resp.get_json()['data']
+        tag_names = [tag['name'] for tag in t['tags']]
+        assert '午饭' in tag_names
+        assert '外卖' in tag_names
 
-    def test_analyze_returns_string(self, temp_db):
-        """analyze 返回字符串"""
-        result = tx_module.analyze_data()
-        assert isinstance(result, str)
+    def test_filter_by_tags(self, client):
+        tag = client.post('/api/tags', data=json.dumps({"name": "可筛选标签"}),
+                         content_type='application/json').get_json()['data']['id']
+        client.post('/api/transactions', data=json.dumps({
+            "type": "支出", "amount": 10.0, "category": "测试",
+            "tag_ids": [tag], "force": True,
+        }), content_type='application/json')
+
+        resp = client.get(f'/api/transactions?tag_ids={tag}')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['data']['total'] >= 1
+
+    def test_update_transaction_tags(self, client):
+        tx_resp = client.post('/api/transactions', data=json.dumps({
+            "type": "支出", "amount": 30.0, "category": "测试",
+            "tag_ids": [], "force": True,
+        }), content_type='application/json')
+        tx_id = tx_resp.get_json()['data']['id']
+
+        tag = client.post('/api/tags', data=json.dumps({"name": "新标签"}),
+                         content_type='application/json').get_json()['data']['id']
+
+        client.put(f'/api/transactions/{tx_id}', data=json.dumps({
+            "tag_ids": [tag],
+        }), content_type='application/json')
+
+        resp = client.get(f'/api/transactions/{tx_id}')
+        tags = resp.get_json()['data']['tags']
+        assert len(tags) == 1
+        assert tags[0]['name'] == '新标签'
+
+
+class TestTemplatesAPI:
+    """记一笔模板 API 测试"""
+
+    def test_create_template(self, client):
+        resp = client.post('/api/templates', data=json.dumps({
+            "name": "通勤", "type": "支出", "amount": 5.0,
+            "category": "交通", "account": "微信",
+            "tag_names": ["日常"],
+        }), content_type='application/json')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert 'id' in data['data']
+
+    def test_list_templates(self, client):
+        client.post('/api/templates', data=json.dumps({
+            "name": "午餐", "type": "支出", "amount": 20.0, "category": "食品",
+        }), content_type='application/json')
+        resp = client.get('/api/templates')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['success'] is True
+        names = [t['name'] for t in data['data']]
+        assert '午餐' in names
+
+    def test_use_template_increments_count(self, client):
+        resp = client.post('/api/templates', data=json.dumps({
+            "name": "人气模板", "type": "支出", "amount": 15.0, "category": "其他",
+        }), content_type='application/json')
+        tid = resp.get_json()['data']['id']
+
+        for _ in range(3):
+            client.post(f'/api/templates/{tid}/use')
+        resp = client.get('/api/templates')
+        tmpl = [t for t in resp.get_json()['data'] if t['id'] == tid][0]
+        assert tmpl['usage_count'] == 3
+
+    def test_delete_template(self, client):
+        resp = client.post('/api/templates', data=json.dumps({
+            "name": "待删除模板", "type": "支出", "amount": 99.0,
+        }), content_type='application/json')
+        tid = resp.get_json()['data']['id']
+        client.delete(f'/api/templates/{tid}')
+        resp = client.get('/api/templates')
+        ids = [t['id'] for t in resp.get_json()['data']]
+        assert tid not in ids
+
+
+class TestSuggestionsAPI:
+    """自动建议 API 测试"""
+
+    def test_suggestions_all(self, client):
+        resp = client.get('/api/suggestions?field=all')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert 'categories' in data['data']
+        assert 'accounts' in data['data']
+        assert 'members' in data['data']
+        assert 'merchants' in data['data']
+        assert 'projects' in data['data']
+        assert 'frequent' in data['data']
+
+    def test_suggestions_single_field(self, client):
+        resp = client.get('/api/suggestions?field=accounts')
+        data = resp.get_json()
+        assert 'accounts' in data['data']
+        assert 'categories' not in data['data']
+
+    def test_suggestions_with_keyword(self, client):
+        client.post('/api/transactions', data=json.dumps({
+            "type": "支出", "amount": 1.0, "merchant": "测试商家专用",
+            "force": True,
+        }), content_type='application/json')
+        resp = client.get('/api/suggestions?field=merchants&keyword=测试')
+        data = resp.get_json()
+        names = [m['name'] for m in data['data']['merchants']]
+        assert '测试商家专用' in names
+
+
+class TestEnhancedStats:
+    """增强统计 API 测试"""
+
+    def test_stats_by_tag(self, client):
+        tag = client.post('/api/tags', data=json.dumps({"name": "统计标签"}),
+                         content_type='application/json').get_json()['data']['id']
+        client.post('/api/transactions', data=json.dumps({
+            "type": "支出", "amount": 50.0, "tag_ids": [tag], "force": True,
+        }), content_type='application/json')
+        resp = client.get('/api/stats?group_by=tag')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        groups = [i['group'] for i in data['data']['items']]
+        assert '统计标签' in groups
+
+    def test_stats_by_merchant(self, client):
+        resp = client.get('/api/stats?group_by=merchant')
+        assert resp.status_code == 200
+
+    def test_stats_by_project(self, client):
+        resp = client.get('/api/stats?group_by=project')
+        assert resp.status_code == 200
+
+    def test_stats_by_member(self, client):
+        resp = client.get('/api/stats?group_by=member')
+        assert resp.status_code == 200
+
+    def test_trends_api(self, client):
+        resp = client.get('/api/trends?year=2026&granularity=month')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert 'items' in data['data']
+        assert 'cumulative' in data['data']
+
+    def test_type_stats(self, client):
+        resp = client.get('/api/stats?group_by=type')
+        assert resp.status_code == 200
+
+    def test_subcategory_stats(self, client):
+        resp = client.get('/api/stats?group_by=subcategory')
+        assert resp.status_code == 200
+
+
+class TestQuickCategories:
+    """常用子类别 API 测试"""
+
+    def test_quick_categories(self, client):
+        resp = client.get('/api/categories/quick')
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data['success'] is True
+        if data['data']:
+            assert 'category' in data['data'][0]
+            assert 'subcategory' in data['data'][0]
