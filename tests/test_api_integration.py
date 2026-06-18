@@ -16,7 +16,19 @@ import sqlite3
 import pytest
 
 # 确保项目根目录在 sys.path 中
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, ROOT)
+
+# 从 pyproject.toml 读取版本号
+def _read_version():
+    try:
+        import tomllib
+        with open(os.path.join(ROOT, 'pyproject.toml'), 'rb') as f:
+            return tomllib.load(f).get('project', {}).get('version', '0.0.0')
+    except Exception:
+        return '0.0.0'
+
+_VERSION = _read_version()
 
 # ── 先劫持 DB 路径再导入 app ──
 TEST_DIR = None
@@ -133,7 +145,7 @@ class TestHealth:
         assert resp.status_code == 200
         data = _get_json(resp)
         assert data["status"] == "ok"
-        assert data["version"] == "1.4.0"
+        assert data["version"] == _VERSION
         assert data["database"] is not None
 
     def test_health_also_at_health_path(self, client):

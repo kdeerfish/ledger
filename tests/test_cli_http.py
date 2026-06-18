@@ -18,7 +18,19 @@ import socket
 import pytest
 
 # 确保项目根目录在 sys.path 中
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, ROOT)
+
+# 从 pyproject.toml 读取版本号
+def _read_version():
+    try:
+        import tomllib
+        with open(os.path.join(ROOT, 'pyproject.toml'), 'rb') as f:
+            return tomllib.load(f).get('project', {}).get('version', '0.0.0')
+    except Exception:
+        return '0.0.0'
+
+_VERSION = _read_version()
 
 
 # ── 全局：临时 DB & 端口 ──
@@ -172,7 +184,7 @@ class TestCliHealth:
         result = cli_module.cmd_health({})
         assert result["success"] is True
         assert "API 连接正常" in result["data"]
-        assert "版本: 1.4.0" in result["data"]
+        assert "版本: " + _VERSION in result["data"]
 
 
 class TestCliAdd:
