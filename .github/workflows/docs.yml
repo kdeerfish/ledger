@@ -2,11 +2,10 @@
 # MkDocs 文档站 — 自动构建并部署到 GitHub Pages
 #
 # 触发条件：
-#   - push 到 master 分支（文档变更时）
+#   - push 到 master 分支（docs/ 或 mkdocs.yml 变更时）
 #   - 手动 workflow_dispatch
 #
 # 输出：
-#   - 部署到 gh-pages 分支
 #   - 自动发布到 https://kdeerfish.github.io/ledger
 # ============================================================
 
@@ -22,13 +21,18 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Build & Deploy MkDocs
+  build:
+    name: Build MkDocs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,10 +52,19 @@ jobs:
       - name: Build documentation
         run: mkdocs build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
