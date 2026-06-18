@@ -66,6 +66,7 @@ WEB_DEBUG = os.environ.get('WEB_DEBUG', '').lower() in ('true', '1', 'yes')
 def _get_version():
     """从 pyproject.toml 读取版本号"""
     try:
+        import tomllib
         pyproject = os.path.join(ROOT_DIR, 'pyproject.toml')
         with open(pyproject, 'rb') as f:
             return tomllib.load(f).get('project', {}).get('version', '0.0.0')
