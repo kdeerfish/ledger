@@ -190,7 +190,7 @@ CREATE TABLE record_templates (...);
 1. Push master → 运行测试 → 构建 Docker → 推送到 3 个仓库
 2. Push tag v* → 同上 + 版本标签
 
-配置见 [.github/workflows/docker-publish.yml](../.github/workflows/docker-publish.yml)。
+配置见 [`.github/workflows/docker-publish.yml`](https://github.com/kdeerfish/ledger/blob/master/.github/workflows/docker-publish.yml)。
 
 ---
 

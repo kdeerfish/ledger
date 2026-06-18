@@ -77,7 +77,7 @@ copyright: Copyright &copy; 2026 zouzhenglu
 nav:
   - 🏠 首页: index.md
   - 🚀 快速开始:
-    - 安装与上手: index.md#快速开始
+    - 安装与上手: index.md
     - CLI 速查: cli.md
     - Docker 部署: docker.md
   - 📘 CLI 命令参考: cli.md
