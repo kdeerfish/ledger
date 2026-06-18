@@ -5,9 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ledger"
 version = "1.4.0"
-description = "个人记账系统 - 支持收支管理、预算规划、多维度统计"
+description = "个人记账系统 - 支持收支管理、预算规划、多维度统计，附带 Web 界面"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0",
+    "flask-cors>=4.0",
+]
 license = {text = "MIT"}
 keywords = ["finance", "accounting", "ledger", "budget"]
 
@@ -21,7 +25,7 @@ lint = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["ledger_modules*"]
+include = ["ledger_modules*", "web*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md"]

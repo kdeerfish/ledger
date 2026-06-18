@@ -26,6 +26,11 @@ ledger/
 │   ├── test_budgets.py      # 预算 / 多维度 / 模板 CRUD
 │   ├── test_robustness.py   # 健壮性测试（边界条件、错误处理）
 │   └── test_integration.py  # 端到端工作流 + CSV 导入
+├── web/                     # Web 管理界面 (Flask)
+│   ├── app.py               # Flask 后端 API
+│   ├── run.py               # 一键启动脚本
+│   ├── templates/           # HTML 模板
+│   └── static/              # CSS 样式
 ├── data/
 │   └── sample/              # 示例数据（随手记 CSV 导出）
 ├── .env.example             # 环境变量配置模板
@@ -142,7 +147,76 @@ python ledger-skills/scripts/ledger_cli.py summary '{"year":2026,"month":7}'
 
 ## 技术栈
 
-- Python 3.10+（仅标准库，零第三方依赖）
+- Python 3.10+
 - SQLite 持久化
+- Flask Web 框架（可选，用于 Web 界面）
 - pytest / pytest-cov 测试
 - ruff 代码检查
+
+---
+
+## Web 管理界面
+
+Ledger 提供一个开箱即用的 Web 管理界面，适配飞牛OS (FnOS) 及任何 Linux 环境。
+
+### 快速启动
+
+```bash
+# 1. 安装依赖
+pip install flask flask-cors
+
+# 2. 启动服务
+python web/run.py
+
+# 3. 打开浏览器
+# 本地访问: http://127.0.0.1:5000
+# NAS访问:  http://NAS_IP:5000
+```
+
+### 功能一览
+
+| 页面 | 功能 |
+|------|------|
+| **概览** | 收支汇总卡片、月度趋势图、最近交易 |
+| **交易** | 全部交易列表、搜索/筛选、新增/编辑/删除（软删除可恢复） |
+| **预算** | 按类别/月设置预算、实时进度跟踪、超支预警 |
+| **类别** | 类别/子类别层级展示、消费金额统计 |
+| **统计** | 按类别/账户/月份分组统计、图表展示 |
+
+### 飞牛OS (FnOS) 部署
+
+```bash
+# SSH 到飞牛OS
+ssh admin@nas_ip
+
+# 进入项目目录
+cd /volume1/docker/ledger
+
+# 安装依赖
+pip3 install flask flask-cors
+
+# 后台运行（退出 SSH 后保持运行）
+nohup python3 web/run.py --port 5000 > ledger-web.log 2>&1 &
+
+# 查看日志
+tail -f ledger-web.log
+
+# 停止服务
+kill $(pgrep -f "web/run.py")
+
+# 配置开机自启（可选），编辑 /etc/rc.local：
+# su - admin -c "cd /volume1/docker/ledger && nohup python3 web/run.py > ledger-web.log 2>&1 &"
+```
+
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `WEB_HOST` | 监听地址 | `0.0.0.0` |
+| `WEB_PORT` | 监听端口 | `5000` |
+| `WEB_DEBUG` | 调试模式 | `false` |
+
+### 截图预览
+
+Web 界面使用 Bootstrap 5 响应式设计，在手机、平板、电脑上均可正常使用。
+包含：Dashboard 概览看板、收支趋势图、交易记录表格、预算进度条等。`
