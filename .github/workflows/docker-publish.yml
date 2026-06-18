@@ -7,7 +7,7 @@
 #
 # 推送目标：
 #   - Docker Hub       docker.io/kdeerfish/ledger
-#   - 阿里云镜像服务    registry.cn-hangzhou.aliyuncs.com/kdeerfish/ledger
+#   - 阿里云镜像服务    crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger
 # ============================================================
 
 name: Docker CI/CD
@@ -29,7 +29,7 @@ on:
 env:
   # ── 镜像名称 ──────────────────────────────────────
   DOCKER_IMAGE:     kdeerfish/ledger
-  ALIYUN_IMAGE:     registry.cn-hangzhou.aliyuncs.com/kdeerfish/ledger
+  ALIYUN_IMAGE:     crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger
 
   # ── Python ──────────────────────────────────────────
   PYTHON_VERSION: '3.11'
@@ -106,7 +106,7 @@ jobs:
       - name: Log in to Alibaba Cloud Container Registry
         uses: docker/login-action@v3
         with:
-          registry: registry.cn-hangzhou.aliyuncs.com
+          registry: crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
