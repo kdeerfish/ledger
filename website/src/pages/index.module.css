@@ -1,5 +1,5 @@
 .hero {
-  padding: 5rem 0 4rem;
+  padding: 6rem 0 5rem;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -7,26 +7,27 @@
 }
 
 .hero h1 {
-  font-size: 3.2rem;
+  font-size: 3.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #fff;
+  margin-bottom: 0.75rem;
 }
 
 .heroTagline {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   color: rgba(255,255,255,.85);
-  max-width: 640px;
-  margin: 0.75rem auto 1.5rem;
+  max-width: 600px;
+  margin: 0 auto 0.5rem;
   line-height: 1.6;
 }
 
 .heroDesc {
   font-size: 0.95rem;
-  color: rgba(255,255,255,.65);
-  max-width: 580px;
+  color: rgba(255,255,255,.6);
+  max-width: 480px;
   margin: 0 auto 2rem;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .buttons {
@@ -42,9 +43,9 @@
   color: #4f46e5 !important;
   border: none !important;
   font-weight: 700 !important;
-  padding: 0.65rem 1.5rem !important;
+  padding: 0.7rem 1.8rem !important;
   border-radius: 10px !important;
-  font-size: 0.95rem !important;
+  font-size: 1rem !important;
   transition: transform 0.15s, box-shadow 0.15s !important;
 }
 .btnPrimary:hover {
@@ -57,9 +58,9 @@
   color: #fff !important;
   border: 1px solid rgba(255,255,255,.2) !important;
   font-weight: 600 !important;
-  padding: 0.65rem 1.5rem !important;
+  padding: 0.7rem 1.8rem !important;
   border-radius: 10px !important;
-  font-size: 0.95rem !important;
+  font-size: 1rem !important;
   backdrop-filter: blur(4px);
   transition: all 0.15s !important;
 }
@@ -68,141 +69,95 @@
   border-color: rgba(255,255,255,.35) !important;
 }
 
-/* ── Section ── */
-.section {
+/* ── Value Props ── */
+.props {
   padding: 4rem 0;
 }
-.sectionAlt {
+
+.propsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .propsGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .hero h1 { font-size: 2.4rem; }
+  .hero { padding: 3rem 0; }
+}
+
+.propCard {
+  text-align: center;
+}
+
+.propIcon {
+  font-size: 2.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.propTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.propDesc {
+  font-size: 0.88rem;
+  color: var(--ifm-color-emphasis-600);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── CTA Section ── */
+.cta {
   padding: 4rem 0;
+  text-align: center;
   background: #f8fafc;
 }
-[data-theme='dark'] .sectionAlt {
+[data-theme='dark'] .cta {
   background: #1e293b;
 }
 
-.sectionTitle {
-  text-align: center;
-  font-size: 1.8rem;
+.ctaTitle {
+  font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
 
-.sectionSub {
-  text-align: center;
+.ctaDesc {
   color: var(--ifm-color-emphasis-600);
-  max-width: 560px;
-  margin: 0 auto 3rem;
-  font-size: 1rem;
+  max-width: 480px;
+  margin: 0 auto 1.5rem;
+  font-size: 0.95rem;
   line-height: 1.6;
 }
 
-/* ── Feature grid ── */
-.featureGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-@media (max-width: 900px) {
-  .featureGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 600px) {
-  .featureGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.featureCard {
-  background: var(--ifm-card-background-color);
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 14px;
-  padding: 1.5rem 1.25rem;
-  transition: all 0.2s;
+.ctaButtons {
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.featureCard:hover {
-  border-color: var(--ifm-color-primary);
-  box-shadow: 0 4px 16px rgba(79,70,229,.12);
-  transform: translateY(-2px);
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.featureNum {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ifm-color-primary);
-  letter-spacing: 0.05em;
+.btnOutline {
+  border: 2px solid var(--ifm-color-primary) !important;
+  color: var(--ifm-color-primary) !important;
+  font-weight: 600 !important;
+  padding: 0.65rem 1.5rem !important;
+  border-radius: 10px !important;
+  font-size: 0.95rem !important;
+  background: transparent !important;
+  transition: all 0.15s !important;
 }
-
-.featureIcon {
-  font-size: 1.8rem;
-  line-height: 1;
-}
-
-.featureTitle {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.featureDesc {
-  font-size: 0.85rem;
-  color: var(--ifm-color-emphasis-700);
-  line-height: 1.55;
-  margin: 0;
-  flex: 1;
-}
-
-.featureLink {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-top: 0.25rem;
-}
-
-/* ── Install Section ── */
-.installGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  max-width: 860px;
-  margin: 0 auto;
-}
-@media (max-width: 700px) {
-  .installGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.installCard {
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 12px;
-  padding: 1.25rem;
-  background: var(--ifm-card-background-color);
-}
-
-.installLabel {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ifm-color-emphasis-600);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-}
-
-.installCode {
-  background: #1e293b !important;
-  border-radius: 8px !important;
-  padding: 0.75rem 1rem !important;
-  font-size: 0.85rem !important;
-  overflow-x: auto;
-}
-[data-theme='dark'] .installCode {
-  background: #0f172a !important;
+.btnOutline:hover {
+  background: var(--ifm-color-primary) !important;
+  color: #fff !important;
 }
 
 /* ── Badges ── */
@@ -211,24 +166,19 @@
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin: 2rem 0 0;
+  margin-top: 2rem;
 }
 
 /* ── Footer note ── */
 .footerNote {
   text-align: center;
-  padding: 2rem 0 3rem;
+  padding: 2rem 0;
   color: var(--ifm-color-emphasis-500);
   font-size: 0.85rem;
-  border-top: 1px solid var(--ifm-color-emphasis-200);
-  max-width: 860px;
+  max-width: 720px;
   margin: 0 auto;
 }
-.footerNote strong {
-  color: var(--ifm-color-primary);
-}
 
-/* ── Container helper ── */
 .slimContainer {
   max-width: 1100px;
   margin: 0 auto;
