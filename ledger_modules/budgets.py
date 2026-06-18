@@ -19,7 +19,7 @@ def set_budget(category, amount, year=None, month=None, dimension_type='category
                  VALUES (?, ?, ?, ?, ?, ?)''', (category, year, month, amount, dimension_type, dimension_value))
     conn.commit()
     conn.close()
-    print(f"✅ 预算已设置: {category} {year}-{month} 限额 {amount} ({dimension_type}:{dimension_value or '-'})")
+    _safe_print(f"✅ 预算已设置: {category} {year}-{month} 限额 {amount} ({dimension_type}:{dimension_value or '-'})")
 
 
 def _get_budget_spent(category, year, month, dimension_type='category', dimension_value=None):
@@ -50,13 +50,13 @@ def check_budget(year=None, month=None):
     budgets = c.fetchall()
     conn.close()
     if not budgets:
-        print("本月无预算")
+        _safe_print("本月无预算")
         return
     for category, budget_amount, dimension_type, dimension_value in budgets:
         spent = _get_budget_spent(category, year, month, dimension_type, dimension_value)
         remain = budget_amount - spent
         suffix = f" | {dimension_type}:{dimension_value}" if dimension_type and dimension_type != 'category' and dimension_value else ""
-        print(f"{category}{suffix}: 预算 {budget_amount:.2f}, 已用 {spent:.2f}, 剩余 {remain:.2f}")
+        _safe_print(f"{category}{suffix}: 预算 {budget_amount:.2f}, 已用 {spent:.2f}, 剩余 {remain:.2f}")
 
 
 def create_budget_template(name, description='', dimension_type='category', dimension_value=None, amount=0.0,
@@ -423,3 +423,16 @@ def suggest_record_templates(limit=5):
         })
     
     return suggestions
+
+
+def _safe_print(*args, **kwargs):
+    """安全打印，处理 GBK 编码问题"""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        try:
+            out = ' '.join(str(a) for a in args)
+            print(out.encode('ascii', 'replace').decode('ascii'), **kwargs)
+        except Exception:
+            pass
+

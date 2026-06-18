@@ -11,6 +11,12 @@ import json
 from datetime import datetime
 from functools import wraps
 
+# 修复 Windows GBK 编码问题（否则 print(emoji) 会崩）
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    os.environ['PYTHONUTF8'] = '1'
+
 # 添加项目根目录到路径
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
