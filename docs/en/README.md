@@ -1,8 +1,3 @@
----
-layout: default
-title: Ledger Documentation
----
-
 # 📒 Ledger — Personal Accounting System
 
 **Income & Expense Management · Budget Planning · Multi-dimensional Statistics · Web UI · AI Agent Integration**

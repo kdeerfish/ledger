@@ -1,23 +1,15 @@
----
-layout: default
-title: CLI 命令参考
----
-
 # 📘 CLI 命令参考
 
 `scripts/cli.py` 是 Ledger 的统一命令行入口，所有业务逻辑委托给 `ledger_modules/` 处理。
-
-## 通用用法
 
 ```bash
 python scripts/cli.py <action> [参数...]
 ```
 
-查看帮助：
-
-```bash
-python scripts/cli.py --help
-```
+!!! tip "查看帮助"
+    ```bash
+    python scripts/cli.py --help
+    ```
 
 ---
 
@@ -30,22 +22,27 @@ python scripts/cli.py add \
   --type 支出|收入 \
   --amount 100 \
   --category 食品 \
-  --subcategory 零食 \    # 可选
-  --account 微信 \         # 可选
-  --project 日常 \         # 可选
-  --member 本人 \          # 可选
-  --merchant 711 \         # 可选
-  --note "零食" \          # 可选
-  --date "2026-06-15" \    # 可选，默认当前时间
-  --confirm                # 跳过重复检查
+  --subcategory 零食 \      # (1)!
+  --account 微信 \           # (2)!
+  --project 日常 \
+  --member 本人 \
+  --merchant 711 \
+  --note "零食" \
+  --date "2026-06-15" \     # (3)!
+  --confirm                  # (4)!
 ```
+
+1.  子类别，可选
+2.  账户、项目、成员、商家均为可选
+3.  可选，默认当前时间
+4.  跳过重复检查
 
 ### 列出交易
 
 ```bash
-python scripts/cli.py list                  # 最近 20 条
-python scripts/cli.py list --limit 50       # 最近 50 条
-python scripts/cli.py list --include_deleted  # 含已删除
+python scripts/cli.py list                   # 最近 20 条
+python scripts/cli.py list --limit 50        # 最近 50 条
+python scripts/cli.py list --include_deleted # 含已删除
 ```
 
 ### 修改交易
@@ -56,122 +53,127 @@ python scripts/cli.py update --id 1 --field category --value 交通
 python scripts/cli.py update --id 1 --field note --value "地铁充值"
 ```
 
-支持修改的字段：`amount`, `category`, `subcategory`, `account`, `project`, `member`, `merchant`, `note`, `trans_date`
+支持修改的字段：`amount` `category` `subcategory` `account` `project` `member` `merchant` `note` `trans_date`
 
 ### 删除与恢复
 
 ```bash
-python scripts/cli.py delete --id 1          # 软删除（可恢复）
-python scripts/cli.py restore --id 1         # 恢复
-python scripts/cli.py hard_delete --id 1 --confirm  # 物理删除（不可恢复）
+python scripts/cli.py delete --id 1                   # 软删除（可恢复）
+python scripts/cli.py restore --id 1                  # 恢复
+python scripts/cli.py hard_delete --id 1 --confirm    # 物理删除（不可恢复）
 ```
+
+!!! warning "硬删除不可恢复"
+    硬删除会从数据库中彻底清除记录，操作前请确认。
 
 ---
 
 ## 🔍 搜索与筛选
 
-### 搜索
+=== "搜索"
 
-```bash
-python scripts/cli.py search --keyword 午餐          # 全局搜索
-python scripts/cli.py search --keyword 午餐 --search_type note     # 按备注
-python scripts/cli.py search --keyword 食品 --search_type category # 按类别
-python scripts/cli.py search --keyword 711 --search_type merchant  # 按商家
-python scripts/cli.py search --keyword xxx --limit 100             # 限制数量
-```
+    ```bash
+    python scripts/cli.py search --keyword 午餐                    # 全局搜索
+    python scripts/cli.py search --keyword 午餐 --search_type note # 按备注
+    python scripts/cli.py search --keyword 食品 --search_type category # 按类别
+    python scripts/cli.py search --keyword 711 --search_type merchant  # 按商家
+    ```
 
-### 筛选
+=== "筛选"
 
-```bash
-python scripts/cli.py filter --category 食品
-python scripts/cli.py filter --account 微信 --start_date 2026-01-01 --end_date 2026-06-30
-python scripts/cli.py filter --member 本人 --merchant 711
-python scripts/cli.py filter --category 食品 --account 支付宝 --limit 100
-```
+    ```bash
+    python scripts/cli.py filter --category 食品
+    python scripts/cli.py filter --account 微信 --start_date 2026-01-01 --end_date 2026-06-30
+    python scripts/cli.py filter --member 本人 --merchant 711
+    python scripts/cli.py filter --category 食品 --account 支付宝 --limit 100
+    ```
+
+搜索类型 `search_type` 可选值：
+
+| 值 | 说明 |
+|----|------|
+| `all` | 全局搜索（默认） |
+| `note` | 按备注搜索 |
+| `category` | 按类别/子类别搜索 |
+| `merchant` | 按商家搜索 |
 
 ---
 
 ## 📈 统计分析
 
-### 收支汇总
+=== "收支汇总"
 
-```bash
-python scripts/cli.py summary                         # 全部汇总
-python scripts/cli.py summary --year 2026             # 2026 年
-python scripts/cli.py summary --year 2026 --month 7   # 2026 年 7 月
-```
+    ```bash
+    python scripts/cli.py summary                       # 全部汇总
+    python scripts/cli.py summary --year 2026           # 2026 年
+    python scripts/cli.py summary --year 2026 --month 7 # 7 月
+    ```
 
-### 多维度统计
+=== "多维度统计"
 
-```bash
-python scripts/cli.py stats --group_by category   # 按类别（默认）
-python scripts/cli.py stats --group_by account    # 按账户
-python scripts/cli.py stats --group_by month      # 按月
-python scripts/cli.py stats --year 2026 --month 7 --group_by account
-```
+    ```bash
+    python scripts/cli.py stats --group_by category  # 按类别
+    python scripts/cli.py stats --group_by account   # 按账户
+    python scripts/cli.py stats --group_by month     # 按月
+    python scripts/cli.py stats --year 2026 --month 7 --group_by account
+    ```
 
-### 查看维度
+=== "查看维度"
 
-```bash
-python scripts/cli.py accounts    # 列出所有账户
-python scripts/cli.py categories  # 列出所有类别（含子类别+统计）
-python scripts/cli.py members     # 列出所有成员（含收支统计）
-python scripts/cli.py reconcile_guide  # 对账指南
-```
+    ```bash
+    python scripts/cli.py accounts          # 列出所有账户
+    python scripts/cli.py categories        # 列出所有类别（含子类别+统计）
+    python scripts/cli.py members           # 列出所有成员（含收支统计）
+    python scripts/cli.py reconcile_guide   # 对账指南
+    ```
 
 ---
 
 ## 💰 预算管理
 
-### 设置预算
+=== "设置预算"
 
-```bash
-# 按类别设置
-python scripts/cli.py budget_set --category 食品 --amount 1000 --year 2026 --month 7
+    ```bash
+    # 按类别设置
+    python scripts/cli.py budget_set --category 食品 --amount 1000 --year 2026 --month 7
 
-# 按账户维度设置
-python scripts/cli.py budget_set --category 餐饮 --amount 500 --dimension_type account --dimension_value 微信
+    # 按账户维度
+    python scripts/cli.py budget_set --category 餐饮 --amount 500 --dimension_type account --dimension_value 微信
 
-# 按成员维度设置
-python scripts/cli.py budget_set --category 日常 --amount 2000 --dimension_type member --dimension_value 本人
-```
+    # 按成员维度
+    python scripts/cli.py budget_set --category 日常 --amount 2000 --dimension_type member --dimension_value 本人
+    ```
 
-### 检查预算
+=== "检查预算"
 
-```bash
-python scripts/cli.py budget_check                    # 本月
-python scripts/cli.py budget_check --year 2026 --month 7
-```
+    ```bash
+    python scripts/cli.py budget_check                     # 本月
+    python scripts/cli.py budget_check --year 2026 --month 7
+    ```
 
-### 预算模板
+=== "预算模板"
 
-```bash
-# 创建模板
-python scripts/cli.py budget_template_create \
-  --template_name "月度餐饮" \
-  --category 食品 --template_amount 1500
+    ```bash
+    # 创建
+    python scripts/cli.py budget_template_create --template_name "月度餐饮" --category 食品 --template_amount 1500
 
-# 列出模板
-python scripts/cli.py budget_template_list
+    # 列出
+    python scripts/cli.py budget_template_list
 
-# 应用模板
-python scripts/cli.py budget_template_apply --template_id 1 --year 2026 --month 8
+    # 应用
+    python scripts/cli.py budget_template_apply --template_id 1 --year 2026 --month 8
 
-# 更新模板
-python scripts/cli.py budget_template_update --template_id 1 --template_name "新名称"
+    # 更新 / 删除
+    python scripts/cli.py budget_template_update --template_id 1 --template_name "新名称"
+    python scripts/cli.py budget_template_delete --template_id 1
 
-# 删除模板
-python scripts/cli.py budget_template_delete --template_id 1
-
-# 智能推荐
-python scripts/cli.py budget_template_suggest --template_limit 5
-```
+    # 智能推荐
+    python scripts/cli.py budget_template_suggest --template_limit 5
+    ```
 
 ---
 
 ## 📋 记录模板（一键记账）
-
-### 创建与使用
 
 ```bash
 # 创建模板
@@ -188,44 +190,42 @@ python scripts/cli.py template_list
 python scripts/cli.py template_apply --template_id 1
 python scripts/cli.py template_apply --template_id 1 --template_amount 7  # 覆盖金额
 
-# 更新模板
+# 更新 / 删除
 python scripts/cli.py template_update --template_id 1 --template_name "通勤（涨价后）"
-
-# 删除模板
 python scripts/cli.py template_delete --template_id 1
 
 # 智能推荐
 python scripts/cli.py template_suggest --template_limit 5
 ```
 
+!!! tip "一键记账"
+    创建模板后，`template_apply` 会自动按模板参数记账，无需每次输入完整命令。
+
 ---
 
 ## 📁 数据导入导出
 
-### 导入 CSV
+=== "导入 CSV"
 
-```bash
-# 随手记格式
-python scripts/import_ledger.py data/sample/mymoney_data.csv
+    ```bash
+    python scripts/import_ledger.py data/sample/mymoney_data.csv
+    python scripts/cli.py import_csv --file data.csv
+    ```
 
-# CLI 方式
-python scripts/cli.py import_csv --file data.csv
-```
+=== "导出"
 
-### 导出
-
-```bash
-python scripts/cli.py export --output report.csv          # CSV
-python scripts/cli.py export --output report.json --format json  # JSON
-python scripts/cli.py export --output output.csv --category 食品  # 按类别
-python scripts/cli.py export --output output.csv --start_date 2026-01-01 --end_date 2026-06-30
-```
+    ```bash
+    python scripts/cli.py export --output report.csv                     # CSV
+    python scripts/cli.py export --output report.json --format json      # JSON
+    python scripts/cli.py export --output output.csv --category 食品     # 按类别
+    python scripts/cli.py export --output output.csv --start_date 2026-01-01 --end_date 2026-06-30
+    ```
 
 ---
 
 ## 🤖 AI Agent 集成
 
-通过 JSON 接口调用，适合 picoclaw 等 AI Agent：
+通过 JSON 参数调用，适合 picoclaw 等 AI Agent：
 
 ```bash
 python ledger-skills/scripts/ledger_cli.py add '{"type":"支出","amount":25.5,"category":"食品","account":"微信"}'
@@ -243,6 +243,6 @@ python ledger-skills/scripts/ledger_cli.py stats '{"group_by":"category"}'
 # 手动初始化数据库
 python scripts/cli.py init
 
-# 数据交叉分析（供 AI 学习）
+# 数据交叉分析（供 AI Agent 学习用户习惯）
 python scripts/cli.py analyze
 ```

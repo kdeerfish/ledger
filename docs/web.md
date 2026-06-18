@@ -1,72 +1,60 @@
----
-layout: default
-title: Web 界面指南
----
-
 # 🌐 Web 管理界面
 
-Ledger 提供开箱即用的 Web 管理界面，基于 Flask + Bootstrap 5，响应式设计，手机/平板/电脑均可用。
+Ledger 提供开箱即用的 Web 管理界面，基于 **Flask + Bootstrap 5**，响应式设计，手机 / 平板 / 电脑均可用。
 
 ---
 
 ## 启动
 
-### 直接运行
+=== "直接运行"
 
-```bash
-# 安装依赖
-pip install flask flask-cors
+    ```bash
+    pip install flask flask-cors
+    python web/run.py
+    ```
 
-# 启动
-python web/run.py
+    访问 [http://localhost:5800](http://localhost:5800)
 
-# 访问
-open http://localhost:5800
-```
+=== "Docker"
 
-### Docker 方式
+    ```bash
+    docker run -d --name ledger -p 5800:5800 -v ./data:/data --restart unless-stopped zouzhenglu/ledger:latest
+    ```
 
-```bash
-docker run -d --name ledger -p 5800:5800 -v ./data:/data --restart unless-stopped zouzhenglu/ledger:latest
-open http://localhost:5800
-```
+    访问 [http://localhost:5800](http://localhost:5800)
 
 ---
 
-## 页面功能
+## 功能页面
 
-### 📊 概览页
-
-![](https://via.placeholder.com/800x400?text=Dashboard+Preview)
+### 📊 概览 Dashboard
 
 - 收支汇总卡片（总收入 / 总支出 / 结余）
 - 月度收支趋势图
 - 最近交易列表
 - 快捷记账入口
 
-### 📋 交易页
+### 📋 交易管理
 
-- 完整交易记录表格
-- 按日期 / 类型 / 类别 / 账户排序
-- 关键词搜索
-- 多条件筛选（日期范围 / 类别 / 账户）
-- 新增 / 编辑 / 删除交易
+- 完整交易记录表格，支持多字段排序
+- 关键词搜索 + 多条件筛选（日期 / 类别 / 账户）
+- 新增 / 编辑 / 软删除交易
 
-### 💰 预算页
+### 💰 预算仪表盘
 
 - 当月所有类别预算列表
-- 实时进度条（已用 / 预算）
-- 超支预警（红色进度条）
+- 实时进度条（已用额度 / 预算总额）
+- 超支预警（红色进度条标识）
 - 新增 / 编辑预算
 
-### 🏷 类别页
+### 🏷 类别总览
 
 - 类别 / 子类别层级展示
 - 各类别消费笔数和金额统计
 
-### 📈 统计页
+### 📈 统计图表
 
-- 按类别分组统计（饼图 / 列表）
+- 按类别分组统计
 - 按账户分组统计
 - 按月趋势统计
 
@@ -81,9 +69,14 @@ open http://localhost:5800
 | `WEB_DEBUG` | 调试模式 | `false` |
 | `LEDGER_DB_PATH` | 数据库路径 | `./ledger.db` |
 
+!!! tip "端口说明"
+    默认使用 5800 端口，避免被其他常见服务（5000/3000）占用。
+
+---
+
 ## API 端点
 
-Web 前端通过以下 API 与后端交互：
+Web 前端通过 RESTful API 与后端交互，所有端点返回 JSON。
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
@@ -92,9 +85,11 @@ Web 前端通过以下 API 与后端交互：
 | `/api/transactions` | GET | 交易列表 |
 | `/api/transactions` | POST | 新增交易 |
 | `/api/transactions/<id>` | PUT | 更新交易 |
-| `/api/transactions/<id>` | DELETE | 软删除交易 |
+| `/api/transactions/<id>` | DELETE | 软删除 |
 | `/api/transactions/<id>/restore` | POST | 恢复交易 |
 | `/api/transactions/<id>/hard` | DELETE | 物理删除 |
+| `/api/transactions/search` | GET | 搜索交易 |
+| `/api/transactions/filter` | GET | 筛选交易 |
 | `/api/summary` | GET | 收支汇总 |
 | `/api/statistics` | GET | 统计分析 |
 | `/api/budgets` | GET | 预算列表 |
@@ -102,4 +97,4 @@ Web 前端通过以下 API 与后端交互：
 | `/api/categories` | GET | 类别列表 |
 | `/api/accounts` | GET | 账户列表 |
 
-完整 API 文档见 [api.md](api.md)。
+详细接口说明见 [API 文档](api.md)。
