@@ -44,7 +44,7 @@ CORS(app)
 
 # Web 配置
 WEB_HOST = os.environ.get('WEB_HOST', '0.0.0.0')
-WEB_PORT = int(os.environ.get('WEB_PORT', '5000'))
+WEB_PORT = int(os.environ.get('WEB_PORT', '5800'))
 WEB_DEBUG = os.environ.get('WEB_DEBUG', '').lower() in ('true', '1', 'yes')
 
 

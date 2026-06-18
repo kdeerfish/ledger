@@ -4,7 +4,7 @@
 #   1. 在飞牛OS 文件管理器创建目录 /docker/ledger
 #   2. 把本文件和 .env 放进去
 #   3. 飞牛OS Docker → 项目 → 新建 → 选择此目录 → 部署
-#   4. 浏览器访问 http://飞牛OS_IP:5000
+#   4. 浏览器访问 http://飞牛OS_IP:5800
 # ============================================================
 
 version: "3.8"
@@ -18,7 +18,7 @@ services:
 
     # 端口映射（宿主机:容器）
     ports:
-      - "5000:5000"
+      - "5800:5800"
 
     # 数据持久化（数据库）
     volumes:
@@ -30,14 +30,14 @@ services:
     # 环境变量（会覆盖 .env 文件）
     environment:
       - WEB_HOST=0.0.0.0
-      - WEB_PORT=5000
+      - WEB_PORT=5800
       - WEB_DEBUG=false
       - LEDGER_DB_PATH=/data/ledger.db
       - TZ=Asia/Shanghai
 
     # 健康检查
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/info')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5800/api/info')"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -27,10 +27,10 @@ AI Agent ──HTTP──→ Docker 容器
 
 ```bash
 # 编辑 .env 文件
-LEDGER_API_URL=http://192.168.31.126:5000
+LEDGER_API_URL=http://192.168.31.126:5800
 ```
 
-如果 Agent 和 Docker 在同一台机器上，可以用 `http://127.0.0.1:5000`。
+如果 Agent 和 Docker 在同一台机器上，可以用 `http://127.0.0.1:5800`。
 
 ## 核心概念
 

@@ -9,7 +9,7 @@ Ledger Agent 调用入口 — HTTP API 版
 配置优先级：
   1. 环境变量 LEDGER_API_URL
   2. skills/ledger/.env 中的 LEDGER_API_URL
-  3. 默认值 http://127.0.0.1:5000
+  3. 默认值 http://127.0.0.1:5800
 """
 
 import json
@@ -58,7 +58,7 @@ def get_api_url():
         return url.rstrip('/')
 
     # 2. 本地回环地址（适合 Agent 和 Web 同机）
-    return 'http://127.0.0.1:5000'
+    return 'http://127.0.0.1:5800'
 
 
 # ── HTTP 请求封装 ────────────────────────────────────

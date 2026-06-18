@@ -169,8 +169,8 @@ pip install flask flask-cors
 python web/run.py
 
 # 3. 打开浏览器
-# 本地访问: http://127.0.0.1:5000
-# NAS访问:  http://NAS_IP:5000
+# 本地访问: http://127.0.0.1:5800
+# NAS访问:  http://NAS_IP:5800
 ```
 
 ### 功能一览
@@ -201,7 +201,7 @@ wget -O docker-compose.yml https://raw.githubusercontent.com/zouzhenglu/ledger/r
 # 3. 在飞牛OS Docker 界面 → 项目 → 新建
 #    - 选择 /volume1/docker/ledger 目录
 #    - 点击部署，稍等片刻
-#    - 访问 http://飞牛OS_IP:5000
+#    - 访问 http://飞牛OS_IP:5800
 ```
 
 #### 方式二：命令行直接跑
@@ -229,7 +229,7 @@ docker compose up -d --build
 ```bash
 docker run -d \
   --name ledger \
-  -p 5000:5000 \
+  -p 5800:5800 \
   -v /path/to/data:/data \
   --restart unless-stopped \
   ledger:latest
@@ -251,7 +251,7 @@ pip install flask flask-cors
 # 2. 启动
 python web/run.py
 
-# 3. 访问 http://127.0.0.1:5000
+# 3. 访问 http://127.0.0.1:5800
 
 # 后台运行
 nohup python web/run.py > ledger-web.log 2>&1 &
@@ -267,7 +267,7 @@ kill $(pgrep -f "web/run.py")
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `WEB_HOST` | 监听地址 | `0.0.0.0` |
-| `WEB_PORT` | 监听端口 | `5000` |
+| `WEB_PORT` | 监听端口 | `5800` |
 | `WEB_DEBUG` | 调试模式 | `false` |
 
 ### 截图预览

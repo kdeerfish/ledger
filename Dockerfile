@@ -34,15 +34,15 @@ RUN mkdir -p /data && chown ledger:ledger /data /app
 USER ledger
 
 VOLUME ["/data"]
-EXPOSE 5000
+EXPOSE 5800
 
 # ── 健康检查 ──
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5800/api/health')" || exit 1
 
 # ── 环境变量（可通过 -e 覆盖） ──
 ENV WEB_HOST=0.0.0.0
-ENV WEB_PORT=5000
+ENV WEB_PORT=5800
 ENV WEB_DEBUG=false
 ENV LEDGER_DB_PATH=/data/ledger.db
 

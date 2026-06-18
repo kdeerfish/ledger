@@ -35,7 +35,7 @@ docker compose up -d
 # 查看日志
 docker compose logs -f
 
-# 访问 http://飞牛OS_IP:5000
+# 访问 http://飞牛OS_IP:5800
 ```
 
 ### 4. 配置 Skills
@@ -44,7 +44,7 @@ docker compose logs -f
 
 ```bash
 # skills/ledger/.env
-LEDGER_API_URL=http://192.168.31.126:5000
+LEDGER_API_URL=http://192.168.31.126:5800
 ```
 
 ---
@@ -64,7 +64,7 @@ python scripts/import_ledger.py data.csv
 # 4. 启动 Web 服务
 python web/run.py
 
-# 5. 访问 http://127.0.0.1:5000
+# 5. 访问 http://127.0.0.1:5800
 ```
 
 ---
@@ -107,13 +107,13 @@ docker compose up -d --build
 **检查**：
 ```bash
 # 在 Agent 所在机器上测试
-curl http://NAS_IP:5000/api/health
+curl http://NAS_IP:5800/api/health
 ```
 
 **解决**：
 - 确认 Docker 容器在运行：`docker ps | grep ledger`
 - 确认 `.env` 中 `LEDGER_API_URL` 指向正确的 IP 和端口
-- 确认飞牛OS 防火墙未阻挡 5000 端口
+- 确认飞牛OS 防火墙未阻挡 5800 端口
 
 ### 问题：数据库不存在
 

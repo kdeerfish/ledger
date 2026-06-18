@@ -5,9 +5,9 @@ Ledger Web 服务启动器
 一键启动 Web 界面，适配飞牛OS (FnOS) 及任何 Linux/Windows 环境
 
 用法：
-    python web/run.py              # 启动 Web 服务（默认 5000 端口）
+    python web/run.py              # 启动 Web 服务（默认 5800 端口）
     python web/run.py --port 8080  # 指定端口
-    python web/run.py --host 0.0.0.0 --port 5000
+    python web/run.py --host 0.0.0.0 --port 5800
 """
 
 import os
@@ -34,7 +34,7 @@ def _println(s=""):
 def main():
     parser = argparse.ArgumentParser(description='Ledger Web Service Starter')
     parser.add_argument('--host', default=None, help='Bind address (default 0.0.0.0)')
-    parser.add_argument('--port', type=int, default=None, help='Port (default 5000)')
+    parser.add_argument('--port', type=int, default=None, help='Port (default 5800)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
 
