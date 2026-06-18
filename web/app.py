@@ -35,23 +35,42 @@ load_env_file()
 # 数据库路径
 DB_PATH = get_db_path()
 
+
 def sync_db_path():
     """确保所有模块使用同一数据库路径"""
     db_module.DB_PATH = DB_PATH
     tx_module.DB_PATH = DB_PATH
     budget_module.DB_PATH = DB_PATH
 
+
 sync_db_path()
 db_module.init_db()
 
 # 创建 Flask 应用
 app = Flask(__name__)
-CORS(app)
+
+# CORS 安全配置：默认只允许同源访问
+# 通过环境变量 WEB_CORS_ORIGINS 可放开指定域名（逗号分隔）
+cors_origins = os.environ.get('WEB_CORS_ORIGINS', '').strip()
+if cors_origins:
+    CORS(app, origins=[o.strip() for o in cors_origins.split(',') if o.strip()], supports_credentials=True)
+else:
+    CORS(app, resources={r"/api/*": {"origins": []}})
 
 # Web 配置
 WEB_HOST = os.environ.get('WEB_HOST', '0.0.0.0')
 WEB_PORT = int(os.environ.get('WEB_PORT', '5800'))
 WEB_DEBUG = os.environ.get('WEB_DEBUG', '').lower() in ('true', '1', 'yes')
+
+
+def _get_version():
+    """从 pyproject.toml 读取版本号"""
+    try:
+        pyproject = os.path.join(ROOT_DIR, 'pyproject.toml')
+        with open(pyproject, 'rb') as f:
+            return tomllib.load(f).get('project', {}).get('version', '0.0.0')
+    except Exception:
+        return '0.0.0'
 
 
 # ─── 辅助函数 ──────────────────────────────────────────
@@ -91,7 +110,7 @@ def health():
             'status': 'ok',
             'database': DB_PATH,
             'records': count,
-            'version': '1.4.0',
+            'version': _get_version(),
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -189,6 +208,8 @@ def add_transaction():
         return api_error('金额不能为空')
     try:
         amount = float(amount)
+        if amount <= 0:
+            return api_error('金额必须为正数')
     except (ValueError, TypeError):
         return api_error('金额格式不正确')
 
