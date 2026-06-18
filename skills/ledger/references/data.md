@@ -1,9 +1,28 @@
 # 数据命令
 
-## 导入CSV (import)
+## 导入CSV
+
+Ledger 运行在 Docker 中，CSV 导入方式变了：
+
+**方式一：通过 Docker 数据卷**
 
 ```bash
-python3 scripts/ledger_cli.py import '{"file":"path/to/data.csv"}'
+# 1. 把 CSV 文件放到宿主机的数据目录
+cp mymoney.csv /volume1/docker/ledger/data/
+
+# 2. 进入容器执行导入
+docker exec -it ledger python scripts/import_ledger.py /data/mymoney.csv
+```
+
+**方式二：宿主机直接运行（临时）**
+
+```bash
+# 停止容器，把 ledger.db 复制到项目目录
+cp /volume1/docker/ledger/data/ledger.db .
+pip install flask flask-cors
+python scripts/import_ledger.py data.csv
+# 导入完成后再把 ledger.db 复制回去
+cp ledger.db /volume1/docker/ledger/data/
 ```
 
 **CSV 格式要求**（第一行必须是表头）：
@@ -21,25 +40,19 @@ python3 scripts/ledger_cli.py import '{"file":"path/to/data.csv"}'
 | 商家 | 消费场所 | 可选 | 拼多多 |
 | 备注 | 补充说明 | 可选 | 买零食 |
 
-**导入流程**：
-
-1. 用户说"导入数据"或"导入CSV"
-2. Agent 询问 CSV 文件路径（如果用户没提供）
-3. 执行导入命令
-4. 导入后建议用户说"学习"来分析数据
-
 ## 导出 (export)
 
 ```bash
-python3 scripts/ledger_cli.py export '{"output":"report.csv","format":"csv","start_date":"2026-06-01","end_date":"2026-06-30"}'
+python3 scripts/ledger_cli.py export '{"format":"csv","start_date":"2026-06-01","end_date":"2026-06-30"}'
 ```
 
 参数：
-- `output`: 输出文件路径 - 必填
-- `format`: 格式 (csv/json) - 可选，默认csv
+- `format`: 格式 (csv/json) - 可选，默认json
 - `category`: 类别筛选 - 可选
 - `start_date`: 开始日期 - 可选
 - `end_date`: 结束日期 - 可选
+
+> 注意：导出数据通过 API 返回，不会写入文件。需手动保存到文件。
 
 ## 数据分析 (analyze)
 
@@ -57,9 +70,10 @@ python3 scripts/ledger_cli.py analyze '{}'
 - 账户→商家关联
 - 字段使用率
 
-## 对账指南 (reconcile)
+## 连接检查 (health)
 
 ```bash
-python3 scripts/ledger_cli.py reconcile '{}'
+python3 scripts/ledger_cli.py health '{}'
 ```
 
+检查 API 连接是否正常，返回数据库状态和记录数。

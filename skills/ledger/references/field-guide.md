@@ -32,12 +32,14 @@
 ## 常用场景
 
 ### 用户说"导入数据"或"导入CSV"
-**Agent 应回复**：请提供 CSV 文件路径，例如 `/path/to/your/data.csv`
+**Agent 应回复**：Ledger 运行在 Docker 中，请把 CSV 文件放到 NAS 上，然后我来帮你导入。
 
-**用户提供了文件后**：
-```bash
-python3 scripts/ledger_cli.py import '{"file":"/path/to/your/data.csv"}'
-```
+**导入方式**：
+1. 用户把 CSV 放到 `/volume1/docker/ledger/data/` 目录
+2. 执行容器内导入：
+   ```bash
+   docker exec -it ledger python scripts/import_ledger.py /data/your-file.csv
+   ```
 
 **导入完成后建议**：
 > 导入完成！建议说"学习"来分析你的数据，这样我就能记住你的账户、商家、类别等习惯。

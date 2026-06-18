@@ -4,178 +4,118 @@
 
 | 包 | 说明 |
 |----|------|
-| `ledger-service.zip` | 核心服务（ledger_modules + scripts） |
-| `ledger-skills.zip` | picoclaw / AI Agent 技能 |
+| `ledger-service.zip` | 核心服务（已容器化，推荐 Docker 部署） |
+| `ledger-skills.zip` | AI Agent 技能（HTTP API 客户端） |
 
 ---
 
-## 🚀 本地测试
+## 🐳 Docker 部署（推荐）
 
-### 1. 部署服务端
-
-```bash
-# 解压服务端
-unzip ledger-service.zip -d /path/to/ledger
-cd /path/to/ledger
-
-# 配置环境变量（可选）
-cp .env.example .env
-# 编辑 .env 设置 LEDGER_PATH 和 LEDGER_DB_PATH
-
-# 导入数据（如果有 CSV）
-python scripts/import_ledger.py data.csv
-
-# 测试运行
-python scripts/cli.py list
-python scripts/cli.py summary --year 2026 --month 7
-```
-
-### 2. 部署 Skills
+### 1. 准备
 
 ```bash
-# 解压 Skills
-unzip ledger-skills.zip -d ~/.picoclaw/skills/ledger
+# SSH 到飞牛OS
+ssh admin@nas_ip
 
-# 配置服务路径
-cd ~/.picoclaw/skills/ledger
-cp .env.example .env
-# 编辑 .env 设置 LEDGER_PATH 指向服务目录
-```
-
-### 3. 测试 Skills 调用
-
-```bash
-# 测试添加
-python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py add '{"type":"支出","amount":25.5,"category":"食品酒水","account":"微信零钱","note":"测试"}'
-
-# 测试查询
-python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py list '{"limit":5}'
-```
-
----
-
-## 🐳 NAS 部署
-
-### 1. 上传文件
-
-```bash
-# 上传到 NAS
-scp ledger-service.zip user@nas:/volume1/docker/ledger/
-scp ledger-skills.zip user@nas:/volume1/docker/ledger/
-```
-
-### 2. 在 NAS 上部署
-
-```bash
-# SSH 到 NAS
-ssh user@nas
-
-# 解压服务端
+# 创建项目目录
+mkdir -p /volume1/docker/ledger/data
 cd /volume1/docker/ledger
-unzip ledger-service.zip
-
-# 配置环境变量
-cp .env.example .env
-cat > .env << EOF
-LEDGER_PATH=/volume1/docker/ledger
-LEDGER_DB_PATH=/volume1/docker/ledger/ledger.db
-EOF
-
-# 导入数据
-python scripts/import_ledger.py data.csv
-
-# 验证
-python scripts/cli.py list
 ```
 
-### 3. 部署 Skills
+### 2. 上传文件
+
+通过飞牛OS 文件管理器，把整个项目上传到 `/volume1/docker/ledger/`。
+
+### 3. 启动
 
 ```bash
-# 解压 Skills
-unzip ledger-skills.zip -d ~/.picoclaw/skills/ledger
+# 构建并启动
+docker compose up -d
 
-# 配置服务路径
-cd ~/.picoclaw/skills/ledger
-cp .env.example .env
-cat > .env << EOF
-LEDGER_PATH=/volume1/docker/ledger
-EOF
+# 查看日志
+docker compose logs -f
+
+# 访问 http://飞牛OS_IP:5000
+```
+
+### 4. 配置 Skills
+
+解压 `ledger-skills.zip` 到 Agent 可访问的位置，编辑 `.env`：
+
+```bash
+# skills/ledger/.env
+LEDGER_API_URL=http://192.168.31.126:5000
 ```
 
 ---
 
-## 📁 部署后的目录结构
+## 🚀 本地测试（非 Docker）
 
-```
-/volume1/docker/ledger/
-├── .env                    # 服务配置
-├── ledger_modules/
-├── scripts/
-└── ledger.db
+```bash
+# 1. 安装依赖
+pip install flask flask-cors
 
-~/.picoclaw/skills/ledger/
-├── .env                    # 指向服务路径
-├── SKILL.md
-├── scripts/
-│   └── ledger_cli.py
-├── references/             # 命令参考文档
-│   ├── basic.md
-│   ├── budget.md
-│   ├── data.md
-│   ├── field-guide.md
-│   ├── modify.md
-│   └── template.md
-└── examples/               # 日常操作示例
-    ├── basic-examples.md
-    ├── budget-examples.md
-    ├── data-examples.md
-    ├── field-guide-examples.md
-    ├── import-workflow.md
-    ├── learn-workflow.md
-    ├── modify-examples.md
-    └── template-examples.md
+# 2. 配置环境
+cp .env.example .env
+
+# 3. 导入数据（如果有 CSV）
+python scripts/import_ledger.py data.csv
+
+# 4. 启动 Web 服务
+python web/run.py
+
+# 5. 访问 http://127.0.0.1:5000
 ```
 
 ---
 
-## 🔧 常用命令
+## 🔧 数据维护
+
+### 导入 CSV
+
+Docker 部署时，CSV 需要通过容器内执行：
 
 ```bash
-# 测试服务端
-python scripts/cli.py list
-python scripts/cli.py summary --year 2026 --month 7
-python scripts/cli.py budget_check
+# 把 CSV 放到数据目录
+cp mydata.csv /volume1/docker/ledger/data/
 
-# 测试 Skills
-python ~/.picoclaw/skills/ledger/scripts/ledger_cli.py list '{"limit":10}'
+# 在容器内导入
+docker exec -it ledger python scripts/import_ledger.py /data/mydata.csv
+```
 
-# 重新导入数据
-python scripts/import_ledger.py data.csv
+### 备份数据库
+
+```bash
+# Docker 数据在宿主机的 ./data/ 目录
+cp /volume1/docker/ledger/data/ledger.db /volume1/backup/ledger-$(date +%Y%m%d).db
+```
+
+### 升级
+
+```bash
+cd /volume1/docker/ledger
+git pull
+docker compose up -d --build
 ```
 
 ---
 
 ## ❓ 故障排除
 
-### 问题：找不到 cli.py
+### 问题：Agent 连不上 API
 
-**原因：** LEDGER_PATH 未正确设置
-
-**解决：**
+**检查**：
 ```bash
-# 检查当前配置
-echo $LEDGER_PATH
-
-# 重新设置
-export LEDGER_PATH=/volume1/docker/ledger
+# 在 Agent 所在机器上测试
+curl http://NAS_IP:5000/api/health
 ```
+
+**解决**：
+- 确认 Docker 容器在运行：`docker ps | grep ledger`
+- 确认 `.env` 中 `LEDGER_API_URL` 指向正确的 IP 和端口
+- 确认飞牛OS 防火墙未阻挡 5000 端口
 
 ### 问题：数据库不存在
 
-**原因：** 首次运行需要初始化
-
-**解决：**
-```bash
-# 导入数据会自动创建数据库
-python scripts/import_ledger.py data.csv
-```
+**解决**：
+首次启动会自行创建，或通过导入 CSV 初始化。

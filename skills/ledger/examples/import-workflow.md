@@ -12,18 +12,23 @@
 > 导入数据
 
 **Agent 回复**：
-> 请提供 CSV 文件路径，例如 `/path/to/your/data.csv`
+> 请把 CSV 文件放到 NAS 上，然后提供文件所在的路径。
 
 ### 步骤 2：用户提供文件路径
 
 **用户说**：
-> /volume1/docker/data/mymoney_export.csv
+> /volume1/docker/ledger/data/mymoney_export.csv
 
 ### 步骤 3：执行导入
 
-**Agent 执行**：
+**Agent 回复**：
+> 请在 NAS 终端执行以下命令在 Docker 容器中导入：
+
 ```bash
-python3 scripts/ledger_cli.py import '{"file":"/volume1/docker/data/mymoney_export.csv"}'
+# 确认文件已放在数据目录
+ls -la /volume1/docker/ledger/data/mymoney_export.csv
+# 在容器内执行导入
+docker exec -it ledger python scripts/import_ledger.py /data/mymoney_export.csv
 ```
 
 **输出**：

@@ -1,276 +1,347 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-agent 调用入口 - 统一接口脚本
-用法: python3 ledger_cli.py <command> [options]
+Ledger Agent 调用入口 — HTTP API 版
+通过 REST API 访问 Docker 中的 Ledger 服务
 
-所有命令都会自动处理路径问题，适用于飞牛NAS环境。
+用法: python3 ledger_cli.py <command> '<json_args>'
+
+配置优先级：
+  1. 环境变量 LEDGER_API_URL
+  2. skills/ledger/.env 中的 LEDGER_API_URL
+  3. 默认值 http://127.0.0.1:5000
 """
 
+import json
 import os
 import sys
-import subprocess
-import json
+import urllib.request
+import urllib.error
 
-# 强制 UTF-8 输出（修复 Windows 编码问题）
+# 强制 UTF-8 输出
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    os.environ['PYTHONUTF8'] = '1'
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILLS_DIR = os.path.dirname(SCRIPT_DIR)  # skills/ledger 目录
+SKILLS_DIR = os.path.dirname(SCRIPT_DIR)
+ENV_FILE = os.path.join(SKILLS_DIR, '.env')
 
+# ── API 基础地址 ─────────────────────────────────────
 
-def load_env_file(env_path):
-    """加载 .env 文件"""
-    if not os.path.exists(env_path):
+def _load_env_file(path):
+    """加载 .env，不覆盖已有环境变量"""
+    if not os.path.exists(path):
         return
     try:
-        with open(env_path, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
                 if '=' in line:
-                    key, _, value = line.partition('=')
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    if key and key not in os.environ:
-                        os.environ[key] = value
+                    k, _, v = line.partition('=')
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
     except Exception:
         pass
 
 
-def get_ledger_root():
-    """获取 ledger 服务目录"""
-    # 1. 先加载 Skills 目录下的 .env 文件
-    skills_env = os.path.join(SKILLS_DIR, '.env')
-    load_env_file(skills_env)
-    
-    # 2. 检查系统环境变量
-    ledger_path = os.environ.get('LEDGER_PATH', '').strip()
-    if ledger_path and os.path.isdir(ledger_path):
-        return ledger_path
-    
-    # 3. 尝试常见部署路径
-    common_paths = [
-        '/volume1/docker/ledger',
-        os.path.expanduser('~/ledger'),
-        os.path.expanduser('~/docker/ledger'),
-    ]
-    for path in common_paths:
-        if os.path.isdir(path):
-            return path
-    
-    # 4. 最后尝试相对路径推导
-    return os.path.dirname(SKILLS_DIR)
+def get_api_url():
+    """获取 API 基础地址"""
+    _load_env_file(ENV_FILE)
 
-def run_ledger_api(action, **kwargs):
-    """调用 scripts/cli.py"""
-    ledger_root = get_ledger_root()
-    cli_path = os.path.join(ledger_root, 'scripts', 'cli.py')
-    if not os.path.exists(cli_path):
-        return '', f'找不到 cli.py: {cli_path}', 1
-    cmd = [sys.executable, cli_path, action]
+    # 1. 环境变量
+    url = os.environ.get('LEDGER_API_URL', '').strip()
+    if url:
+        return url.rstrip('/')
 
-    for key, value in kwargs.items():
-        if value is not None and value is not False and value != '':
-            cmd.append(f'--{key}')
-            if value is not True:
-                cmd.append(str(value))
-
-    # Windows 下设置环境变量确保子进程使用 UTF-8
-    env = os.environ.copy()
-    env['PYTHONUTF8'] = '1'
-    env['PYTHONIOENCODING'] = 'utf-8'
-    
-    result = subprocess.run(
-        cmd, 
-        capture_output=True, 
-        text=True, 
-        encoding='utf-8', 
-        errors='replace',
-        env=env,
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
-    )
-    return result.stdout, result.stderr, result.returncode
+    # 2. 本地回环地址（适合 Agent 和 Web 同机）
+    return 'http://127.0.0.1:5000'
 
 
-def format_output(stdout, stderr, returncode):
-    """格式化输出为JSON"""
-    result = {
-        'success': returncode == 0,
-        'data': stdout.strip() if stdout else None,
-        'error': stderr.strip() if stderr else None,
-    }
-    # 确保中文正常显示，不转义为 \uXXXX
-    return json.dumps(result, ensure_ascii=False, indent=2)
+# ── HTTP 请求封装 ────────────────────────────────────
+
+def api_get(path, params=None):
+    """GET 请求"""
+    url = get_api_url() + path
+    if params:
+        qs = urllib.parse.urlencode(params)
+        url += '?' + qs
+    req = urllib.request.Request(url, method='GET',
+                                 headers={'Accept': 'application/json'})
+    return _do_request(req)
+
+
+def api_post(path, body=None):
+    """POST 请求"""
+    url = get_api_url() + path
+    data = json.dumps(body or {}).encode('utf-8') if body else None
+    req = urllib.request.Request(url, data=data, method='POST',
+                                 headers={'Content-Type': 'application/json',
+                                          'Accept': 'application/json'})
+    return _do_request(req)
+
+
+def api_put(path, body=None):
+    """PUT 请求"""
+    url = get_api_url() + path
+    data = json.dumps(body or {}).encode('utf-8') if body else None
+    req = urllib.request.Request(url, data=data, method='PUT',
+                                 headers={'Content-Type': 'application/json',
+                                          'Accept': 'application/json'})
+    return _do_request(req)
+
+
+def api_delete(path):
+    """DELETE 请求"""
+    url = get_api_url() + path
+    req = urllib.request.Request(url, method='DELETE',
+                                 headers={'Accept': 'application/json'})
+    return _do_request(req)
+
+
+def _do_request(req):
+    """执行请求，统一解析 JSON 响应"""
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode('utf-8')
+            return json.loads(body)
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read().decode('utf-8'))
+            return err
+        except Exception:
+            return {'success': False, 'error': f'HTTP {e.code}: {e.reason}'}
+    except urllib.error.URLError as e:
+        return {'success': False, 'error': f'无法连接 API: {e.reason}。请确认 Ledger Docker 容器已启动且 LEDGER_API_URL 配置正确。'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def _ensure(data, fields):
+    """辅助：组装参数"""
+    return {f: data.get(f) for f in fields if data.get(f) is not None and data.get(f) != ''}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 交易命令
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 def cmd_add(args):
-    kwargs = {
-        'type': args.get('type'),
+    return api_post('/api/transactions', {
+        'type': args.get('type', '支出'),
         'amount': args.get('amount'),
-        'category': args.get('category'),
-        'subcategory': args.get('subcategory'),
-        'account': args.get('account'),
-        'project': args.get('project'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'note': args.get('note'),
+        'category': args.get('category', ''),
+        'subcategory': args.get('subcategory', ''),
+        'account': args.get('account', ''),
+        'project': args.get('project', ''),
+        'member': args.get('member', ''),
+        'merchant': args.get('merchant', ''),
+        'note': args.get('note', ''),
         'date': args.get('date'),
-        'confirm': args.get('force', False),  # force 参数映射到 confirm
-    }
-    stdout, stderr, code = run_ledger_api('add', **kwargs)
-    return format_output(stdout, stderr, code)
+        'force': args.get('force', False),
+    })
 
 
 def cmd_list(args):
-    kwargs = {
-        'limit': args.get('limit', 20),
-        'include_deleted': args.get('include_deleted', False),
-    }
-    stdout, stderr, code = run_ledger_api('list', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {'limit': args.get('limit', 20)}
+    if args.get('include_deleted'):
+        params['include_deleted'] = '1'
+    result = api_get('/api/transactions', params)
+    # 保持向后兼容
+    if result.get('success') and result.get('data'):
+        txs = result['data'].get('transactions', [])
+        total = result['data'].get('total', 0)
+        lines = [f"共 {total} 条记录："]
+        for t in txs:
+            amt = f"¥{t['amount']:.2f}" if t.get('amount') else '¥0.00'
+            cat = t.get('category', '-')
+            acc = t.get('account', '-')
+            note = t.get('note', '')
+            d = (t.get('date') or '')[:10]
+            lines.append(f"#{t['id']}: {d} | {t['type']} | {amt} | {cat} | {acc} | {note}")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_search(args):
-    kwargs = {
-        'keyword': args.get('keyword'),
-        'search_type': args.get('search_type', 'all'),
-        'limit': args.get('limit', 50),
-    }
-    stdout, stderr, code = run_ledger_api('search', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = _ensure(args, ['keyword', 'search_type'])
+    params.setdefault('keyword', '')
+    params.setdefault('search_type', 'all')
+    if args.get('limit'):
+        params['limit'] = args['limit']
+    result = api_get('/api/transactions/search', params)
+    if result.get('success') and isinstance(result.get('data'), list):
+        items = result['data']
+        lines = [f"找到 {len(items)} 条相关记录："]
+        for t in items:
+            amt = f"¥{t['amount']:.2f}" if t.get('amount') else '¥0.00'
+            lines.append(f"#{t['id']}: {t.get('date','')[:10]} | {t['type']} | {amt} | {t.get('category','-')} | {t.get('account','-')} | {t.get('note','')}")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_filter(args):
-    kwargs = {
-        'category': args.get('category'),
-        'account': args.get('account'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'project': args.get('project'),
-        'start_date': args.get('start_date'),
-        'end_date': args.get('end_date'),
-        'limit': args.get('limit', 50),
-    }
-    stdout, stderr, code = run_ledger_api('filter', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {}
+    for f in ['category', 'account', 'member', 'merchant', 'project', 'start_date', 'end_date']:
+        v = args.get(f)
+        if v:
+            params[f] = v
+    if args.get('limit'):
+        params['limit'] = args['limit']
+    # filter 通过 list + filter 实现，我们用 search 的 filter 方式
+    # 实际上直接调 GET /api/transactions 加上参数
+    result = api_get('/api/transactions', params)
+    if result.get('success') and result.get('data'):
+        txs = result['data'].get('transactions', [])
+        lines = [f"找到 {len(txs)} 条记录："]
+        for t in txs:
+            amt = f"¥{t['amount']:.2f}" if t.get('amount') else '¥0.00'
+            lines.append(f"#{t['id']}: {t.get('date','')[:10]} | {t['type']} | {amt} | {t.get('category','-')} | {t.get('account','-')} | {t.get('note','')}")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_summary(args):
-    kwargs = {'year': args.get('year'), 'month': args.get('month')}
-    stdout, stderr, code = run_ledger_api('summary', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {}
+    for k in ['year', 'month']:
+        v = args.get(k)
+        if v is not None:
+            params[k] = v
+    result = api_get('/api/summary', params)
+    if result.get('success') and result.get('data'):
+        d = result['data']
+        period = f"{d.get('year') or '所有'}-{d.get('month') or '全年'}"
+        lines = [
+            f"收支统计 ({period}):",
+            f"  收入: ¥{d['income']:.2f}" if d.get('income') else "  收入: ¥0.00",
+            f"  支出: ¥{d['expense']:.2f}" if d.get('expense') else "  支出: ¥0.00",
+            f"  结余: ¥{d['balance']:.2f}" if d.get('balance') else "  结余: ¥0.00",
+        ]
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_stats(args):
-    kwargs = {
-        'year': args.get('year'),
-        'month': args.get('month'),
-        'group_by': args.get('group_by', 'category'),
-    }
-    stdout, stderr, code = run_ledger_api('stats', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {'group_by': args.get('group_by', 'category')}
+    for k in ['year', 'month']:
+        v = args.get(k)
+        if v is not None:
+            params[k] = v
+    result = api_get('/api/stats', params)
+    if result.get('success') and result.get('data'):
+        items = result['data'].get('items', [])
+        lines = [f"按{params['group_by']}统计："]
+        for i in items:
+            lines.append(f"  {i['group']} ({i['type']}): ¥{i['total']:.2f}, {i['count']}笔")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_update(args):
-    kwargs = {'id': args.get('id'), 'field': args.get('field'), 'value': args.get('value')}
-    stdout, stderr, code = run_ledger_api('update', **kwargs)
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_put(f'/api/transactions/{tid}', {
+        'field': args.get('field'),
+        'value': args.get('value'),
+    })
 
 
 def cmd_delete(args):
-    stdout, stderr, code = run_ledger_api('delete', id=args.get('id'))
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_delete(f'/api/transactions/{tid}')
 
 
 def cmd_restore(args):
-    stdout, stderr, code = run_ledger_api('restore', id=args.get('id'))
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_post(f'/api/transactions/{tid}/restore')
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 预算命令
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 def cmd_budget_set(args):
-    kwargs = {
-        'category': args.get('category'),
-        'amount': args.get('amount'),
-        'year': args.get('year'),
-        'month': args.get('month'),
-        'dimension_type': args.get('dimension_type'),
-        'dimension_value': args.get('dimension_value'),
-    }
-    stdout, stderr, code = run_ledger_api('budget_set', **kwargs)
-    return format_output(stdout, stderr, code)
+    body = _ensure(args, ['category', 'amount', 'year', 'month', 'dimension_type', 'dimension_value'])
+    result = api_post('/api/budgets', body)
+    if result.get('success'):
+        result['data'] = f"预算已设置: {args.get('category')} {args.get('year') or '今年'}-{args.get('month') or '本月'} 限额 ¥{args.get('amount')}"
+    return result
 
 
 def cmd_budget_check(args):
-    kwargs = {'year': args.get('year'), 'month': args.get('month')}
-    stdout, stderr, code = run_ledger_api('budget_check', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {}
+    for k in ['year', 'month']:
+        v = args.get(k)
+        if v is not None:
+            params[k] = v
+    result = api_get('/api/budgets/check', params)
+    if result.get('success') and isinstance(result.get('data'), list):
+        items = result['data']
+        if not items:
+            result['data'] = "本月无预算"
+        else:
+            lines = ["预算检查结果："]
+            for b in items:
+                pct = b.get('percentage', 0)
+                warn = " ⚠️ 超支!" if pct > 100 else " ⚠️ 接近上限" if pct > 80 else ""
+                lines.append(f"  {b['category']}: 预算 ¥{b['budget']:.2f}, 已用 ¥{b['spent']:.2f} ({pct}%), 剩余 ¥{b['remaining']:.2f}{warn}")
+            result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_budget_template_create(args):
-    kwargs = {
-        'template_name': args.get('name'),
-        'template_description': args.get('description'),
-        'category': args.get('category'),
-        'template_amount': args.get('amount'),
-        'dimension_type': args.get('dimension_type'),
-        'dimension_value': args.get('dimension_value'),
-        'account': args.get('account'),
-        'project': args.get('project'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'note': args.get('note'),
-        'year': args.get('year'),
-        'month': args.get('month'),
-    }
-    stdout, stderr, code = run_ledger_api('budget_template_create', **kwargs)
-    return format_output(stdout, stderr, code)
+    return api_post('/api/budgets/templates', _ensure(args, [
+        'name', 'description', 'category', 'amount', 'dimension_type',
+        'dimension_value', 'account', 'project', 'member', 'merchant', 'note', 'year', 'month',
+    ]))
 
 
 def cmd_budget_template_list(args):
-    stdout, stderr, code = run_ledger_api('budget_template_list')
-    return format_output(stdout, stderr, code)
+    return api_get('/api/budgets/templates')
 
 
 def cmd_budget_template_update(args):
-    kwargs = {
-        'template_id': args.get('id'),
-        'template_name': args.get('name'),
-        'template_description': args.get('description'),
-        'category': args.get('category'),
-        'template_amount': args.get('amount'),
-        'dimension_type': args.get('dimension_type'),
-        'dimension_value': args.get('dimension_value'),
-        'account': args.get('account'),
-        'project': args.get('project'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'note': args.get('note'),
-        'year': args.get('year'),
-        'month': args.get('month'),
-    }
-    stdout, stderr, code = run_ledger_api('budget_template_update', **kwargs)
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_put(f'/api/budgets/templates/{tid}', _ensure(args, [
+        'name', 'description', 'category', 'amount', 'dimension_type',
+        'dimension_value', 'account', 'project', 'member', 'merchant', 'note', 'year', 'month',
+    ]))
 
 
 def cmd_budget_template_delete(args):
-    stdout, stderr, code = run_ledger_api('budget_template_delete', template_id=args.get('id'))
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_delete(f'/api/budgets/templates/{tid}')
 
 
 def cmd_budget_template_apply(args):
-    stdout, stderr, code = run_ledger_api('budget_template_apply', template_id=args.get('id'), year=args.get('year'), month=args.get('month'))
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    body = {}
+    for k in ['year', 'month']:
+        v = args.get(k)
+        if v is not None:
+            body[k] = v
+    return api_post(f'/api/budgets/templates/{tid}/apply', body)
 
 
 def cmd_budget_template_suggest(args):
-    kwargs = {'template_limit': args.get('limit', 3)}
-    stdout, stderr, code = run_ledger_api('budget_template_suggest', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {'limit': args.get('limit', 3)}
+    return api_get('/api/budgets/templates/suggest', params)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -279,117 +350,143 @@ def cmd_budget_template_suggest(args):
 
 
 def cmd_template_create(args):
-    kwargs = {
-        'template_name': args.get('name'),
-        'template_description': args.get('description'),
-        'template_type': args.get('template_type'),
-        'type': args.get('type'),
-        'template_amount': args.get('amount'),
-        'category': args.get('category'),
-        'subcategory': args.get('subcategory'),
-        'account': args.get('account'),
-        'project': args.get('project'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'note': args.get('note'),
-    }
-    stdout, stderr, code = run_ledger_api('template_create', **kwargs)
-    return format_output(stdout, stderr, code)
+    return api_post('/api/record_templates', _ensure(args, [
+        'name', 'description', 'template_type', 'type', 'amount',
+        'category', 'subcategory', 'account', 'project', 'member', 'merchant', 'note',
+    ]))
 
 
 def cmd_template_list(args):
-    kwargs = {'template_type': args.get('template_type')}
-    stdout, stderr, code = run_ledger_api('template_list', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {}
+    v = args.get('template_type')
+    if v:
+        params['template_type'] = v
+    return api_get('/api/record_templates', params)
 
 
 def cmd_template_update(args):
-    kwargs = {
-        'template_id': args.get('id'),
-        'template_name': args.get('name'),
-        'template_description': args.get('description'),
-        'template_type': args.get('template_type'),
-        'type': args.get('type'),
-        'template_amount': args.get('amount'),
-        'category': args.get('category'),
-        'subcategory': args.get('subcategory'),
-        'account': args.get('account'),
-        'project': args.get('project'),
-        'member': args.get('member'),
-        'merchant': args.get('merchant'),
-        'note': args.get('note'),
-    }
-    stdout, stderr, code = run_ledger_api('template_update', **kwargs)
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_put(f'/api/record_templates/{tid}', _ensure(args, [
+        'name', 'description', 'template_type', 'type', 'amount',
+        'category', 'subcategory', 'account', 'project', 'member', 'merchant', 'note',
+    ]))
 
 
 def cmd_template_delete(args):
-    stdout, stderr, code = run_ledger_api('template_delete', template_id=args.get('id'))
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    return api_delete(f'/api/record_templates/{tid}')
 
 
 def cmd_template_apply(args):
-    kwargs = {
-        'template_id': args.get('id'),
-        'template_amount': args.get('amount'),
-    }
-    stdout, stderr, code = run_ledger_api('template_apply', **kwargs)
-    return format_output(stdout, stderr, code)
+    tid = args.get('id')
+    if not tid:
+        return {'success': False, 'error': '需要 id'}
+    body = {}
+    v = args.get('amount')
+    if v is not None:
+        body['amount'] = v
+    return api_post(f'/api/record_templates/{tid}/apply', body)
 
 
 def cmd_template_suggest(args):
-    kwargs = {'template_limit': args.get('limit', 5)}
-    stdout, stderr, code = run_ledger_api('template_suggest', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = {'limit': args.get('limit', 5)}
+    return api_get('/api/record_templates/suggest', params)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 数据 / 查询命令
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 def cmd_export(args):
-    kwargs = {
-        'output': args.get('output'),
-        'format': args.get('format', 'csv'),
-        'category': args.get('category'),
-        'start_date': args.get('start_date'),
-        'end_date': args.get('end_date'),
-    }
-    stdout, stderr, code = run_ledger_api('export', **kwargs)
-    return format_output(stdout, stderr, code)
+    params = _ensure(args, ['format', 'category', 'start_date', 'end_date'])
+    params.setdefault('format', 'json')
+    result = api_get('/api/export', params)
+    if result.get('success') and result.get('data'):
+        d = result['data']
+        lines = [f"已导出 {d.get('count', 0)} 条记录"]
+        if d.get('data'):
+            # 转成 CSV 格式输出来适配原有接口
+            records = d['data']
+            if params.get('format') == 'csv':
+                import csv
+                import io
+                buf = io.StringIO()
+                w = csv.writer(buf)
+                w.writerow(['ID', '日期', '类型', '金额', '类别', '子类别', '账户', '项目', '成员', '商家', '备注'])
+                for r in records:
+                    w.writerow([r['id'], r['date'], r['type'], r['amount'], r['category'],
+                                r.get('subcategory',''), r['account'], r.get('project',''),
+                                r.get('member',''), r.get('merchant',''), r.get('note','')])
+                result['data'] = buf.getvalue()
+            else:
+                result['data'] = json.dumps(records, ensure_ascii=False, indent=2)
+        else:
+            result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_accounts(args):
-    stdout, stderr, code = run_ledger_api('accounts')
-    return format_output(stdout, stderr, code)
+    result = api_get('/api/accounts')
+    if result.get('success') and isinstance(result.get('data'), list):
+        items = result['data']
+        lines = [f"所有账户 ({len(items)} 个)："]
+        for a in items:
+            lines.append(f"  - {a['name']} ({a['count']}笔, ¥{a['amount']:.2f})")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_categories(args):
-    stdout, stderr, code = run_ledger_api('categories')
-    return format_output(stdout, stderr, code)
+    result = api_get('/api/categories')
+    if result.get('success') and isinstance(result.get('data'), list):
+        lines = ["所有类别："]
+        for c in result['data']:
+            lines.append(f"\n  {c['name']} ({c['total_count']}笔, ¥{c['total_amount']:.2f}):")
+            for s in c['subcategories']:
+                lines.append(f"    - {s['name']} ({s['count']}笔, ¥{s['amount']:.2f})")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_members(args):
-    stdout, stderr, code = run_ledger_api('members')
-    return format_output(stdout, stderr, code)
-
-
-def cmd_schema(args):
-    stdout, stderr, code = run_ledger_api('schema')
-    return format_output(stdout, stderr, code)
+    result = api_get('/api/members')
+    if result.get('success') and isinstance(result.get('data'), list):
+        items = result['data']
+        lines = [f"所有成员 ({len(items)} 个)："]
+        for m in items:
+            lines.append(f"  - {m['name']} ({m['count']}笔, ¥{m['amount']:.2f})")
+        result['data'] = "\n".join(lines)
+    return result
 
 
 def cmd_analyze(args):
-    stdout, stderr, code = run_ledger_api('analyze')
-    return format_output(stdout, stderr, code)
+    result = api_get('/api/analyze')
+    if result.get('success') and result.get('data'):
+        report = result['data'].get('report', '')
+        result['data'] = report
+    return result
 
 
-def cmd_import(args):
-    kwargs = {'file': args.get('file')}
-    stdout, stderr, code = run_ledger_api('import_csv', **kwargs)
-    return format_output(stdout, stderr, code)
+def cmd_health(args):
+    """检查 API 连接状态"""
+    result = api_get('/api/health')
+    if result.get('success') or result.get('status') == 'ok':
+        d = result
+        return {
+            'success': True,
+            'data': f"API 连接正常 | 数据库: {d.get('database', '?')} | 记录数: {d.get('records', 0)} | 版本: {d.get('version', '?')}"
+        }
+    return result
 
 
-def cmd_reconcile(args):
-    stdout, stderr, code = run_ledger_api('reconcile_guide')
-    return format_output(stdout, stderr, code)
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# 命令注册
+# ═══════════════════════════════════════════════════════════════════════════════
 
 COMMANDS = {
     'add': cmd_add,
@@ -419,21 +516,21 @@ COMMANDS = {
     'accounts': cmd_accounts,
     'categories': cmd_categories,
     'members': cmd_members,
-    'schema': cmd_schema,
     'analyze': cmd_analyze,
-    'import': cmd_import,
-    'reconcile': cmd_reconcile,
+    'health': cmd_health,
 }
 
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({'success': False, 'error': '缺少命令参数', 'available_commands': list(COMMANDS.keys())}, ensure_ascii=False, indent=2))
+        info = {'success': False, 'error': '缺少命令参数', 'available_commands': list(COMMANDS.keys())}
+        print(json.dumps(info, ensure_ascii=False, indent=2))
         sys.exit(1)
 
     command = sys.argv[1]
     if command not in COMMANDS:
-        print(json.dumps({'success': False, 'error': f'未知命令: {command}', 'available_commands': list(COMMANDS.keys())}, ensure_ascii=False, indent=2))
+        info = {'success': False, 'error': f'未知命令: {command}', 'available_commands': list(COMMANDS.keys())}
+        print(json.dumps(info, ensure_ascii=False, indent=2))
         sys.exit(1)
 
     args = {}
@@ -441,11 +538,17 @@ def main():
         try:
             args = json.loads(sys.argv[2])
         except json.JSONDecodeError:
-            print(json.dumps({'success': False, 'error': '参数必须是JSON格式'}, ensure_ascii=False, indent=2))
+            info = {'success': False, 'error': '参数必须是JSON格式'}
+            print(json.dumps(info, ensure_ascii=False, indent=2))
             sys.exit(1)
 
     result = COMMANDS[command](args)
-    print(result)
+    # 确保输出为统一 JSON 格式
+    if not isinstance(result, dict):
+        result = {'success': True, 'data': str(result)}
+    if 'success' not in result:
+        result = {'success': True, 'data': result}
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

@@ -10,14 +10,19 @@
 > 帮我导入这个月的微信账单
 
 **Agent 回复**：
-> 请提供 CSV 文件路径
+> 请提供 CSV 文件路径。Ledger 运行在 Docker 中，需要把文件放到 NAS 上后用容器内命令导入。
 
 **用户说**：
-> /data/wechat_bill_202606.csv
+> /volume1/docker/ledger/data/wechat_bill_202606.csv
 
-**Agent 执行**：
+**Agent 回复**：
+> 请先把文件放到 `/volume1/docker/ledger/data/` 目录，然后执行：
+
 ```bash
-python3 scripts/ledger_cli.py import '{"file":"/data/wechat_bill_202606.csv"}'
+# 先把文件放到数据目录
+cp /path/to/export.csv /volume1/docker/ledger/data/
+# 在容器内导入
+docker exec -it ledger python scripts/import_ledger.py /data/wechat_bill_202606.csv
 ```
 
 **输出**：
@@ -70,15 +75,16 @@ python3 scripts/ledger_cli.py analyze '{}'
 
 ---
 
-### 场景四：对账
+### 场景四：导出数据
 
 **用户说**：
-> 帮我对一下账
+> 帮我导出所有流水
 
 **Agent 执行**：
 ```bash
-python3 scripts/ledger_cli.py reconcile '{}'
+python3 scripts/ledger_cli.py export '{"format":"csv","start_date":"2026-01-01","end_date":"2026-12-31"}'
 ```
 
----
+**Agent 回复**：
+> 数据已从 API 获取，请手动保存到文件。
 
