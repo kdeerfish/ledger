@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && rm -rf /build
 
 # ── 创建非 root 用户（UID=1000 兼容飞牛OS/Synology 等 NAS 环境） ──
-RUN addgroup -g 1000 ledger && adduser -u 1000 -G ledger -h /app -s /sbin/nologin ledger
+RUN addgroup -g 1000 ledger && adduser -u 1000 -G ledger -h /app -s /sbin/nologin -D ledger
 
 # ── 复制应用代码 ──
 WORKDIR /app
