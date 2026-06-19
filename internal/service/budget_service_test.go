@@ -1,17 +1,16 @@
-package service_test
+﻿package service_test
 
 import (
 	"testing"
 
 	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/kdeerfish/ledger/internal/service"
-	"github.com/kdeerfish/ledger/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBudget_SetAndCheck(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	require.NoError(t, h.Budget.Set(service.SetInput{Category: "食品", Amount: 1000, Year: 2026, Month: 6}))
 	checks, err := h.Budget.Check(2026, 6)
 	require.NoError(t, err)
@@ -21,8 +20,8 @@ func TestBudget_SetAndCheck(t *testing.T) {
 }
 
 func TestBudget_Check_SpentMatches(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h) // 2 食品 transactions: 25.5 + 120 = 145.5
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	require.NoError(t, h.Budget.Set(service.SetInput{Category: "食品", Amount: 1000, Year: 2026, Month: 6}))
 	checks, _ := h.Budget.Check(2026, 6)
 	require.Len(t, checks, 1)
@@ -31,7 +30,7 @@ func TestBudget_Check_SpentMatches(t *testing.T) {
 }
 
 func TestBudget_Duplicate_UpdatesAmount(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	require.NoError(t, h.Budget.Set(service.SetInput{Category: "食品", Amount: 1000, Year: 2026, Month: 6}))
 	require.NoError(t, h.Budget.Set(service.SetInput{Category: "食品", Amount: 2000, Year: 2026, Month: 6}))
 	bs, _ := h.Budget.List(2026, 6)
@@ -40,7 +39,7 @@ func TestBudget_Duplicate_UpdatesAmount(t *testing.T) {
 }
 
 func TestBudgetTemplate_CreateAndApply(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	tpl, err := h.Budget.CreateBudgetTemplate(service.CreateBudgetTemplateInput{
 		Name: "月度餐饮", Category: "食品", Amount: 1500,
 	})
@@ -53,9 +52,7 @@ func TestBudgetTemplate_CreateAndApply(t *testing.T) {
 }
 
 func TestRecordTemplate_ApplyIncrementsUsage(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	// Pass the literal string — CreateRecordTemplateInput.Type is a plain string.
-	_ = stringPtr // silence unused in case we later need it for other fields
+	h := newSvc(t)
 	tpl, err := h.Template.CreateRecordTemplate(service.CreateRecordTemplateInput{
 		Name: "早餐", Type: "支出", Amount: 8, Category: "食品", Account: "微信",
 	})
@@ -65,15 +62,14 @@ func TestRecordTemplate_ApplyIncrementsUsage(t *testing.T) {
 	assert.Greater(t, tx.ID, int64(0))
 	after, _ := h.Template.GetRecordTemplate(tpl.ID)
 	assert.Equal(t, 1, after.UsageCount)
-	tx2, _ := h.Template.ApplyRecordTemplate(tpl.ID, 0)
-	require.NoError(t, err)
+	_, _ = h.Template.ApplyRecordTemplate(tpl.ID, 0)
 	after2, _ := h.Template.GetRecordTemplate(tpl.ID)
 	assert.Equal(t, 2, after2.UsageCount)
-	_ = tx2
+	_ = tx
 }
 
 func TestRecordTemplate_Suggest(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	_, _ = h.Template.CreateRecordTemplate(service.CreateRecordTemplateInput{Name: "a"})
 	_, _ = h.Template.CreateRecordTemplate(service.CreateRecordTemplateInput{Name: "b"})
 	ts, err := h.Template.SuggestRecordTemplates(1)
@@ -82,7 +78,7 @@ func TestRecordTemplate_Suggest(t *testing.T) {
 }
 
 func TestTags_Lifecycle(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	id, err := h.Tag.Create("常用", "")
 	require.NoError(t, err)
 	tags, _ := h.Tag.List()
@@ -92,5 +88,3 @@ func TestTags_Lifecycle(t *testing.T) {
 	_, err = h.Tag.Get(id)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
-
-func stringPtr(s string) *string { return &s }

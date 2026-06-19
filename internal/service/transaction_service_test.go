@@ -1,4 +1,4 @@
-package service_test
+﻿package service_test
 
 import (
 	"strings"
@@ -7,13 +7,12 @@ import (
 	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/kdeerfish/ledger/internal/repo"
 	"github.com/kdeerfish/ledger/internal/service"
-	"github.com/kdeerfish/ledger/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAdd_Normal(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	txn, err := h.Tx.Add(service.AddInput{
 		Type: "支出", Amount: 30, Category: "食品", Account: "微信",
 		TransDate: "2026-06-19 12:00:00", Force: true,
@@ -24,19 +23,19 @@ func TestAdd_Normal(t *testing.T) {
 }
 
 func TestAdd_RejectsZeroAmount(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	_, err := h.Tx.Add(service.AddInput{Type: "支出", Amount: 0, TransDate: "2026-06-19"})
 	require.Error(t, err)
 }
 
 func TestAdd_RejectsInvalidType(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	_, err := h.Tx.Add(service.AddInput{Type: "其他", Amount: 10})
 	require.Error(t, err)
 }
 
 func TestAdd_Duplicate(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	in := service.AddInput{
 		Type: "支出", Amount: 30, Category: "食品", Account: "微信",
 		TransDate: "2026-06-19 12:00:00",
@@ -48,7 +47,7 @@ func TestAdd_Duplicate(t *testing.T) {
 }
 
 func TestAdd_ForceBypassesDuplicate(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	in := service.AddInput{
 		Type: "支出", Amount: 30, Category: "食品", Account: "微信",
 		TransDate: "2026-06-19 12:00:00", Force: true,
@@ -60,8 +59,8 @@ func TestAdd_ForceBypassesDuplicate(t *testing.T) {
 }
 
 func TestList_FilterByCategory(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, total, err := h.Tx.List(domain.ListFilter{Category: "食品"})
 	require.NoError(t, err)
 	assert.Equal(t, 2, total)
@@ -71,8 +70,8 @@ func TestList_FilterByCategory(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, err := h.Tx.Search("午餐", "all", 50)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1)
@@ -80,8 +79,8 @@ func TestSearch(t *testing.T) {
 }
 
 func TestSoftDeleteAndRestore(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, _, _ := h.Tx.List(domain.ListFilter{})
 	first := rows[0].ID
 	require.NoError(t, h.Tx.SoftDelete(first))
@@ -96,8 +95,8 @@ func TestSoftDeleteAndRestore(t *testing.T) {
 }
 
 func TestHardDelete(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, _, _ := h.Tx.List(domain.ListFilter{})
 	first := rows[0].ID
 	require.NoError(t, h.Tx.HardDelete(first))
@@ -106,8 +105,8 @@ func TestHardDelete(t *testing.T) {
 }
 
 func TestUpdate_Whitelist(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, _, _ := h.Tx.List(domain.ListFilter{})
 	first := rows[0].ID
 	require.NoError(t, h.Tx.Update(first, "category", "娱乐"))
@@ -116,8 +115,8 @@ func TestUpdate_Whitelist(t *testing.T) {
 }
 
 func TestUpdate_RejectsBogusField(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, _, _ := h.Tx.List(domain.ListFilter{})
 	first := rows[0].ID
 	err := h.Tx.Update(first, "is_deleted", "1")
@@ -125,8 +124,8 @@ func TestUpdate_RejectsBogusField(t *testing.T) {
 }
 
 func TestSummary(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	sum, err := h.Tx.Summary("2026-06-01", "2026-06-30")
 	require.NoError(t, err)
 	assert.InDelta(t, 8000, sum.Income, 0.01)
@@ -135,8 +134,8 @@ func TestSummary(t *testing.T) {
 }
 
 func TestStatistics_ByCategory(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, err := h.Tx.Statistics("category", "", "2026-06-01", "2026-06-30")
 	require.NoError(t, err)
 	m := statsByGroup(rows)
@@ -145,16 +144,16 @@ func TestStatistics_ByCategory(t *testing.T) {
 }
 
 func TestStatistics_ByMonth(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	rows, err := h.Tx.Statistics("month", "", "2026-06-01", "2026-06-30")
 	require.NoError(t, err)
 	assert.Greater(t, len(rows), 0)
 }
 
 func TestAccountsAndCategories(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	acc, err := h.Tx.ListAccounts()
 	require.NoError(t, err)
 	assert.Contains(t, acc, "微信")
@@ -164,14 +163,14 @@ func TestAccountsAndCategories(t *testing.T) {
 }
 
 func TestImportCSV(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	csv := strings.NewReader(strings.Join([]string{
 		"交易类型,金额,日期,类别,子类别,账户,项目,成员,商家,备注",
 		"支出,12.5,2026/06/19 12:00,食品,午餐,微信,,,便利店,沙拉",
 		"收入,8000,2026/06/01 09:00,工资,,银行卡,,,公司,月薪",
-		"支出,无效,2026/06/19 12:00,食品,午餐,微信,,,便利店,沙拉", // invalid amount
-		"未知类型,5,2026/06/19 12:00,食品,午餐,微信,,,便利店,沙拉",  // unknown type
-		"", "", "", "", "", "", "", "", "", "",                              // empty row
+		"支出,无效,2026/06/19 12:00,食品,午餐,微信,,,便利店,沙拉",
+		"未知类型,5,2026/06/19 12:00,食品,午餐,微信,,,便利店,沙拉",
+		"", "", "", "", "", "", "", "", "", "",
 	}, "\n"))
 	res, err := h.Tx.ImportCSV(csv)
 	require.NoError(t, err)
@@ -180,8 +179,8 @@ func TestImportCSV(t *testing.T) {
 }
 
 func TestExport_CSV(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	var sb strings.Builder
 	require.NoError(t, h.Tx.Export(domain.ListFilter{Limit: 1000}, &sb, service.FormatCSV))
 	out := sb.String()
@@ -190,23 +189,23 @@ func TestExport_CSV(t *testing.T) {
 }
 
 func TestExport_JSON(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	var sb strings.Builder
 	require.NoError(t, h.Tx.Export(domain.ListFilter{Limit: 1000}, &sb, service.FormatJSON))
-	assert.Contains(t, sb.String(), "\"type\": \"支出\"")
+	assert.Contains(t, sb.String(), `"type": "支出"`)
 }
 
 func TestSuggestion(t *testing.T) {
-	h := testutil.NewTestDB(t)
-	testutil.SampleData(t, h)
+	h := newSvc(t)
+	sampleData(t, h.Tx)
 	s, err := h.Tx.Suggestion("", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, s.Categories)
 }
 
 func TestTags_CreateAndAttach(t *testing.T) {
-	h := testutil.NewTestDB(t)
+	h := newSvc(t)
 	id, err := h.Tag.Create("日常", "#abcdef")
 	require.NoError(t, err)
 	assert.Greater(t, id, int64(0))
