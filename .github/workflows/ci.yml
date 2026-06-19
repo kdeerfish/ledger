@@ -19,6 +19,16 @@ jobs:
         with:
           go-version: "1.23"
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+          cp -r frontend/dist internal/webui/dist
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
@@ -91,6 +101,7 @@ jobs:
           cd ..
           cp -r frontend/dist internal/webui/dist
       - name: Build
+        shell: bash
         env:
           GOOS: ${{ matrix.os == 'ubuntu-latest' && 'linux' || (matrix.os == 'windows-latest' && 'windows' || 'darwin') }}
           GOARCH: ${{ matrix.arch }}
