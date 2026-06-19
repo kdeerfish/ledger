@@ -1,8 +1,9 @@
 package cli
 
 import (
-	"github.com/kdeerfish/ledger/internal/httpapi"
 	"github.com/spf13/cobra"
+
+	"github.com/kdeerfish/ledger/internal/httpapi"
 )
 
 // serveCmd is the Web UI entry point. Kept in a separate file so that the

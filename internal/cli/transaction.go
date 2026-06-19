@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/spf13/cobra"
+
+	"github.com/kdeerfish/ledger/internal/domain"
 )
 
 // txCmd is the umbrella command grouping all transaction operations.

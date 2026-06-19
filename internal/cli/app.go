@@ -100,8 +100,6 @@ func (a *App) OK(format string, args ...any) { a.Print("✅ "+format, args...) }
 // Fail is a convenience for printing ❌ failure messages.
 func (a *App) Fail(format string, args ...any) { a.ErrPrint("❌ "+format, args...) }
 
-
-
 // parseFloat parses a string flag into a float64.
 func parseFloat(s string) (float64, error) {
 	if s == "" {
@@ -171,7 +169,6 @@ func derefStr(p *string) string {
 	}
 	return *p
 }
-
 
 // isNoConfirm returns true when the user did NOT pass --confirm.
 func isNoConfirm(confirm bool) bool { return !confirm }

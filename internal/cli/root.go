@@ -4,8 +4,9 @@
 package cli
 
 import (
-	"github.com/kdeerfish/ledger/internal/version"
 	"github.com/spf13/cobra"
+
+	"github.com/kdeerfish/ledger/internal/version"
 )
 
 // BuildRoot assembles the full command tree. The returned root can be

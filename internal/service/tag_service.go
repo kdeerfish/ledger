@@ -1,7 +1,9 @@
 package service
 
-import "github.com/kdeerfish/ledger/internal/domain"
-import "github.com/kdeerfish/ledger/internal/repo"
+import (
+	"github.com/kdeerfish/ledger/internal/domain"
+	"github.com/kdeerfish/ledger/internal/repo"
+)
 
 // TagService handles tag CRUD.
 type TagService struct {

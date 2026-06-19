@@ -18,7 +18,6 @@ type DB interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
-
 // derefString returns the dereferenced value of p, or empty if nil.
 func derefString(p *string) string {
 	if p == nil {

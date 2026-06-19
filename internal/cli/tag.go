@@ -1,8 +1,9 @@
 package cli
 
 import (
-	"github.com/kdeerfish/ledger/internal/service"
 	"github.com/spf13/cobra"
+
+	"github.com/kdeerfish/ledger/internal/service"
 )
 
 // tagCmd groups tag CRUD operations.
