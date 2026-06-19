@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/kdeerfish/ledger)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 
-**🐳 [`docker pull zouzhenglu/ledger`](https://hub.docker.com/r/zouzhenglu/ledger) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
+**🐳 [`docker`](https://hub.docker.com/r/zouzhenglu/ledger) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
 
 </div>
 
