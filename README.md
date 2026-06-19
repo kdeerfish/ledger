@@ -31,19 +31,19 @@ docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-s
 
 ## 📚 文档导航
 
-> 完整文档站：👉 **https://kdeerfish.github.io/ledger**
-
 | 你想干什么？ | 看这里 |
 |-------------|--------|
-| **第一次安装**，不知道选什么方式 | 👉 [快速开始 — 按你的环境选](https://kdeerfish.github.io/ledger/docs/getting-started/) |
-| Docker 跑在 **Windows + WSL** | 👉 [Docker on WSL 指南](https://kdeerfish.github.io/ledger/docs/getting-started/docker-wsl/) |
-| Docker 跑在 **NAS / 飞牛OS / 群晖** | 👉 [Docker on NAS 指南](https://kdeerfish.github.io/ledger/docs/getting-started/docker-nas/) |
-| 不想用 Docker，**直接跑源码** | 👉 [源码运行指南](https://kdeerfish.github.io/ledger/docs/getting-started/source-code/) |
-| 怎么用 **Web 界面** 记账 | 👉 [Web 界面使用手册](https://kdeerfish.github.io/ledger/docs/user-guide/web-ui/) |
-| 怎么用 **命令行** 记账 | 👉 [CLI 命令参考](https://kdeerfish.github.io/ledger/docs/user-guide/cli/) |
-| 想让 **AI Agent / Hermes** 接管记账 | 👉 [AI Agent 集成指南](https://kdeerfish.github.io/ledger/docs/ai-agent/) |
-| 数据库在哪 / 怎么备份 / 怎么迁移 | 👉 [FAQ · 数据管理](https://kdeerfish.github.io/ledger/docs/faq/data/) |
-| 出问题了 | 👉 [FAQ · 常见问题](https://kdeerfish.github.io/ledger/docs/faq/troubleshooting/) |
+| **第一次安装**，不知道选什么方式 | 👉 [快速开始 — 按你的环境选](website/docs/getting-started/index.md) |
+| Docker 跑在 **Windows + WSL** | 👉 [Docker on WSL 指南](website/docs/getting-started/docker-wsl.md) |
+| Docker 跑在 **NAS / 飞牛OS / 群晖** | 👉 [Docker on NAS 指南](website/docs/getting-started/docker-nas.md) |
+| 不想用 Docker，**直接跑源码** | 👉 [源码运行指南](website/docs/getting-started/source-code.md) |
+| 怎么用 **Web 界面** 记账 | 👉 [Web 界面使用手册](website/docs/user-guide/web-ui.md) |
+| 怎么用 **命令行** 记账 | 👉 [CLI 命令参考](website/docs/user-guide/cli.md) |
+| 想让 **AI Agent / Hermes** 接管记账 | 👉 [AI Agent 集成指南](website/docs/ai-agent/index.md) |
+| 数据库在哪 / 怎么备份 / 怎么迁移 | 👉 [FAQ · 数据管理](website/docs/faq/data.md) |
+| 出问题了 | 👉 [FAQ · 常见问题](website/docs/faq/troubleshooting.md) |
+
+文档站（Docusaurus）：👉 [kdeerfish.github.io/ledger](https://kdeerfish.github.io/ledger)
 
 ---
 
