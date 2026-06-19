@@ -15,17 +15,22 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ 配置加载失败: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("配置加载失败: %w", err)
 	}
 	logger.Setup(cfg.LogLevel, cfg.LogFormat)
 
 	app, err := cli.NewApp(cfg, os.Stdout, os.Stderr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ 初始化失败: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("初始化失败: %w", err)
 	}
 	defer app.Close()
 
@@ -33,7 +38,5 @@ func main() {
 	// knows about the webui package, so the rest of the code stays SPA-agnostic.
 	httpapi.SetFS(webui.FS())
 
-	if err := app.BuildRoot().Execute(); err != nil {
-		os.Exit(1)
-	}
+	return app.BuildRoot().Execute()
 }

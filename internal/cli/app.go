@@ -100,24 +100,7 @@ func (a *App) OK(format string, args ...any) { a.Print("✅ "+format, args...) }
 // Fail is a convenience for printing ❌ failure messages.
 func (a *App) Fail(format string, args ...any) { a.ErrPrint("❌ "+format, args...) }
 
-// stringP returns a pointer to s (or nil when s is empty), aligning with the
-// rest of the codebase.
-func stringP(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
 
-// optString reads a string flag, defaulting to empty.
-func optString(m map[string]any, k string) string {
-	if v, ok := m[k]; ok {
-		if s, ok2 := v.(string); ok2 {
-			return s
-		}
-	}
-	return ""
-}
 
 // parseFloat parses a string flag into a float64.
 func parseFloat(s string) (float64, error) {
@@ -189,13 +172,6 @@ func derefStr(p *string) string {
 	return *p
 }
 
-// readInput parses a non-empty flag value, returning a friendly error.
-func readInput(label, value string) (string, error) {
-	if strings.TrimSpace(value) == "" {
-		return "", fmt.Errorf("%s is required", label)
-	}
-	return value, nil
-}
 
 // isNoConfirm returns true when the user did NOT pass --confirm.
 func isNoConfirm(confirm bool) bool { return !confirm }

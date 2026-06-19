@@ -4,11 +4,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/kdeerfish/ledger/internal/db"
 	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/kdeerfish/ledger/internal/repo"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func newRepo(t *testing.T) (*repo.TransactionRepo, *repo.TagRepo) {

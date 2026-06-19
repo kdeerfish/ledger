@@ -85,7 +85,8 @@ func (r *TagRepo) Delete(id int64) error {
 func (r *TagRepo) Count() (int, error) {
 	var n int
 	row := r.db.QueryRow(`SELECT COUNT(*) FROM tags`)
-	return n, row.Scan(&n)
+	err := row.Scan(&n)
+	return n, err
 }
 
 // FindOrCreate returns the id for name, creating the row when missing.

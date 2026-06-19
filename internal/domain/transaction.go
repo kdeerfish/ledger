@@ -72,11 +72,11 @@ type Summary struct {
 
 // StatRow is one row of a GetStatistics result.
 type StatRow struct {
-	Group     string  `json:"group"`
-	Income    float64 `json:"income"`
-	Expense   float64 `json:"expense"`
-	Balance   float64 `json:"balance"`
-	Count     int     `json:"count"`
+	Group     string    `json:"group"`
+	Income    float64   `json:"income"`
+	Expense   float64   `json:"expense"`
+	Balance   float64   `json:"balance"`
+	Count     int       `json:"count"`
 	SubGroups []StatRow `json:"sub_groups,omitempty"`
 }
 
@@ -99,11 +99,11 @@ type SuggestionItem struct {
 
 // Info aggregates database metadata returned by /api/info.
 type Info struct {
-	TotalRecords    int    `json:"total_records"`
-	ActiveRecords   int    `json:"active_records"`
-	DeletedRecords  int    `json:"deleted_records"`
-	DateRangeStart  string `json:"date_range_start"`
-	DateRangeEnd    string `json:"date_range_end"`
-	TagCount        int    `json:"tag_count"`
-	DBPath          string `json:"db_path"`
+	TotalRecords   int    `json:"total_records"`
+	ActiveRecords  int    `json:"active_records"`
+	DeletedRecords int    `json:"deleted_records"`
+	DateRangeStart string `json:"date_range_start"`
+	DateRangeEnd   string `json:"date_range_end"`
+	TagCount       int    `json:"tag_count"`
+	DBPath         string `json:"db_path"`
 }

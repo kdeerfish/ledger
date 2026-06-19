@@ -16,7 +16,7 @@ func (a *App) tagListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "列出所有标签",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			tags, err := a.Tag.List()
 			if err != nil {
 				return err
@@ -34,7 +34,7 @@ func (a *App) tagCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "创建标签",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			id, err := a.Tag.Create(name, color)
 			if err != nil {
 				return err
@@ -54,7 +54,7 @@ func (a *App) tagDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "删除标签",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Tag.Delete(id); err != nil {
 				return err
 			}

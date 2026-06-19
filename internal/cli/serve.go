@@ -16,7 +16,7 @@ func (a *App) serveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "启动 Web 服务(http://0.0.0.0:5800)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			cfg := *a.Cfg
 			if host != "" {
 				cfg.WebHost = host

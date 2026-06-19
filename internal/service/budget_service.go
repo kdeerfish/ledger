@@ -101,7 +101,7 @@ func (s *BudgetService) CreateBudgetTemplate(in CreateBudgetTemplateInput) (*dom
 		Category: ptrString(in.Category), Amount: in.Amount,
 		DimensionType:  in.DimensionType,
 		DimensionValue: ptrString(in.DimensionValue),
-		Account: ptrString(in.Account), Project: ptrString(in.Project),
+		Account:        ptrString(in.Account), Project: ptrString(in.Project),
 		Member: ptrString(in.Member), Merchant: ptrString(in.Merchant),
 		Note: ptrString(in.Note), Year: in.Year, Month: in.Month,
 	}

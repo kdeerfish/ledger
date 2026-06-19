@@ -276,10 +276,10 @@ func (r *TransactionRepo) DistinctValues(column string, includeDeleted bool) ([]
 
 // StatsResult groups one row returned by GetStatistics.
 type StatsResult struct {
-	Group  string
-	Income float64
+	Group   string
+	Income  float64
 	Expense float64
-	Count  int
+	Count   int
 	// sub holds per-row sub-grouping results.
 	Sub []StatsResult
 }
@@ -419,7 +419,6 @@ func (r *TransactionRepo) MinMaxDate() (string, string, error) {
 }
 
 func dailyAvg(expense float64, start, end string) float64 {
-	const layout = "2006-01-02"
 	a, errA := parseDay(start)
 	b, errB := parseDay(end)
 	if errA != nil || errB != nil {
@@ -451,7 +450,8 @@ func (r *TransactionRepo) CountAll() (total, active, deleted int, err error) {
 func (r *TransactionRepo) TagUsageCount(tagID int64) (int, error) {
 	var n int
 	row := r.db.QueryRow(`SELECT COUNT(*) FROM transaction_tags WHERE tag_id = ?`, tagID)
-	return n, row.Scan(&n)
+	err := row.Scan(&n)
+	return n, err
 }
 
 // TransactionsByTag returns paginated transactions for a tag.

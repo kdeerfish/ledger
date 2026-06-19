@@ -33,7 +33,7 @@ func (a *App) txAddCmd() *cobra.Command {
 		Short: "添加一笔交易",
 		Example: `  ledger tx add --type 支出 --amount 25.5 --category 食品 --account 微信
   ledger tx add -t 收入 -a 8000 -c 工资 -A 银行卡 --tag 工资 --tag 月薪`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			amt, err := parseFloat(amount)
 			if err != nil {
 				a.Fail("金额格式错误: %v", err)
@@ -81,7 +81,7 @@ func (a *App) txListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "列出最近交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			rows, total, err := a.Tx.List(domain.ListFilter{Limit: limit, IncludeDeleted: includeDeleted})
 			if err != nil {
 				a.Fail("查询失败: %v", err)
@@ -102,7 +102,7 @@ func (a *App) txGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "查询单条交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			t, err := a.Tx.Get(id)
 			if err != nil {
 				a.Fail("未找到 #%d", id)
@@ -123,7 +123,7 @@ func (a *App) txUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "更新单字段(白名单)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Tx.Update(id, field, value); err != nil {
 				a.Fail("更新失败: %v", err)
 				return err
@@ -146,7 +146,7 @@ func (a *App) txDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "软删除一笔交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Tx.SoftDelete(id); err != nil {
 				a.Fail("删除失败: %v", err)
 				return err
@@ -165,7 +165,7 @@ func (a *App) txRestoreCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restore",
 		Short: "恢复一笔已软删的交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Tx.Restore(id); err != nil {
 				a.Fail("恢复失败: %v", err)
 				return err
@@ -185,7 +185,7 @@ func (a *App) txHardDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hard-delete",
 		Short: "永久删除一笔交易(需 --confirm)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if isNoConfirm(confirm) {
 				a.Fail("请传 --confirm 以确认永久删除")
 				return fmt.Errorf("missing --confirm")
@@ -205,7 +205,8 @@ func (a *App) txHardDeleteCmd() *cobra.Command {
 }
 
 func renderTxnTable(rows []domain.Transaction, w interface{ Write(p []byte) (int, error) }) {
-	for _, t := range rows {
+	for i := range rows {
+		t := &rows[i]
 		fmt.Fprintf(w, "#%-6d  %-3s  ¥%-10s  %-6s  %-12s  %-10s  %s  %s\n",
 			t.ID, string(t.Type), formatAmount(t.Amount),
 			derefStr(t.Category), derefStr(t.Subcategory),

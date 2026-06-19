@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/kdeerfish/ledger/internal/config"
 	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/kdeerfish/ledger/internal/service"
@@ -23,14 +24,14 @@ import (
 
 // Server is the HTTP application surface. Use NewServer to construct.
 type Server struct {
-	cfg  *config.Config
-	srv  *http.Server
-	r    *chi.Mux
-	log  *slog.Logger
-	tx   *service.TransactionService
-	bdg  *service.BudgetService
-	tpl  *service.TemplateService
-	tag  *service.TagService
+	cfg *config.Config
+	srv *http.Server
+	r   *chi.Mux
+	log *slog.Logger
+	tx  *service.TransactionService
+	bdg *service.BudgetService
+	tpl *service.TemplateService
+	tag *service.TagService
 }
 
 // FS is populated in main.go by calling SetFS(). It defaults to nil so
@@ -696,7 +697,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAnalyze(w http.ResponseWriter, _ *http.Request) {
 	sections, err := s.tx.AnalyzeData()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)

@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/spf13/cobra"
+
+	"github.com/kdeerfish/ledger/internal/domain"
 )
 
 // miscCmd groups the lower-frequency commands (search/filter/summary/etc).
@@ -27,7 +28,7 @@ func (a *App) searchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "search",
 		Short: "关键词搜索",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			rows, err := a.Tx.Search(keyword, stype, limit)
 			if err != nil {
 				return err
@@ -50,7 +51,7 @@ func (a *App) filterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "filter",
 		Short: "多维过滤",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			rows, err := a.Tx.Filter(f)
 			if err != nil {
 				return err
@@ -77,7 +78,7 @@ func (a *App) summaryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "summary",
 		Short: "月度汇总",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			y, m, err := parseYearMonth(joinYM(year, month))
 			if err != nil {
 				return err
@@ -116,7 +117,7 @@ func (a *App) statsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "按维度统计",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			rows, err := a.Tx.Statistics(groupBy, subGroup, startDate, endDate)
 			if err != nil {
 				return err
@@ -145,7 +146,7 @@ func (a *App) importCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "从 CSV 导入交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			abs, err := pathAbs(file)
 			if err != nil {
 				return err
@@ -179,7 +180,7 @@ func (a *App) exportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
 		Short: "导出 CSV / JSON",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if format == "" {
 				format = "csv"
 			}
@@ -205,7 +206,7 @@ func (a *App) analyzeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "analyze",
 		Short: "交叉统计分析报告",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			sections, err := a.Tx.AnalyzeData()
 			if err != nil {
 				return err
@@ -222,7 +223,7 @@ func (a *App) reconcileCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "reconcile",
 		Short: "对账指南",
-		Run: func(cmd *cobra.Command, _ []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Fprintln(a.Out, a.Tx.ReconcileGuide())
 		},
 	}
@@ -232,7 +233,7 @@ func (a *App) accountsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "accounts",
 		Short: "所有账户",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			xs, err := a.Tx.ListAccounts()
 			if err != nil {
 				return err
@@ -247,7 +248,7 @@ func (a *App) categoriesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "categories",
 		Short: "所有类别",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			xs, err := a.Tx.ListCategories()
 			if err != nil {
 				return err
@@ -262,7 +263,7 @@ func (a *App) membersCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "members",
 		Short: "所有成员",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			xs, err := a.Tx.ListMembers()
 			if err != nil {
 				return err

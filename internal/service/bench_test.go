@@ -63,12 +63,12 @@ func BenchmarkListTransactions(b *testing.B) {
 			cat = "交通"
 		}
 		_, _ = tx.Add(service.AddInput{
-			Type:        "支出",
-			Amount:      float64(i%100) + 1,
-			Category:    cat,
-			Account:     "微信",
-			TransDate:   "2026-06-19 12:00:00",
-			Force:       true,
+			Type:      "支出",
+			Amount:    float64(i%100) + 1,
+			Category:  cat,
+			Account:   "微信",
+			TransDate: "2026-06-19 12:00:00",
+			Force:     true,
 		})
 	}
 	b.ResetTimer()

@@ -7,23 +7,23 @@ type Budget struct {
 	Year           int     `json:"year"            db:"year"`
 	Month          int     `json:"month"           db:"month"`
 	Amount         float64 `json:"amount"          db:"amount"`
-	DimensionType  string  `json:"dimension_type"  db:"dimension_type"`  // category/account/member/project/merchant
+	DimensionType  string  `json:"dimension_type"  db:"dimension_type"` // category/account/member/project/merchant
 	DimensionValue *string `json:"dimension_value" db:"dimension_value"`
 	CreatedAt      string  `json:"created_at"      db:"created_at"`
 }
 
 // BudgetCheck is one row of the budget utilisation report.
 type BudgetCheck struct {
-	BudgetID    int64   `json:"budget_id"`
-	Category    string  `json:"category"`
-	Year        int     `json:"year"`
-	Month       int     `json:"month"`
-	Dimension   string  `json:"dimension_type"`
-	DimValue    string  `json:"dimension_value"`
-	Budget      float64 `json:"budget"`
-	Spent       float64 `json:"spent"`
-	Remaining   float64 `json:"remaining"`
-	Percentage  float64 `json:"percentage"`
+	BudgetID   int64   `json:"budget_id"`
+	Category   string  `json:"category"`
+	Year       int     `json:"year"`
+	Month      int     `json:"month"`
+	Dimension  string  `json:"dimension_type"`
+	DimValue   string  `json:"dimension_value"`
+	Budget     float64 `json:"budget"`
+	Spent      float64 `json:"spent"`
+	Remaining  float64 `json:"remaining"`
+	Percentage float64 `json:"percentage"`
 }
 
 // BudgetTemplate mirrors a row in the `budget_templates` table.

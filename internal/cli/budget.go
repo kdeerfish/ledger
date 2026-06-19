@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/spf13/cobra"
+
 	"github.com/kdeerfish/ledger/internal/domain"
 	"github.com/kdeerfish/ledger/internal/service"
-	"github.com/spf13/cobra"
 )
 
 // AddInputFromCmd collects CLI flags into a service.AddInput.
@@ -36,7 +37,7 @@ func (a *App) budgetSetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "设置(创建/更新)一笔预算",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			amt, err := parseFloat(amount)
 			if err != nil {
 				return err
@@ -73,7 +74,7 @@ func (a *App) budgetCheckCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "检查预算执行情况",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			y, m, err := parseYearMonth(joinYM(year, month))
 			if err != nil {
 				return err
@@ -99,7 +100,7 @@ func (a *App) budgetListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "列出预算",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			y, m, err := parseYearMonth(joinYM(year, month))
 			if err != nil {
 				return err
@@ -125,7 +126,7 @@ func (a *App) budgetTplCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template-create",
 		Short: "创建预算模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			t, err := a.Budget.CreateBudgetTemplate(in)
 			if err != nil {
 				a.Fail("创建失败: %v", err)
@@ -154,12 +155,13 @@ func (a *App) budgetTplListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "template-list",
 		Short: "列出预算模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			ts, err := a.Budget.ListBudgetTemplates()
 			if err != nil {
 				return err
 			}
-			for _, t := range ts {
+			for i := range ts {
+				t := &ts[i]
 				fmt.Fprintf(a.Out, "#%-4d  %s  amount=%.2f  cat=%s\n",
 					t.ID, t.Name, t.Amount, derefStr(t.Category))
 			}
@@ -174,7 +176,7 @@ func (a *App) budgetTplUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template-update",
 		Short: "更新预算模板字段",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			m, err := parseKVFields(fields)
 			if err != nil {
 				return err
@@ -198,7 +200,7 @@ func (a *App) budgetTplDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template-delete",
 		Short: "删除预算模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Budget.DeleteBudgetTemplate(id); err != nil {
 				return err
 			}
@@ -216,7 +218,7 @@ func (a *App) budgetTplApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template-apply",
 		Short: "应用预算模板(生成一笔预算)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			bs, err := a.Budget.ApplyBudgetTemplate(id)
 			if err != nil {
 				return err
@@ -237,12 +239,13 @@ func (a *App) budgetTplSuggestCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "template-suggest",
 		Short: "智能推荐预算模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			ts, err := a.Budget.SuggestBudgetTemplates(limit)
 			if err != nil {
 				return err
 			}
-			for _, t := range ts {
+			for i := range ts {
+				t := &ts[i]
 				fmt.Fprintf(a.Out, "%s (¥%.2f)\n", t.Name, t.Amount)
 			}
 			return nil
@@ -268,7 +271,7 @@ func (a *App) tplCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "创建记账模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			in.Tags = tags
 			t, err := a.Template.CreateRecordTemplate(in)
 			if err != nil {
@@ -301,12 +304,13 @@ func (a *App) tplListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "列出记账模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			ts, err := a.Template.ListRecordTemplates(typ)
 			if err != nil {
 				return err
 			}
-			for _, t := range ts {
+			for i := range ts {
+				t := &ts[i]
 				fmt.Fprintf(a.Out, "#%-4d used=%-3d  %s  cat=%s  amt=%.2f\n",
 					t.ID, t.UsageCount, t.Name, derefStr(t.Category), t.Amount)
 			}
@@ -323,7 +327,7 @@ func (a *App) tplUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "更新记账模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			m, err := parseKVFields(fields)
 			if err != nil {
 				return err
@@ -346,7 +350,7 @@ func (a *App) tplDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "删除记账模板",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := a.Template.DeleteRecordTemplate(id); err != nil {
 				return err
 			}
@@ -365,7 +369,7 @@ func (a *App) tplApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "应用模板生成一笔交易",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			amt, err := parseFloat(amount)
 			if err != nil {
 				return err
@@ -389,12 +393,13 @@ func (a *App) tplSuggestCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "suggest",
 		Short: "智能推荐模板(按使用频次)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			ts, err := a.Template.SuggestRecordTemplates(limit)
 			if err != nil {
 				return err
 			}
-			for _, t := range ts {
+			for i := range ts {
+				t := &ts[i]
 				fmt.Fprintf(a.Out, "%s (使用 %d 次)\n", t.Name, t.UsageCount)
 			}
 			return nil

@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/kdeerfish/ledger/internal/config"
 	"github.com/kdeerfish/ledger/internal/db"
 	"github.com/kdeerfish/ledger/internal/httpapi"
 	"github.com/kdeerfish/ledger/internal/repo"
 	"github.com/kdeerfish/ledger/internal/service"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func newServer(t *testing.T) (*httptest.Server, *service.TransactionService) {
@@ -74,7 +75,9 @@ func TestHTTP_Transactions_RoundTrip(t *testing.T) {
 	resp, err := http.Post(ts.URL+"/api/transactions", "application/json", buf)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
-	var created struct{ ID int64 `json:"id"` }
+	var created struct {
+		ID int64 `json:"id"`
+	}
 	decodeOK(t, resp, &created)
 	assert.Greater(t, created.ID, int64(0))
 
@@ -94,6 +97,7 @@ func TestHTTP_BadJSON_Returns400(t *testing.T) {
 	ts, _ := newServer(t)
 	resp, err := http.Post(ts.URL+"/api/transactions", "application/json", bytes.NewBufferString("{not json"))
 	require.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
@@ -101,5 +105,6 @@ func TestHTTP_NotFound(t *testing.T) {
 	ts, _ := newServer(t)
 	resp, err := http.Get(ts.URL + "/api/transactions/9999")
 	require.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

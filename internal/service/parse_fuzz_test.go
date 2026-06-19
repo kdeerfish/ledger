@@ -21,17 +21,17 @@ func FuzzParseCSVDate(f *testing.F) {
 	f.Add("2026/06/19")
 	f.Add("2026-06-19 12:00:00")
 	f.Add("2026-06-19")
-	f.Add("2026/13/40 25:99")        // impossible values
+	f.Add("2026/13/40 25:99") // impossible values
 	f.Add("not a date")
 	f.Add("")
 	f.Add(" ")
-	f.Add("2026/6/9 1:2")             // short
-	f.Add("2026/06/19T12:00:00Z")     // ISO 8601
-	f.Add("19/06/2026")               // dd/mm/yyyy
+	f.Add("2026/6/9 1:2")         // short
+	f.Add("2026/06/19T12:00:00Z") // ISO 8601
+	f.Add("19/06/2026")           // dd/mm/yyyy
 	f.Add("2026_06_19")
-	f.Add("\x00\x00\x00")             // null bytes
-	f.Add(strings.Repeat("9", 1000))  // very long
-	f.Add("2026/06/19 12:00:00.000")  // with subseconds
+	f.Add("\x00\x00\x00")            // null bytes
+	f.Add(strings.Repeat("9", 1000)) // very long
+	f.Add("2026/06/19 12:00:00.000") // with subseconds
 
 	f.Fuzz(func(t *testing.T, s string) {
 		out, err := parseCSVDate(s)

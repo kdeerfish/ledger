@@ -37,7 +37,7 @@ func (a *App) initCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "初始化数据库(已自动调用)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Open() already ran during NewApp; nothing more to do.
 			a.OK("数据库已就绪: %s", a.Cfg.DBPath)
 			return nil
@@ -49,7 +49,7 @@ func (a *App) versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "打印版本信息",
-		Run: func(cmd *cobra.Command, _ []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			info := version.Get()
 			a.Print("ledger %s (commit %s, built %s, %s/%s, %s)",
 				info.Version, info.Commit, info.BuildTime, info.OS, info.Arch, info.GoVersion)

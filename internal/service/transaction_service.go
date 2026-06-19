@@ -201,9 +201,15 @@ func (s *TransactionService) DistinctValues(column string) ([]string, error) {
 }
 
 // ListAccounts is a convenience wrapper.
-func (s *TransactionService) ListAccounts() ([]string, error)   { return s.Repo.DistinctValues("account", false) }
-func (s *TransactionService) ListCategories() ([]string, error) { return s.Repo.DistinctValues("category", false) }
-func (s *TransactionService) ListMembers() ([]string, error)    { return s.Repo.DistinctValues("member", false) }
+func (s *TransactionService) ListAccounts() ([]string, error) {
+	return s.Repo.DistinctValues("account", false)
+}
+func (s *TransactionService) ListCategories() ([]string, error) {
+	return s.Repo.DistinctValues("category", false)
+}
+func (s *TransactionService) ListMembers() ([]string, error) {
+	return s.Repo.DistinctValues("member", false)
+}
 
 // Suggestion returns auto-complete data.
 func (s *TransactionService) Suggestion(field, keyword string) (domain.Suggestion, error) {
@@ -344,22 +350,22 @@ func (s *TransactionService) ImportCSV(r io.Reader) (ImportResult, error) {
 			continue
 		}
 		rows = append(rows, AddInput{
-			Type:      domain.TxnType(typ),
-			Amount:    amt,
-			Category:  strings.TrimSpace(rec[idx["类别"]]),
+			Type:        domain.TxnType(typ),
+			Amount:      amt,
+			Category:    strings.TrimSpace(rec[idx["类别"]]),
 			Subcategory: safeCol(rec, idx, "子类别"),
-			Account:   safeCol(rec, idx, "账户"),
-			Project:   safeCol(rec, idx, "项目"),
-			Member:    safeCol(rec, idx, "成员"),
-			Merchant:  safeCol(rec, idx, "商家"),
-			Note:      safeCol(rec, idx, "备注"),
-			TransDate: date,
+			Account:     safeCol(rec, idx, "账户"),
+			Project:     safeCol(rec, idx, "项目"),
+			Member:      safeCol(rec, idx, "成员"),
+			Merchant:    safeCol(rec, idx, "商家"),
+			Note:        safeCol(rec, idx, "备注"),
+			TransDate:   date,
 		})
 	}
 	// Sort by date ascending to keep id order = time order.
 	sort.Slice(rows, func(i, j int) bool { return rows[i].TransDate < rows[j].TransDate })
-	for _, r := range rows {
-		if _, err := s.Add(r); err != nil {
+	for i := range rows {
+		if _, err := s.Add(rows[i]); err != nil {
 			res.Skipped++
 			res.Errors = append(res.Errors, err.Error())
 			continue
@@ -413,7 +419,8 @@ func (s *TransactionService) Export(f domain.ListFilter, w io.Writer, format Exp
 		if err := cw.Write(header); err != nil {
 			return err
 		}
-		for _, r := range rows {
+		for i := range rows {
+			r := &rows[i]
 			row := []string{
 				strconv.FormatInt(r.ID, 10),
 				string(r.Type),

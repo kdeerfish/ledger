@@ -13,7 +13,7 @@ func NewTagService(r *repo.TagRepo, tx *repo.TransactionRepo) *TagService {
 	return &TagService{Repo: r, Tx: tx}
 }
 
-func (s *TagService) List() ([]domain.Tag, error)             { return s.Repo.List() }
+func (s *TagService) List() ([]domain.Tag, error)              { return s.Repo.List() }
 func (s *TagService) Create(name, color string) (int64, error) { return s.Repo.Create(name, color) }
 func (s *TagService) Get(id int64) (*domain.Tag, error)        { return s.Repo.Get(id) }
 func (s *TagService) Delete(id int64) error                    { return s.Repo.Delete(id) }
