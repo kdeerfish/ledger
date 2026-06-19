@@ -1,48 +1,54 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
+# ── Go ─────────────────────────────────────────────
+bin/
 dist/
-build/
-.venv/
+*.test
+*.out
+coverage.out
+coverage.html
 
-# 测试输出 / 覆盖率
-*_output.txt
-.coverage
-htmlcov/
-.coverage.*
-.pytest_cache/
-coverage.json
+# ── 工具链 / 依赖锁文件保留 ────────────────────────
+# (go.sum 必须提交)
 
-# 数据库（用户自己的数据）
+# ── 本地构建产物 / 部署目录 ───────────────────────
+deploy/
+tools.go
+
+# ── 数据库 (用户自有数据) ─────────────────────────
 ledger.db
 *.db
+*.db-wal
+*.db-shm
 
-# 个人隐私数据
-data/sample/*.csv
-
-# 环境变量配置
+# ── 环境变量 (含密钥) ──────────────────────────────
 .env
+.env.local
 
-# 临时文件
+# ── 临时文件 ──────────────────────────────────────
 *.tmp
 *.bak
 .DS_Store
 Thumbs.db
 
-# IDE / 工具配置
+# ── 前端构建产物 / 依赖 ──────────────────────────
+frontend/node_modules/
+frontend/dist/
+website/node_modules/
+website/build/
+website/.docusaurus/
+
+# ── IDE / 工具配置 ────────────────────────────────
 .vscode/
+.idea/
+*.swp
 .codegraph/
 .reasonix/
 reasonix.toml
 
-# 部署目录（构建产物，不纳入版本管理）
-deploy/
+# ── 旧 Python 残留 (分支清理后不再产生) ─────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+htmlcov/
 
-# Docusaurus 构建输出
-website/build/
-website/.docusaurus/
-website/node_modules/
+# ── Docusaurus 旧 .nojekyll(已迁到 website/static) ──
+/.nojekyll
