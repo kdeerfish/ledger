@@ -22,7 +22,24 @@ def _get_db_version(c):
 
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn = sqlite3.connect(DB_PATH)
+    except sqlite3.OperationalError as e:
+        import sys
+        db_dir = os.path.dirname(DB_PATH) if DB_PATH else '(unknown)'
+        print(f"\n{'='*60}", file=sys.stderr)
+        print(f"  数据库连接失败: {e}", file=sys.stderr)
+        print(f"  数据库路径: {DB_PATH}", file=sys.stderr)
+        print(f"  数据库目录: {db_dir}", file=sys.stderr)
+        if db_dir and not os.access(db_dir, os.W_OK):
+            print(f"\n  原因: 目录 {db_dir} 没有写入权限", file=sys.stderr)
+            print(f"  当前用户: uid={os.getuid()}, gid={os.getgid()}", file=sys.stderr)
+            print(f"\n  解决方法:", file=sys.stderr)
+            print(f"    1. 在宿主机上执行: chmod 777 {db_dir}", file=sys.stderr)
+            print(f"    2. 或在 docker-compose.yml 中添加: user: \"0:0\"", file=sys.stderr)
+            print(f"    3. 或重新构建镜像确保容器用户 UID 与宿主机目录所有者一致", file=sys.stderr)
+        print(f"{'='*60}\n", file=sys.stderr)
+        raise
     c = conn.cursor()
 
     # 元数据表

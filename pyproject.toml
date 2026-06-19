@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ledger"
-version = "0.2.0"
+version = "0.3.2"
 description = "个人记账系统 - 支持收支管理、预算规划、标签分类、多维统计，附带 React Web 界面"
 readme = "README.md"
 requires-python = ">=3.10"

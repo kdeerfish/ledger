@@ -59,6 +59,13 @@ def get_db_path():
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
+        # 检查目录可写性
+        if db_dir and not os.access(db_dir, os.W_OK):
+            import sys
+            print(f"[WARN] 数据库目录不可写: {db_dir}", file=sys.stderr)
+            print(f"[WARN] 当前用户: uid={os.getuid()}, gid={os.getgid()}", file=sys.stderr)
+            print(f"[WARN] 请确保挂载目录对容器内用户有写入权限", file=sys.stderr)
+            print(f"[WARN] 例如: chmod 777 {db_dir} 或在 docker-compose 中设置 user 配置", file=sys.stderr)
         return db_path
     # 默认：项目根目录下的 ledger.db
     return os.path.join(ROOT_DIR, 'ledger.db')
