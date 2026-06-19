@@ -1,7 +1,7 @@
 ---
 name: ledger
 description: 记账、查账、统计、预算、导入导出、学习用户习惯等个人财务管理工具（HTTP API 版）
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Ledger - 个人记账系统
@@ -26,11 +26,71 @@ AI Agent ──HTTP──→ Docker 容器
 在 `skills/ledger/.env` 中配置 API 地址：
 
 ```bash
-# 编辑 .env 文件
-LEDGER_API_URL=http://192.168.31.126:5800
+LEDGER_API_URL=http://127.0.0.1:5800
 ```
 
-如果 Agent 和 Docker 在同一台机器上，可以用 `http://127.0.0.1:5800`。
+### 场景配置
+
+| 部署方式 | .env 配置 | 说明 |
+|----------|-----------|------|
+| **Docker 在本机** | `http://127.0.0.1:5800` | 默认值，无需配置 |
+| **Docker 在 NAS 上，本机访问** | `http://<NAS-IP>:5800` | 如 `http://192.168.31.126:5800` |
+| **Docker 在 WSL 同机** | 无需配置 | 自动探测网关 IP |
+| **Docker 在 Windows 宿主机，WSL 访问** | 无需配置 | 自动探测 WSL 网关 |
+
+> `ledger_cli.py` 内置自动探测：配置的地址不通时，会依次尝试 `127.0.0.1` → WSL 网关 → 配置值。
+> 部署到 NAS 后，电脑上的 agent 只需在 `.env` 填 NAS 的局域网 IP 即可。
+
+## 部署与安装
+
+### 一、服务端（Docker）
+
+在飞牛 NAS 或任意机器上部署 Ledger Docker 容器，端口 `5800`。
+
+```bash
+# 飞牛 NAS 示例
+docker pull ledger-web:latest
+docker run -d -p 5800:5800 -v /vol1/ledger-data:/app/data ledger-web
+```
+
+验证服务已启动：
+```bash
+curl http://<NAS-IP>:5800/api/health
+```
+
+### 二、Agent 端（Skills 安装）
+
+#### 场景 A：NAS 本机 agent
+
+直接把 `skills/ledger/` 放到 agent 的技能目录，**不需要配置 `.env`**，默认连 `127.0.0.1:5800`。
+
+#### 场景 B：Windows 电脑 agent
+
+1. 复制 `skills/ledger/` 到 agent 技能目录（如 `~/.agents/skills/ledger/`）
+2. 在 `skills/ledger/` 下创建 `.env` 文件，写入 NAS 地址：
+   ```
+   LEDGER_API_URL=http://192.168.31.126:5800
+   ```
+3. 完成。所有 Windows 上的 agent 共用这一份配置。
+
+#### 场景 C：WSL hermes
+
+1. WSL 读取 Windows 上的 `~/.agents/skills/ledger/`（通过 `/mnt/c/` 访问）
+2. 同一个 `.env` 文件，**不用额外配置**
+3. 或者在 `~/.hermes/config.yaml` 中添加：
+   ```yaml
+   skills:
+     external_dirs:
+       - /mnt/c/Users/<用户名>/.agents/skills
+   ```
+
+### 三、验证连接
+
+```bash
+python3 scripts/ledger_cli.py health '{}'
+```
+
+返回 `"success": true` 即表示连接正常。
 
 ## 核心概念
 

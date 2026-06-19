@@ -48,17 +48,56 @@ def _load_env_file(path):
         pass
 
 
+def _probe_api(url, timeout=2):
+    """快速探测 API 是否可达"""
+    try:
+        req = urllib.request.Request(url + '/api/health', method='GET')
+        urllib.request.urlopen(req, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def _detect_wsl_gateway():
+    """WSL2 环境下自动获取 Windows 宿主机网关 IP"""
+    try:
+        with open('/proc/net/route', 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 3 and parts[1] == '00000000':
+                    gw_hex = parts[2]
+                    # 小端序：逐字节反转
+                    return f"{int(gw_hex[6:8],16)}.{int(gw_hex[4:6],16)}.{int(gw_hex[2:4],16)}.{int(gw_hex[0:2],16)}"
+    except Exception:
+        pass
+    return None
+
+
 def get_api_url():
-    """获取 API 基础地址"""
+    """获取 API 基础地址（带自动探测）"""
     _load_env_file(ENV_FILE)
 
-    # 1. 环境变量
-    url = os.environ.get('LEDGER_API_URL', '').strip()
+    # 1. 环境变量 / .env 配置
+    url = os.environ.get('LEDGER_API_URL', '').strip().rstrip('/')
     if url:
-        return url.rstrip('/')
+        if _probe_api(url):
+            return url
+        # 配置的地址不通，继续尝试其他地址
 
-    # 2. 本地回环地址（适合 Agent 和 Web 同机）
-    return 'http://127.0.0.1:5800'
+    # 2. 本地回环（Windows 本地 / Docker 同机）
+    local = 'http://127.0.0.1:5800'
+    if _probe_api(local):
+        return local
+
+    # 3. WSL2 网关（Docker 在 Windows 宿主机上）
+    gw = _detect_wsl_gateway()
+    if gw:
+        gw_url = f'http://{gw}:5800'
+        if _probe_api(gw_url):
+            return gw_url
+
+    # 4. 返回配置值或默认值（即使不通，让调用方报错）
+    return url or local
 
 
 # ── HTTP 请求封装 ────────────────────────────────────
