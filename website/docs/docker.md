@@ -10,8 +10,8 @@ Ledger 通过 GitHub Actions CI/CD 自动构建，推送到 **3 个镜像仓库*
 
 | 仓库 | 拉取命令 | 速度 |
 |------|----------|------|
-| **Docker Hub** | `docker pull zouzhenglu/ledger:latest` | 🌍 全球 |
-| **GitHub Container Registry** | `docker pull ghcr.io/kdeerfish/ledger:latest` | 🌍 全球 |
+| **Docker Hub**（主） | `docker pull zouzhenglu/ledger:latest` | 🌍 全球默认 |
+| **GitHub Container Registry** | `docker pull ghcr.io/kdeerfish/ledger:latest` | 🌍 备选 |
 | **阿里云容器镜像服务** | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest` | 🇨🇳 国内最快 |
 
 :::tip 国内用户推荐
@@ -122,7 +122,7 @@ graph LR
 | 触发方式 | 构建标签 |
 |----------|----------|
 | push `master` | `:latest` |
-| push tag `v2.0.0` | `:2.0.0` + `:latest` |
+| push tag `v0.1.0` | `:0.1.0` + `:latest` |
 | 手动触发 | 自定义标签 + `:latest` |
 
 ## 🔧 环境变量

@@ -23,7 +23,7 @@ FROM python:3.11-slim
 # ── 元信息 ──
 LABEL org.opencontainers.image.title="Ledger"
 LABEL org.opencontainers.image.description="个人记账系统 - 收支管理、预算规划、多维度统计"
-LABEL org.opencontainers.image.version="2.0.0"
+LABEL org.opencontainers.image.version="0.1.0"
 LABEL org.opencontainers.image.source="https://github.com/kdeerfish/ledger"
 
 # ── 安装 Python 依赖 ──

@@ -4,7 +4,21 @@ sidebar_position: 2
 
 # 🚀 快速开始
 
-## 安装
+## Docker 部署（推荐）
+
+```bash
+# 一键启动
+docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-stopped zouzhenglu/ledger:latest
+
+# 查看日志
+docker logs -f ledger
+
+# 打开 http://localhost:5800
+```
+
+> 无需安装 Python 或 Node.js，有 Docker 就能用。
+
+## 本地安装
 
 ```bash
 # 1. 安装开发依赖

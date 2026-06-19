@@ -6,7 +6,7 @@ sidebar_position: 1
 
 **Ledger** 是一个个人记账系统，支持 CLI 命令行、React Web 界面、AI Agent 集成，可通过 Docker 一键部署。
 
-**当前版本：v2.0.0** — 新增标签系统、交互图表、自动建议、记账模板。
+**当前版本：v0.1.0** — 首个公开发布版本。
 
 ## ✨ 功能总览
 
@@ -70,8 +70,8 @@ sidebar_position: 1
 ## 🐳 快速部署
 
 ```bash
-# 拉取镜像（国内用户推荐阿里云）
-docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest
+# 拉取镜像（推荐 Docker Hub）
+docker pull zouzhenglu/ledger:latest
 
 # 启动容器
 docker run -d \
@@ -89,8 +89,8 @@ open http://localhost:5800
 
 | 仓库 | 拉取命令 | 速度 |
 |------|----------|------|
-| [Docker Hub](https://hub.docker.com/r/zouzhenglu/ledger) | `docker pull zouzhenglu/ledger:latest` | 🌍 全球 |
-| [ghcr.io](https://github.com/kdeerfish/ledger/pkgs/container/ledger) | `docker pull ghcr.io/kdeerfish/ledger:latest` | 🌍 全球 |
+| **Docker Hub**（主） | `docker pull zouzhenglu/ledger:latest` | 🌍 全球 |
+| [ghcr.io](https://github.com/kdeerfish/ledger/pkgs/container/ledger) | `docker pull ghcr.io/kdeerfish/ledger:latest` | 🌍 备选 |
 | 阿里云容器镜像服务 | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest` | 🇨🇳 国内最快 |
 
 ## 🌟 项目信息
