@@ -1,9 +1,6 @@
 run:
   timeout: 5m
   tests: true
-  skip-dirs:
-    - frontend/node_modules
-    - frontend/dist
 
 linters:
   disable-all: true
@@ -33,6 +30,9 @@ linters-settings:
     local-prefixes: github.com/kdeerfish/ledger
 
 issues:
+  exclude-dirs:
+    - frontend/node_modules
+    - frontend/dist
   exclude-rules:
     - path: _test\.go
       linters: [errcheck, gosimple, gocritic, revive]
