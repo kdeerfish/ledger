@@ -3,10 +3,11 @@ package service_test
 import (
 	"testing"
 
-	"github.com/kdeerfish/ledger/internal/domain"
-	"github.com/kdeerfish/ledger/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kdeerfish/ledger/internal/domain"
+	"github.com/kdeerfish/ledger/internal/service"
 )
 
 func TestBudget_SetAndCheck(t *testing.T) {
