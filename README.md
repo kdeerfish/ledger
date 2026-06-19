@@ -15,19 +15,20 @@
 
 ### 方式 1: Docker(推荐)
 ```bash
-docker pull zouzhenglu/ledger
+# Go 版发布到独立仓库 ledger-go,与 Python 版 (zouzhenglu/ledger) 并行不冲突
+docker pull zouzhenglu/ledger-go
 docker run -d \
-  --name ledger \
+  --name ledger-go \
   -p 5800:5800 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  zouzhenglu/ledger
+  zouzhenglu/ledger-go
 open http://localhost:5800
 ```
 
-### 方式 2: docker-compose
+### 方式 2: docker-compose(从 rewrite/go 分支)
 ```bash
-wget https://raw.githubusercontent.com/kdeerfish/ledger/master/docker-compose.yml
+wget https://raw.githubusercontent.com/kdeerfish/ledger/rewrite/go/docker-compose.yml
 docker compose up -d
 ```
 
@@ -39,13 +40,15 @@ tar xzf ledger-linux-amd64.tar.gz
 ./ledger serve --port 5800
 ```
 
-### 备选镜像仓库
+### 备选镜像仓库(Go 版 `ledger-go` 命名空间)
 
 | 仓库 | 拉取命令 | 适用场景 |
 |------|----------|----------|
-| **Docker Hub**(主) | `docker pull zouzhenglu/ledger` | 🌍 全球默认 |
-| GitHub Container Registry | `docker pull ghcr.io/kdeerfish/ledger` | 🌍 开发者备选 |
-| 阿里云容器镜像服务 | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger` | 🇨🇳 国内最快 |
+| **Docker Hub**(主) | `docker pull zouzhenglu/ledger-go` | 🌍 全球默认 |
+| GitHub Container Registry | `docker pull ghcr.io/kdeerfish/ledger-go` | 🌍 开发者备选 |
+| 阿里云容器镜像服务 | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go` | 🇨🇳 国内最快 |
+
+> 📦 旧 Python 版镜像仍在 `zouzhenglu/ledger`,**与 Go 版并行不冲突**,你可以按需拉取任意版本。
 
 ---
 

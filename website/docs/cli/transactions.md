@@ -2,53 +2,90 @@
 sidebar_position: 5
 ---
 
-# 📊 交易管理
+# 📊 交易管理 (CLI)
 
-`scripts/cli.py` 支持完整的交易 CRUD 操作。
+`ledger tx` 子命令组提供完整的交易 CRUD 操作。
 
 ## 添加交易
 
 ```bash
-python scripts/cli.py add \
+ledger tx add \
   --type 支出|收入 \
   --amount 100 \
   --category 食品 \
-  --subcategory 零食 \      # 可选
-  --account 微信 \           # 可选
+  --subcategory 零食 \
+  --account 微信 \
   --project 日常 \
   --member 本人 \
   --merchant 711 \
-  --note "零食" \
-  --date "2026-06-15" \     # 可选，默认当前时间
-  --confirm                  # 跳过重复检查
+  --note "晚上加餐" \
+  --date "2026-06-19 12:00:00" \
+  --tag 日常 --tag 工作日 \
+  --force
 ```
+
+| Flag | 简写 | 必填 | 说明 |
+|------|------|------|------|
+| `--type` | `-t` | ✅ | `支出` 或 `收入` |
+| `--amount` | `-a` | ✅ | 金额 (正数) |
+| `--category` | `-c` | | 类别 |
+| `--subcategory` | | | 子类别 |
+| `--account` | `-A` | | 账户 |
+| `--project` | `-p` | | 项目 |
+| `--member` | `-m` | | 成员 |
+| `--merchant` | | | 商家 |
+| `--note` | `-n` | | 备注 |
+| `--date` | `-d` | | `YYYY-MM-DD` 或 `YYYY-MM-DD HH:MM:SS`(默认 = now) |
+| `--tag` | | | 标签(可多次) |
+| `--force` | | | 强制添加,跳过重复检测 |
 
 ## 列出交易
 
 ```bash
-python scripts/cli.py list                   # 最近 20 条
-python scripts/cli.py list --limit 50        # 最近 50 条
-python scripts/cli.py list --include_deleted # 含已删除
+ledger tx list --limit 20 --include-deleted
 ```
 
-## 修改交易
+| Flag | 简写 | 默认 | 说明 |
+|------|------|------|------|
+| `--limit` | `-l` | 20 | 限制条数 |
+| `--include-deleted` | | false | 包含已软删记录 |
+
+## 查询单条
 
 ```bash
-python scripts/cli.py update --id 1 --field amount --value 50
-python scripts/cli.py update --id 1 --field category --value 交通
-python scripts/cli.py update --id 1 --field note --value "地铁充值"
+ledger tx get --id 1
 ```
 
-支持修改的字段：`amount` `category` `subcategory` `account` `project` `member` `merchant` `note` `trans_date`
+## 更新单字段
 
-## 删除与恢复
+白名单字段: `amount / category / subcategory / account / project / member / merchant / note / trans_date / type`
 
 ```bash
-python scripts/cli.py delete --id 1                   # 软删除（可恢复）
-python scripts/cli.py restore --id 1                  # 恢复
-python scripts/cli.py hard_delete --id 1 --confirm    # 物理删除（不可恢复）
+ledger tx update --id 1 --field amount --value 150
 ```
 
-:::warning 硬删除不可恢复
-硬删除会从数据库中彻底清除记录，操作前请确认。
-:::
+## 软删除
+
+```bash
+ledger tx delete --id 1
+```
+
+## 恢复软删
+
+```bash
+ledger tx restore --id 1
+```
+
+## 永久删除(危险)
+
+```bash
+ledger tx hard-delete --id 1 --confirm
+```
+
+## 重复检测
+
+默认会拒绝同日/同金额/同类型/同类别的重复交易。绕过用 `--force`。
+
+## 软删行为
+
+所有查询/统计默认 `is_deleted = 0`,软删记录隐藏。如需查看传 `--include-deleted`(CLI)或 `include_deleted=true`(HTTP)。

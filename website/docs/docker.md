@@ -2,25 +2,27 @@
 sidebar_position: 3
 ---
 
-# 🐳 Docker 部署
+# 🐳 Docker 部署 (Go 版)
 
 ## 镜像仓库
 
-Ledger 通过 GitHub Actions CI/CD 自动构建，推送到 **3 个镜像仓库**：
+Go 版发布到独立的 `ledger-go` 命名空间(与 Python 版 `zouzhenglu/ledger` 并存):
 
 | 仓库 | 拉取命令 | 速度 |
 |------|----------|------|
-| **Docker Hub**（主） | `docker pull zouzhenglu/ledger:latest` | 🌍 全球默认 |
-| **GitHub Container Registry** | `docker pull ghcr.io/kdeerfish/ledger:latest` | 🌍 备选 |
-| **阿里云容器镜像服务** | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest` | 🇨🇳 国内最快 |
+| **Docker Hub**(主) | `docker pull zouzhenglu/ledger-go:latest` | 🌍 全球默认 |
+| **GitHub Container Registry** | `docker pull ghcr.io/kdeerfish/ledger-go:latest` | 🌍 备选 |
+| **阿里云容器镜像服务** | `docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest` | 🇨🇳 国内最快 |
 
-:::tip 国内用户推荐
-阿里云镜像无需代理，拉取速度最快
-:::
+## 多架构支持
 
-## 🚀 快速启动
+每个仓库同时提供:
+- `linux/amd64` — 普通 PC / 服务器
+- `linux/arm64` — 树莓派 / Mac M1 / ARM 服务器
 
-### docker run
+Docker 自动选择匹配的架构。
+
+## 快速启动
 
 ```bash
 docker run -d \
@@ -28,17 +30,17 @@ docker run -d \
   -p 5800:5800 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  zouzhenglu/ledger:latest
+  zouzhenglu/ledger-go:latest
 ```
 
-### docker-compose（推荐）
+启动后访问 http://localhost:5800。
 
-创建 `docker-compose.yml`：
+## docker-compose
 
 ```yaml
 services:
   ledger:
-    image: zouzhenglu/ledger:latest
+    image: zouzhenglu/ledger-go:latest
     container_name: ledger
     restart: unless-stopped
     ports:
@@ -46,103 +48,71 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - WEB_HOST=0.0.0.0
-      - WEB_PORT=5800
-      - TZ=Asia/Shanghai
+      WEB_HOST: "0.0.0.0"
+      WEB_PORT: "5800"
+      LEDGER_DB_PATH: "/data/ledger.db"
+      LOG_LEVEL: "info"
 ```
 
-启动：
-
 ```bash
-docker compose up -d
-docker compose logs -f
-```
-
-### 从源码构建
-
-```bash
-git clone https://github.com/kdeerfish/ledger.git
-cd ledger
-docker compose build
+wget https://raw.githubusercontent.com/kdeerfish/ledger/rewrite/go/docker-compose.yml
 docker compose up -d
 ```
 
-启动后访问 [http://localhost:5800](http://localhost:5800)
+## 数据持久化
 
-## 📂 数据持久化
+数据库保存在容器 `/data/ledger.db`,通过 `-v $(pwd)/data:/data` 映射到宿主机。
+删除容器不会丢数据,反之亦然(只要不删宿主机目录)。
 
-数据库默认保存在容器的 `/data/ledger.db`，通过挂载卷持久化：
+## 多实例并存
 
-```bash
--v /volume1/docker/ledger/data:/data
-```
-
-### 备份数据库
+Go 版与 Python 版可以同时跑(用不同端口):
 
 ```bash
-cp ./data/ledger.db ./data/ledger-$(date +%Y%m%d).db
+# Python 版: :5800 (旧数据)
+docker run -d --name ledger-py -p 5800:5800 -v $(pwd)/data-py:/data zouzhenglu/ledger
+
+# Go 版: :5801 (新数据)
+docker run -d --name ledger-go -p 5801:5800 -v $(pwd)/data-go:/data zouzhenglu/ledger-go
 ```
 
-### 导入已有数据
+## 环境变量
 
-把旧的 `ledger.db` 复制到 `./data/` 目录下，重启容器即可：
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `WEB_HOST` | `0.0.0.0` | HTTP 监听地址 |
+| `WEB_PORT` | `5800` | HTTP 端口 |
+| `WEB_DEBUG` | `false` | 调试模式 (verbose 日志) |
+| `WEB_CORS_ORIGINS` | `*` | CORS 允许的来源 (逗号分隔) |
+| `LEDGER_DB_PATH` | `/data/ledger.db` | SQLite 文件路径 |
+| `LOG_LEVEL` | `info` | debug / info / warn / error |
+| `LOG_FORMAT` | `json` | json / text (debug 模式默认 text) |
+
+## 健康检查
+
+镜像内置 `HEALTHCHECK`(基于 `ledger version` 命令),Docker 自动监控容器健康状态:
 
 ```bash
-docker compose restart
+docker inspect --format='{{.State.Health.Status}}' ledger
+# 输出: healthy / unhealthy / starting
 ```
 
-## 📋 运维命令
-
-| 命令 | 说明 |
-|------|------|
-| `docker compose logs -f` | 查看实时日志 |
-| `docker compose down` | 停止容器 |
-| `docker compose pull` | 拉取最新镜像 |
-| `docker compose up -d` | 重启 |
-| `git pull && docker compose up -d --build` | 从源码升级 |
-| `docker exec -it ledger bash` | 进入容器 |
-| `docker exec -it ledger python scripts/import_ledger.py /data/file.csv` | 容器内导入 CSV |
-
-## 🔄 CI/CD 流水线
-
-每次 push 到 `master` 分支或打 `v*` tag，GitHub Actions 自动执行：
-
-```mermaid
-graph LR
-    A[Push master/tag] --> B[Run Tests (252)]
-    B --> C[Build Frontend]
-    C --> D[Build Docker]
-    D --> E[Docker Hub]
-    D --> F[ghcr.io]
-    D --> G[阿里云]
-```
-
-### 镜像标签规则
-
-| 触发方式 | 构建标签 |
-|----------|----------|
-| push `master` | `:latest` |
-| push tag `v0.1.0` | `:0.1.0` + `:latest` |
-| 手动触发 | 自定义标签 + `:latest` |
-
-## 🔧 环境变量
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `WEB_HOST` | 监听地址 | `0.0.0.0` |
-| `WEB_PORT` | 端口 | `5800` |
-| `WEB_DEBUG` | 调试模式 | `false` |
-| `LEDGER_DB_PATH` | 数据库路径 | `/data/ledger.db` |
-| `TZ` | 时区 | `Asia/Shanghai` |
-
-## 🩺 健康检查
+## 升级
 
 ```bash
-curl http://localhost:5800/api/health
+# 1. 拉取新版
+docker pull zouzhenglu/ledger-go:latest
+
+# 2. 停掉旧容器
+docker stop ledger && docker rm ledger
+
+# 3. 启动新容器(数据卷保持不动)
+docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data zouzhenglu/ledger-go:latest
 ```
 
-```json
-{"success": true, "data": {"status": "ok"}}
-```
+## 镜像体积对比
 
-Docker 内置 HEALTHCHECK（每 30s 检测一次），容器异常自动重启。
+| 版本 | 基础镜像 | 压缩后 | 解压后 |
+|------|----------|--------|--------|
+| Python 0.1.0 | `python:3.11-alpine` + node | ~30 MB | ~110 MB |
+| **Go 0.2.0** | `distroless/static:nonroot` | ~8 MB | **~20 MB** |

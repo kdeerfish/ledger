@@ -39,13 +39,15 @@ archives:
       - LICENSE
 
 dockers:
+  # Go 版发布到独立的 ledger-go 仓库,与原 Python 版 (zouzhenglu/ledger) 并行,
+  # 避免 latest tag 冲突。原 Python 仓库保持原样不动。
   - id: dockerhub
     use: buildx
     dockerfile: Dockerfile
     images:
-      - docker.io/zouzhenglu/ledger
-      - ghcr.io/kdeerfish/ledger
-      - crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger
+      - docker.io/zouzhenglu/ledger-go
+      - ghcr.io/kdeerfish/ledger-go
+      - crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go
     tags:
       - "{{ .Version }}"
       - latest

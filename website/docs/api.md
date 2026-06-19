@@ -2,172 +2,188 @@
 sidebar_position: 14
 ---
 
-# 🔌 API 文档
+# 🔌 HTTP API 文档 (Go 版)
 
-Ledger Web 服务提供 RESTful API，所有端点返回 JSON 格式。
+Ledger Go 版提供 **30+ RESTful API 端点**,响应结构与 Python 版 100% 兼容。
 
-**Base URL:** `http://<host>:5800`
+**Base URL**: `http://<host>:5800`
 
 ## 通用响应格式
 
 ```json
-{
-  "success": true,
-  "data": { ... }
-}
+{ "success": true, "data": { ... } }
 ```
 
-失败时：
-
+失败时:
 ```json
-{
-  "success": false,
-  "error": "错误描述"
-}
+{ "success": false, "error": "..." }
 ```
 
-## 端点一览
+带 HTTP 状态码 4xx/5xx。
 
-### 🩺 系统
+## 端点分类
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/info` | 系统信息 |
+### 🩺 健康与元信息
 
-### 📊 交易
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/health` | 健康检查,返回 `{status, db_path, version}` |
+| GET | `/api/info` | 数据库元信息(总/活跃/软删数、日期范围、标签数) |
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/transactions` | 交易列表（支持多维筛选：type/category/subcategory/account/project/member/merchant/tag_ids/keyword/start_date/end_date） |
-| POST | `/api/transactions` | 新增交易（支持 tag_ids） |
-| GET | `/api/transactions/<id>` | 获取单条交易（含 tags） |
-| PUT | `/api/transactions/<id>` | 更新交易（支持 tag_ids） |
-| DELETE | `/api/transactions/<id>` | 软删除 |
-| POST | `/api/transactions/<id>/restore` | 恢复 |
+### 💰 交易
+
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/transactions` | 列表,支持 `limit/offset/include_deleted/type/category/account/project/member/merchant/keyword/tag_ids/year/month/start_date/end_date` |
+| POST | `/api/transactions` | 新增(JSON body),返回 201 |
+| GET | `/api/transactions/{id}` | 单条(含 tag 数组) |
+| PUT | `/api/transactions/{id}` | 局部更新(白名单字段) |
+| DELETE | `/api/transactions/{id}` | 软删除 |
+| POST | `/api/transactions/{id}/restore` | 恢复软删 |
+| GET | `/api/transactions/{id}/hard-delete?confirm=true` | 永久删除 |
+| GET | `/api/transactions/search?keyword=...` | 关键词搜索 |
 
 ### 🏷 标签
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/tags` | 标签列表（含 usage_count） |
-| POST | `/api/tags` | 创建标签 `{"name":"xxx","color":"#6366f1"}` |
-| DELETE | `/api/tags/<id>` | 删除标签 |
-| GET | `/api/tags/<id>/transactions` | 某标签下的交易 |
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/tags` | 列表(含 `usage_count`) |
+| POST | `/api/tags` | 创建 |
+| DELETE | `/api/tags/{id}` | 删除(级联删关联) |
+| GET | `/api/tags/{id}/transactions` | 该标签下交易 |
 
-### 📋 记账模板
+### 📋 模板
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/templates` | 模板列表（按使用频次排序） |
-| POST | `/api/templates` | 创建模板（支持 tag_names） |
-| PUT | `/api/templates/<id>` | 更新模板 |
-| DELETE | `/api/templates/<id>` | 删除模板 |
-| POST | `/api/templates/<id>/use` | 使用模板（递增计数） |
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/templates` | 列表 |
+| POST | `/api/templates` | 创建 |
+| PUT | `/api/templates/{id}` | 更新 |
+| DELETE | `/api/templates/{id}` | 删除 |
+| POST | `/api/templates/{id}/use` | 应用模板生成交易 |
 
-### 💡 自动建议
+### 💼 预算
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/suggestions?field=all` | 全部字段建议（categories/subcategories/accounts/merchants/projects/members + frequent） |
-| GET | `/api/suggestions?field=accounts&keyword=微` | 带关键词筛选 |
-| GET | `/api/categories/quick` | 常用子类别快速选择 |
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/budgets` | 列表(`year/month` 可选) |
+| POST | `/api/budgets` | 设置(自动 upsert) |
+| GET | `/api/budgets/check` | 执行情况(`spent/remaining/percentage`) |
 
-### 📈 统计
+### 📊 统计 / 报告
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/summary?year=2026&month=6` | 收支汇总（含日均支出） |
-| GET | `/api/stats?year=2026&group_by=category` | 多维度统计（支持 group_by: category/subcategory/account/merchant/project/member/month/tag/type） |
-| GET | `/api/trends?year=2026&granularity=month` | 趋势数据（含累计趋势，granularity: day/week/month） |
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/summary` | 收入/支出/结余/笔数 |
+| GET | `/api/stats` | 按 `group_by` 分组(支持 `sub_group` 二级) |
+| GET | `/api/suggestions` | 自动补全数据 |
+| GET | `/api/accounts` / `/api/categories` / `/api/members` | distinct 值列表 |
+| GET | `/api/analyze` | 交叉统计报告 |
 
-### 💰 预算
+### 📤 导出
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/budgets?year=2026&month=6` | 预算列表 |
-| POST | `/api/budgets` | 设置预算 |
-| GET | `/api/budgets/check` | 预算执行检查（含百分比） |
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/export?format=csv\|json` | 导出筛选结果 |
 
-### 🏷 辅助数据
+## 详细示例
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/categories` | 类别/子类别层级列表 |
-| GET | `/api/accounts` | 账户列表 |
-| GET | `/api/members` | 成员列表 |
-| GET | `/api/projects` | 项目列表 |
-| GET | `/api/merchants` | 商家列表 |
-
-## 示例
-
-### 获取交易列表（含标签筛选）
+### 新增交易
 
 ```bash
-curl "http://localhost:5800/api/transactions?limit=5&type=支出&tag_ids=1,2"
+curl -X POST http://localhost:5800/api/transactions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "type": "支出",
+    "amount": 25.5,
+    "category": "食品",
+    "subcategory": "午餐",
+    "account": "微信",
+    "note": "公司食堂",
+    "trans_date": "2026-06-19 12:00:00",
+    "tags": ["日常", "工作日"]
+  }'
 ```
 
+响应:
 ```json
 {
   "success": true,
   "data": {
-    "transactions": [
-      {
-        "id": 1,
-        "date": "2026-06-15 10:00:00",
-        "type": "支出",
-        "amount": 100.0,
-        "category": "食品",
-        "subcategory": "零食",
-        "account": "微信",
-        "tags": [{"id": 1, "name": "餐饮", "color": "#ef4444"}]
-      }
-    ],
-    "total": 1
+    "id": 1,
+    "type": "支出",
+    "amount": 25.5,
+    "category": "食品",
+    "subcategory": "午餐",
+    "account": "微信",
+    "note": "公司食堂",
+    "trans_date": "2026-06-19 12:00:00",
+    "is_deleted": false,
+    "tag_ids": [1, 2],
+    "tags": ["日常", "工作日"]
   }
 }
 ```
 
-### 新增交易（含标签）
+### 列表 + 筛选
 
 ```bash
-curl -X POST http://localhost:5800/api/transactions \
-  -H "Content-Type: application/json" \
-  -d '{"type":"支出","amount":100,"category":"食品","account":"微信","note":"午餐","tag_ids":[1,2],"force":true}'
+# 最近 10 条
+curl 'http://localhost:5800/api/transactions?limit=10'
+
+# 6 月食品类支出
+curl 'http://localhost:5800/api/transactions?category=食品&start_date=2026-06-01&end_date=2026-06-30'
+
+# 按 tag 筛选
+curl 'http://localhost:5800/api/transactions?tag_ids=1,2'
 ```
 
-### 创建标签
+### 预算检查
 
 ```bash
-curl -X POST http://localhost:5800/api/tags \
-  -H "Content-Type: application/json" \
-  -d '{"name":"餐饮","color":"#ef4444"}'
+curl 'http://localhost:5800/api/budgets/check?year=2026&month=6'
 ```
 
-### 多维度统计
-
-```bash
-# 按标签统计
-curl "http://localhost:5800/api/stats?year=2026&group_by=tag"
-
-# 按商家统计
-curl "http://localhost:5800/api/stats?year=2026&group_by=merchant"
-
-# 按月趋势
-curl "http://localhost:5800/api/trends?year=2026&granularity=month"
-```
-
-### 自动建议
-
-```bash
-curl "http://localhost:5800/api/suggestions?field=all"
+响应:
+```json
+{
+  "success": true,
+  "data": {
+    "checks": [
+      {
+        "budget_id": 1,
+        "category": "食品",
+        "year": 2026,
+        "month": 6,
+        "dimension_type": "category",
+        "dimension_value": "",
+        "budget": 1000,
+        "spent": 145.5,
+        "remaining": 854.5,
+        "percentage": 14.55
+      }
+    ]
+  }
+}
 ```
 
 ## 错误码
 
-| HTTP 状态码 | 说明 |
-|-------------|------|
-| `200` | 成功 |
-| `400` | 请求参数错误 |
-| `404` | 资源不存在 |
-| `500` | 服务器内部错误 |
+| 状态 | 含义 |
+|------|------|
+| 200 | 成功 |
+| 201 | 创建成功 |
+| 400 | 参数错误(JSON 解析失败、字段白名单) |
+| 404 | 资源不存在 |
+| 409 | 重复(同日/同金额/同类型/同类别) |
+| 500 | 内部错误 |
+
+## 与 Python 版兼容性
+
+Go 版的 API 路径、参数、响应结构与 Python 版**完全一致**:
+- 同一路径 (`/api/transactions`)
+- 同一参数名 (`limit/offset/category/...`)
+- 同一响应结构 (`{success, data, error}`)
+- 同一错误码
+
+因此原 Python 版的前端和 Agent 代码**无需修改**即可对接 Go 版。
