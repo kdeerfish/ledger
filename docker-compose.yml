@@ -1,0 +1,22 @@
+services:
+  ledger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ledger:dev
+    container_name: ledger
+    restart: unless-stopped
+    ports:
+      - "5800:5800"
+    volumes:
+      - ./data:/data
+    environment:
+      WEB_HOST: "0.0.0.0"
+      WEB_PORT: "5800"
+      LEDGER_DB_PATH: "/data/ledger.db"
+      LOG_LEVEL: "info"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ledger", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

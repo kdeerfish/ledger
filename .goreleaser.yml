@@ -1,0 +1,83 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ledger
+    main: ./cmd/ledger
+    binary: ledger
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+      - -ldflags=-s -w -X github.com/kdeerfish/ledger/internal/version.Commit={{.Commit}} -X github.com/kdeerfish/ledger/internal/version.BuildTime={{.Date}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .Binary }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+  - id: windows-archive
+    formats: [zip]
+    name_template: "{{ .Binary }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+dockers:
+  - id: dockerhub
+    use: buildx
+    dockerfile: Dockerfile
+    images:
+      - docker.io/zouzhenglu/ledger
+      - ghcr.io/kdeerfish/ledger
+      - crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+
+nfpms:
+  - id: packages
+    package_name: ledger
+    file_name_template: "{{ .ConventionalFileName }}"
+    formats:
+      - deb
+      - rpm
+    maintainer: kdeerfish <noreply@example.com>
+    description: Personal accounting CLI / web (Go rewrite)
+    license: MIT
+    section: utils
+    priority: optional
+
+brews:
+  - name: ledger
+    repository:
+      owner: kdeerfish
+      name: homebrew-tap
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+release:
+  github:
+    owner: kdeerfish
+    name: ledger
+  prerelease: auto
+  draft: false
