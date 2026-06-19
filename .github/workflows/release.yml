@@ -1,0 +1,197 @@
+# ============================================================
+# Ledger GitHub Release — 自动打包并发布 Release
+#
+# 【触发规则】
+#   push tag v*        → 自动测试、打包、创建 Release
+#   workflow_dispatch  → 手动触发
+#
+# 【发布内容】
+#   - ledger-service.zip  核心服务（Python 后端 + Web 前端）
+#   - ledger-skills.zip   AI Agent 技能包
+# ============================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 2.0.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  # ═══════════════════════════════════════════════════════
+  # 1. 测试
+  # ═══════════════════════════════════════════════════════
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: python -m pytest tests -v --tb=short
+
+  # ═══════════════════════════════════════════════════════
+  # 2. 构建前端
+  # ═══════════════════════════════════════════════════════
+  frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+  # ═══════════════════════════════════════════════════════
+  # 3. 打包并创建 Release
+  # ═══════════════════════════════════════════════════════
+  release:
+    name: Package & Create Release
+    runs-on: ubuntu-latest
+    needs: [test, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 下载前端构建产物
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      # ── 创建临时打包目录 ──
+      - name: Package ledger-service.zip
+        shell: bash
+        run: |
+          mkdir -p deploy/_service
+
+          # 复制 Python 后端
+          cp -r ledger_modules deploy/_service/ledger_modules
+          cp -r scripts deploy/_service/scripts
+          cp -r web deploy/_service/web
+
+          # 移除 __pycache__
+          find deploy/_service -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+          find deploy/_service -name '*.pyc' -delete
+
+          # 复制前端构建产物
+          mkdir -p deploy/_service/frontend
+          cp -r frontend/dist deploy/_service/frontend/dist
+
+          # 复制配置文件和 Dockerfile
+          cp requirements.txt deploy/_service/
+          cp pyproject.toml deploy/_service/
+          cp Dockerfile deploy/_service/
+          cp docker-compose.yml deploy/_service/
+          cp DEPLOY.md deploy/_service/
+          [ -f .env.example ] && cp .env.example deploy/_service/
+
+          # 打包
+          cd deploy/_service
+          zip -r ../ledger-service.zip .
+          cd ../..
+          rm -rf deploy/_service
+
+      - name: Package ledger-skills.zip
+        shell: bash
+        run: |
+          mkdir -p deploy/_skills
+
+          # 复制 AI Agent 技能
+          cp -r skills/ledger/scripts deploy/_skills/scripts
+          cp skills/ledger/SKILL.md deploy/_skills/
+          cp skills/ledger/.env.example deploy/_skills/.env.example
+
+          # 复制 references 和 examples
+          [ -d skills/ledger/references ] && cp -r skills/ledger/references deploy/_skills/references
+          [ -d skills/ledger/examples ] && cp -r skills/ledger/examples deploy/_skills/examples
+
+          # 打包
+          cd deploy/_skills
+          zip -r ../ledger-skills.zip .
+          cd ../..
+          rm -rf deploy/_skills
+
+      # ── 计算版本号 ──
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building release: v${VERSION}"
+
+      # ── 创建 GitHub Release ──
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## v${{ steps.version.outputs.version }}
+
+            ### 📦 下载
+
+            | 包 | 说明 |
+            |----|------|
+            | `ledger-service.zip` | 核心服务（Python 后端 + Web 前端 + Dockerfile） |
+            | `ledger-skills.zip` | AI Agent 技能包 |
+
+            ### 🐳 Docker 镜像
+
+            ```bash
+            docker pull ghcr.io/kdeerfish/ledger:v${{ steps.version.outputs.version }}
+            ```
+
+            ### 🚀 快速部署
+
+            参考 [DEPLOY.md](https://github.com/kdeerfish/ledger/blob/master/DEPLOY.md)
+          files: |
+            deploy/ledger-service.zip
+            deploy/ledger-skills.zip
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: false
