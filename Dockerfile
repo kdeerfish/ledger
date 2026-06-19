@@ -18,7 +18,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ── 阶段2: Python 运行环境 ──
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 # ── 元信息 ──
 LABEL org.opencontainers.image.title="Ledger"
@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && rm -rf /build
 
 # ── 创建非 root 用户 ──
-RUN groupadd -r ledger && useradd -r -g ledger -d /app -s /sbin/nologin ledger
+RUN addgroup -S ledger && adduser -S -G ledger -h /app -s /sbin/nologin ledger
 
 # ── 复制应用代码 ──
 WORKDIR /app
