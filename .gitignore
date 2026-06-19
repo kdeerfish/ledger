@@ -18,6 +18,10 @@ ledger.db
 *.db
 *.db-wal
 *.db-shm
+# 测试 / 临时导出文件
+data/test.csv
+data/*.csv
+!data/sample/*.csv
 
 # ── 环境变量 (含密钥) ──────────────────────────────
 .env

@@ -1,4 +1,0 @@
-id,type,amount,category,subcategory,account,project,member,merchant,note,trans_date,is_deleted
-3,支出,8,交通,地铁,支付宝,,,,,2026-06-19 20:14:18,false
-2,支出,30,食品,,微信,,,,午餐,2026-06-19 20:14:18,false
-1,收入,8000,工资,,银行卡,,,,月薪,2026-06-19 20:14:18,false
