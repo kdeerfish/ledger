@@ -22,7 +22,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.59.1
+          version: v1.62.2
           args: --timeout=5m
 
   test:
@@ -37,6 +37,16 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+          cp -r frontend/dist internal/webui/dist
       - name: Download modules
         run: go mod download
       - name: Build
@@ -70,6 +80,16 @@ jobs:
         with:
           go-version: "1.23"
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+          cp -r frontend/dist internal/webui/dist
       - name: Build
         env:
           GOOS: ${{ matrix.os == 'ubuntu-latest' && 'linux' || (matrix.os == 'windows-latest' && 'windows' || 'darwin') }}
