@@ -231,7 +231,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	info := version.Get()
 	writeOK(w, map[string]any{
 		"status":  "ok",
@@ -240,7 +240,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleInfo(w http.ResponseWriter, _ *http.Request) {
 	info, err := s.tx.Info()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -437,7 +437,7 @@ func atoiDefault(s string, def int) int {
 
 // ─── Tags ────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListTags(w http.ResponseWriter, _ *http.Request) {
 	tags, err := s.tag.List()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -600,7 +600,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"stats": rows})
 }
 
-func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAccounts(w http.ResponseWriter, _ *http.Request) {
 	xs, err := s.tx.ListAccounts()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -609,7 +609,7 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"accounts": xs})
 }
 
-func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCategories(w http.ResponseWriter, _ *http.Request) {
 	xs, err := s.tx.ListCategories()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -618,7 +618,7 @@ func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"categories": xs})
 }
 
-func (s *Server) handleMembers(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	xs, err := s.tx.ListMembers()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -814,7 +814,7 @@ func readSeekerFromBytes(b []byte) *bytesSeeker { return &bytesSeeker{b: b} }
 
 // periodRange resolves (year, month, startDate, endDate) to a (start, end)
 // pair suitable for the Summary service.
-func periodRange(year, month int, startDate, endDate string) (string, string) {
+func periodRange(year, month int, startDate, endDate string) (start, end string) {
 	if startDate != "" && endDate != "" {
 		return startDate, endDate
 	}

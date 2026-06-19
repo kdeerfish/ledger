@@ -123,7 +123,7 @@ func (s *BudgetService) DeleteBudgetTemplate(id int64) error {
 	return s.Template.Delete(id)
 }
 
-// ApplyBudgetTemplate materialises a template into one or more budget rows.
+// ApplyBudgetTemplate materializes a template into one or more budget rows.
 // If the template defines year/month, only that period is created; otherwise
 // the current month is used.
 func (s *BudgetService) ApplyBudgetTemplate(id int64) ([]domain.Budget, error) {

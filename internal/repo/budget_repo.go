@@ -205,8 +205,8 @@ func (r *BudgetTemplateRepo) UpdateFields(id int64, fields map[string]any) error
 		"project": true, "member": true, "merchant": true, "note": true,
 		"year": true, "month": true,
 	}
-	var setParts []string
-	var args []any
+	setParts := make([]string, 0, len(fields))
+	args := make([]any, 0, len(fields))
 	for k, v := range fields {
 		if !allowed[k] {
 			return domain.Wrap(domain.ErrInvalidField, "field %q not updateable", k)
@@ -317,8 +317,8 @@ func (r *RecordTemplateRepo) UpdateFields(id int64, fields map[string]any) error
 		"amount": true, "category": true, "subcategory": true, "account": true,
 		"project": true, "member": true, "merchant": true, "note": true, "tags": true,
 	}
-	var setParts []string
-	var args []any
+	setParts := make([]string, 0, len(fields))
+	args := make([]any, 0, len(fields))
 	for k, v := range fields {
 		if !allowed[k] {
 			return domain.Wrap(domain.ErrInvalidField, "field %q not updateable", k)

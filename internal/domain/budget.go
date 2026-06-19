@@ -12,7 +12,7 @@ type Budget struct {
 	CreatedAt      string  `json:"created_at"      db:"created_at"`
 }
 
-// BudgetCheck is one row of the budget utilisation report.
+// BudgetCheck is one row of the budget utilization report.
 type BudgetCheck struct {
 	BudgetID   int64   `json:"budget_id"`
 	Category   string  `json:"category"`

@@ -41,7 +41,7 @@ func emptyAsNull(s string) any {
 
 // buildWhere assembles a WHERE clause + args from a ListFilter. Returns
 // ("", nil) when there are no constraints.
-func buildWhere(f domain.ListFilter) (string, []any) {
+func buildWhere(f domain.ListFilter) (query string, args []any) {
 	var clauses []string
 	var args []any
 

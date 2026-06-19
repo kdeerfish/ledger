@@ -100,7 +100,7 @@ func (s *TransactionService) Get(id int64) (*domain.Transaction, error) {
 	return s.Repo.Get(id)
 }
 
-// List returns matching transactions (limit/offset honoured) and the total
+// List returns matching transactions (limit/offset honored) and the total
 // match count for pagination.
 func (s *TransactionService) List(f domain.ListFilter) ([]domain.Transaction, int, error) {
 	if f.Limit <= 0 {
@@ -389,7 +389,7 @@ func parseCSVDate(s string) (string, error) {
 			return t.Format("2006-01-02 15:04:05"), nil
 		}
 	}
-	return "", fmt.Errorf("unrecognised date %q", s)
+	return "", fmt.Errorf("unrecognized date %q", s)
 }
 
 // ExportFormat is the on-disk format for Export.

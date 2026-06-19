@@ -34,7 +34,7 @@ type Config struct {
 	DataDir string
 }
 
-// FromViper materialises a Config from the given viper instance.
+// FromViper materializes a Config from the given viper instance.
 func FromViper(v *viper.Viper) (*Config, error) {
 	cfg := &Config{
 		DBPath:         v.GetString("LEDGER_DB_PATH"),
@@ -88,7 +88,7 @@ func Load() (*Config, error) {
 	v.AutomaticEnv()
 
 	// Built-in defaults. These are intentionally identical to the original
-	// Python project so the migration is behaviour-preserving.
+	// Python project so the migration is behavior-preserving.
 	v.SetDefault("LEDGER_DB_PATH", "ledger.db")
 	v.SetDefault("WEB_HOST", "0.0.0.0")
 	v.SetDefault("WEB_PORT", 5800)

@@ -25,7 +25,7 @@ func Open(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	// SQLite serialises writes; a small connection pool keeps the reader
+	// SQLite serializes writes; a small connection pool keeps the reader
 	// fast without exhausting the lock.
 	d.SetMaxOpenConns(1)
 	d.SetMaxIdleConns(1)

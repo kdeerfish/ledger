@@ -126,8 +126,8 @@ func (r *TransactionRepo) UpdateFields(id int64, fields map[string]any) error {
 		"project": true, "member": true, "merchant": true, "note": true,
 		"trans_date": true, "type": true,
 	}
-	var setParts []string
-	var args []any
+	setParts := make([]string, 0, len(fields))
+	args := make([]any, 0, len(fields))
 	for k, v := range fields {
 		if !allowed[k] {
 			return domain.Wrap(domain.ErrInvalidField, "field %q is not updateable", k)
@@ -378,7 +378,7 @@ func (r *TransactionRepo) Summary(startDate, endDate string) (domain.Summary, er
 	return s, nil
 }
 
-func (r *TransactionRepo) buildStatsWhere(startDate, endDate string) (string, []any) {
+func (r *TransactionRepo) buildStatsWhere(startDate, endDate string) (query string, args []any) {
 	var clauses []string
 	var args []any
 	clauses = append(clauses, "is_deleted = 0")
@@ -409,13 +409,13 @@ func (r *TransactionRepo) distinctAllowed(column string) (string, error) {
 }
 
 // MinMaxDate returns the [min, max] trans_date among non-deleted rows.
-func (r *TransactionRepo) MinMaxDate() (string, string, error) {
-	var lo, hi sql.NullString
+func (r *TransactionRepo) MinMaxDate() (lo, hi string, err error) {
+	var minDate, maxDate sql.NullString
 	row := r.db.QueryRow(`SELECT MIN(trans_date), MAX(trans_date) FROM transactions WHERE is_deleted = 0`)
-	if err := row.Scan(&lo, &hi); err != nil {
+	if err := row.Scan(&minDate, &maxDate); err != nil {
 		return "", "", err
 	}
-	return lo.String, hi.String, nil
+	return minDate.String, maxDate.String, nil
 }
 
 func dailyAvg(expense float64, start, end string) float64 {
