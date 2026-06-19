@@ -440,8 +440,8 @@ func parseDay(s string) (time.Time, error) {
 func (r *TransactionRepo) CountAll() (total, active, deleted int, err error) {
 	row := r.db.QueryRow(`SELECT
 		COUNT(*),
-		SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END),
-		SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END)
+		COALESCE(SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END), 0)
 		FROM transactions`)
 	err = row.Scan(&total, &active, &deleted)
 	return
