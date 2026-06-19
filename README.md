@@ -18,7 +18,6 @@
 
 ## 🐳 一分钟启动
 
-无需安装 Python 或 Node.js，有 Docker 就能用：
 
 ```bash
 # 1. 拉取镜像

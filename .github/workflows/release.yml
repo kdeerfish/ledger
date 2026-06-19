@@ -181,15 +181,24 @@ jobs:
             | `ledger-service.zip` | 核心服务（Python 后端 + Web 前端 + Dockerfile） |
             | `ledger-skills.zip` | AI Agent 技能包 |
 
-            ### 🐳 Docker 镜像
+            ### 🐳 Docker 镜像（推荐 — Docker Hub）
 
             ```bash
-            docker pull ghcr.io/kdeerfish/ledger:v${{ steps.version.outputs.version }}
+            docker pull zouzhenglu/ledger:v${{ steps.version.outputs.version }}
             ```
+
+            备选仓库：
+            - `docker pull ghcr.io/kdeerfish/ledger:v${{ steps.version.outputs.version }}`
 
             ### 🚀 快速部署
 
-            参考 [DEPLOY.md](https://github.com/kdeerfish/ledger/blob/master/DEPLOY.md)
+            ```bash
+            docker run -d -p 5800:5800 --name ledger zouzhenglu/ledger:v${{ steps.version.outputs.version }}
+            ```
+
+            然后访问 http://localhost:5800
+
+            详细部署指南参考 [DEPLOY.md](https://github.com/kdeerfish/ledger/blob/master/DEPLOY.md)
           files: |
             deploy/ledger-service.zip
             deploy/ledger-skills.zip
