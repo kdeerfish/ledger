@@ -9,7 +9,9 @@ import (
 
 	"github.com/kdeerfish/ledger/internal/cli"
 	"github.com/kdeerfish/ledger/internal/config"
+	"github.com/kdeerfish/ledger/internal/httpapi"
 	"github.com/kdeerfish/ledger/internal/logger"
+	"github.com/kdeerfish/ledger/internal/webui"
 )
 
 func main() {
@@ -26,6 +28,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer app.Close()
+
+	// Hand the embedded SPA to the HTTP server. main is the only place that
+	// knows about the webui package, so the rest of the code stays SPA-agnostic.
+	httpapi.SetFS(webui.FS())
 
 	if err := app.BuildRoot().Execute(); err != nil {
 		os.Exit(1)

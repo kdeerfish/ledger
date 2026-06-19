@@ -14,13 +14,16 @@ type BudgetRepo struct{ db DB }
 func NewBudgetRepo(d DB) *BudgetRepo { return &BudgetRepo{db: d} }
 
 func (r *BudgetRepo) Set(b *domain.Budget) error {
+	dimVal := derefString(b.DimensionValue)
+	// SQLite UNIQUE treats NULLs as distinct. Coerce empty → '' so that a
+	// second insert with the same (category, year, month, dimension_type,
+	// dimension_value='') hits the conflict branch and updates the row.
 	res, err := r.db.Exec(`INSERT INTO budgets
 		(category, year, month, amount, dimension_type, dimension_value)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(category, year, month, dimension_type, dimension_value)
 		DO UPDATE SET amount = excluded.amount`,
-		b.Category, b.Year, b.Month, b.Amount,
-		b.DimensionType, emptyAsNull(derefString(b.DimensionValue)))
+		b.Category, b.Year, b.Month, b.Amount, b.DimensionType, dimVal)
 	if err != nil {
 		return err
 	}

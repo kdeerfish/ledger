@@ -88,6 +88,10 @@ func (s *TransactionService) Add(in AddInput) (*domain.Transaction, error) {
 	if _, err := s.Repo.Insert(t); err != nil {
 		return nil, err
 	}
+	// Reload to populate TagNames (used by callers like TemplateService).
+	if loaded, err := s.Repo.Get(t.ID); err == nil {
+		return loaded, nil
+	}
 	return t, nil
 }
 

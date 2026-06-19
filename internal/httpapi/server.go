@@ -33,10 +33,14 @@ type Server struct {
 	tag  *service.TagService
 }
 
-// FS is populated in main.go via go:embed. We declare a tiny package-level
-// variable that the WebUI handler reads; the actual embed is supplied by the
-// caller. When empty, the API still works (used in tests).
+// FS is populated in main.go by calling SetFS(). It defaults to nil so
+// API-only builds (and tests) can omit the embedded SPA. When nil,
+// handleSPA returns 404 for non-/api routes.
 var FS fs.FS
+
+// SetFS wires the embedded SPA into the handler. main.go calls this during
+// startup; tests typically leave FS nil.
+func SetFS(f fs.FS) { FS = f }
 
 // NewServer builds an HTTP server. dist is the embed.FS root (may be nil for
 // API-only deployments, e.g. tests).
@@ -57,6 +61,14 @@ func NewServer(cfg *config.Config, tx *service.TransactionService,
 		IdleTimeout:       120 * time.Second,
 	}
 	return s, nil
+}
+
+// NewServerForTest is a thin wrapper used by external test packages. Kept
+// here so we don't break the public NewServer signature.
+func NewServerForTest(cfg *config.Config, tx *service.TransactionService,
+	bdg *service.BudgetService, tpl *service.TemplateService, tag *service.TagService,
+) (*Server, error) {
+	return NewServer(cfg, tx, bdg, tpl, tag)
 }
 
 // Run blocks until the server stops. Use Start/Stop for tests.
