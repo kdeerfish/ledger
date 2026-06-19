@@ -380,7 +380,6 @@ func (r *TransactionRepo) Summary(startDate, endDate string) (domain.Summary, er
 
 func (r *TransactionRepo) buildStatsWhere(startDate, endDate string) (query string, args []any) {
 	var clauses []string
-	var args []any
 	clauses = append(clauses, "is_deleted = 0")
 	if startDate != "" {
 		clauses = append(clauses, "trans_date >= ?")

@@ -43,7 +43,6 @@ func emptyAsNull(s string) any {
 // ("", nil) when there are no constraints.
 func buildWhere(f domain.ListFilter) (query string, args []any) {
 	var clauses []string
-	var args []any
 
 	if !f.IncludeDeleted {
 		clauses = append(clauses, "is_deleted = 0")
