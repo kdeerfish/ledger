@@ -159,7 +159,7 @@ sqlite3 ./data/ledger.db ".schema transactions"
 
 ---
 
-## 🐛 数据相关
+## 数据相关
 
 ### 看不到刚记的交易
 
@@ -209,7 +209,7 @@ WHERE category = '食品酒水';
 
 ---
 
-## ⬆️ 升级问题
+## 升级问题
 
 ### 升级后容器起不来
 
@@ -335,6 +335,6 @@ docker compose up -d
 
 ## ❓ 还没解决？
 
-- 提交 Issue: <https://github.com/kdeerfish/ledger/issues>
+- 提交 Issue: [https://github.com/kdeerfish/ledger/issues](https://github.com/kdeerfish/ledger/issues)
 - 带上 `docker compose logs` 输出
 - 带上你的部署方式（WSL/NAS/源码）和操作系统版本

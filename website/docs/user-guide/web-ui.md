@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # 🌐 Web 界面使用手册
 
-启动后浏览器打开 **http://localhost:5800**（或你的 NAS/服务器 IP:5800）即可使用。
+启动后浏览器打开 `http://localhost:5800`（或你的 NAS/服务器 IP:5800）即可使用。
 
 界面采用 **React + Vite + Chart.js**，响应式设计，手机 / 平板 / 电脑均可用。
 

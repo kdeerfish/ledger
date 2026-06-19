@@ -60,7 +60,7 @@ docker pull crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/
 
 启动成功后（约 3 秒）：
 
-- 浏览器打开：**http://localhost:5800** （Windows 上直接访问，WSL 自动转发）
+- 浏览器打开：`http://localhost:5800` （Windows 上直接访问，WSL 自动转发）
 - 或者在 WSL 里跑 `curl http://localhost:5800/api/health` 验证
 
 看到 React 仪表盘 = 安装成功 🎉

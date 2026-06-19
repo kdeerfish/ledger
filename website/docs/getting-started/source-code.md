@@ -132,7 +132,7 @@ cd ..
 python web/run.py
 ```
 
-访问 **http://localhost:5800**。
+访问 `http://localhost:5800` 。
 
 ### 开发模式（带热更新）
 
@@ -144,7 +144,7 @@ WEB_DEBUG=true python web/run.py
 cd frontend && npm run dev
 ```
 
-访问 **http://localhost:5800**，改代码自动刷新。
+访问 `http://localhost:5800` ，改代码自动刷新。
 
 或者用 VS Code 的 **"Full Stack Dev"** compound 配置一键启动。
 

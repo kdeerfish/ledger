@@ -42,7 +42,7 @@ sidebar_position: 1
 docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-stopped zouzhenglu/ledger:latest
 ```
 
-- ✅ 启动成功：浏览器打开 **http://localhost:5800**
+- ✅ 启动成功：浏览器打开 `http://localhost:5800`
 - ❌ 启动失败 / 想搞明白每一步：去上面表格里选你的环境，对应文档会讲清楚细节。
 
 ---
