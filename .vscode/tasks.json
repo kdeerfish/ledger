@@ -1,0 +1,78 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "env": {
+      "GOPATH": "C:\\Users\\kezhe\\go-pkg",
+      "GOMODCACHE": "C:\\Users\\kezhe\\go-pkg\\mod",
+      "GOCACHE": "C:\\Users\\kezhe\\go-cache",
+      "GOPROXY": "https://goproxy.io,direct",
+      "GOSUMDB": "off",
+      "GOTOOLCHAIN": "local",
+      "LEDGER_DB_PATH": "${workspaceFolder}\\data\\test.db"
+    }
+  },
+  "tasks": [
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "go",
+      "args": ["build", "-trimpath", "-ldflags", "-s -w", "-o", "bin/ledger-cli.exe", "."],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"],
+      "detail": "Build single binary bin/ledger-cli.exe"
+    },
+    {
+      "label": "Test: Unit",
+      "type": "shell",
+      "command": "go",
+      "args": ["test", "-count=1", "-v", "./..."],
+      "group": "test",
+      "problemMatcher": ["$go"],
+      "detail": "Run all tests"
+    },
+    {
+      "label": "Format",
+      "type": "shell",
+      "command": "go",
+      "args": ["fmt", "./..."],
+      "problemMatcher": [],
+      "detail": "gofmt -s -w"
+    },
+    {
+      "label": "Vet",
+      "type": "shell",
+      "command": "go",
+      "args": ["vet", "./..."],
+      "problemMatcher": ["$go"],
+      "detail": "go vet static check"
+    },
+    {
+      "label": "Tidy Modules",
+      "type": "shell",
+      "command": "go",
+      "args": ["mod", "tidy"],
+      "problemMatcher": [],
+      "detail": "go mod tidy"
+    },
+    {
+      "label": "Package (local)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["package.sh"],
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Cross-compile and package skill zip"
+    },
+    {
+      "label": "CLI: --help",
+      "type": "shell",
+      "command": "go",
+      "args": ["run", ".", "--help"],
+      "problemMatcher": [],
+      "detail": "Show CLI help"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Cross-compile all platforms
+        shell: bash
+        run: |
+          chmod +x package.sh
+          bash package.sh
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'const version = "\K[^"]+' main.go)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ledger-cli v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            bin/ledger-cli-linux-amd64
+            bin/ledger-cli-linux-arm64
+            bin/ledger-cli-darwin-amd64
+            bin/ledger-cli-darwin-arm64
+            bin/ledger-cli-windows-amd64.exe
+            dist/ledger-cli-${{ steps.version.outputs.version }}-skill.zip

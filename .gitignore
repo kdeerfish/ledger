@@ -1,4 +1,10 @@
-ledger-cli.exe
+# Build artifacts (generated locally, not committed)
 ledger-cli
-*.exe
+ledger-cli.exe
+bin/
+dist/
 data/
+
+# OS
+.DS_Store
+Thumbs.db

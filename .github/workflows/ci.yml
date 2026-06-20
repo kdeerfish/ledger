@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [feature/skill-lite]
+  pull_request:
+    branches: [feature/skill-lite]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build -trimpath -o ledger-cli .
+      - name: Test CLI
+        run: |
+          ./ledger-cli --version
+          ./ledger-cli info --json
+          ./ledger-cli tx add --type expense --amount 10 --category test --account test --note "ci test"
+          ./ledger-cli tx list --json
+          ./ledger-cli summary --year 2026 --month 6 --json
