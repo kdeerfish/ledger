@@ -25,18 +25,19 @@ builds:
         goarch: arm64
 
 archives:
+  # 单个 archive 定义,通过 format_overrides 让 windows 单独走 zip。
+  # 之前拆成两个 archive(default tar.gz + windows-archive zip) 没有 per-OS 过滤,
+  # 导致每个 OS/Arch 都同时生成 tar.gz 和 zip,触发 brews pipe 报错:
+  # 'one tap can handle only one archive of an OS/Arch combination'。
   - id: default
     formats: [tar.gz]
     name_template: "{{ .Binary }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
     files:
       - README.md
       - LICENSE
-  - id: windows-archive
-    formats: [zip]
-    name_template: "{{ .Binary }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
-    files:
-      - README.md
-      - LICENSE
+    format_overrides:
+      - goos: windows
+        formats: [zip]
 
 dockers:
   # Go 版发布到独立的 ledger-go 仓库,与原 Python 版 (zouzhenglu/ledger) 并行,
