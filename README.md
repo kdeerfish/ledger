@@ -3,8 +3,12 @@
 **收支管理 · 预算规划 · 标签分类 · 多维统计 · React 仪表盘 · AI Agent 集成**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/kdeerfish/ledger/ci.yml?branch=rewrite/go&label=CI%2FCD&logo=github)](https://github.com/kdeerfish/ledger/actions)
+[![Tests](https://img.shields.io/github/actions/workflow/status/kdeerfish/ledger/ci.yml?branch=rewrite/go&label=Tests&logo=vitest)](https://github.com/kdeerfish/ledger/actions)
+[![License](https://img.shields.io/github/license/kdeerfish/ledger)](LICENSE)
 [![License](https://img.shields.io/github/license/kdeerfish/ledger)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go)](https://go.dev/)
+[![Go Coverage](https://img.shields.io/codecov/c/github/kdeerfish/ledger?branch=rewrite/go&label=Go%20Coverage&logo=codecov)](https://codecov.io/gh/kdeerfish/ledger)
+[![Frontend Coverage](https://img.shields.io/codecov/c/github/kdeerfish/ledger?branch=rewrite/go&label=Frontend%20Coverage&logo=codecov&flag=frontend)](https://codecov.io/gh/kdeerfish/ledger)
 
 > **Go 重写版本** — 体积更小(单二进制 ~20MB),启动更快(无 Python/Node 运行时),性能更好(原生并发),API 100% 兼容原 Python 版本。
 > 旧 Python 版仍在 `master` 分支保留,供回退使用。

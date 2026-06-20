@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   lint:
@@ -72,6 +73,55 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+
+  frontend-test:
+    name: frontend-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Test with coverage
+        run: npm run test:coverage
+        working-directory: frontend
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+
+  coverage:
+    name: coverage
+    needs: [test, frontend-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Upload Go coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: artifacts/coverage/coverage.out
+          flags: go
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload Frontend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: artifacts/frontend-coverage/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: build-${{ matrix.os }}-${{ matrix.arch }}

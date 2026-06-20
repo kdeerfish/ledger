@@ -10,7 +10,8 @@ VER   := $(shell $(GO) run ./internal/version 2>$null; if ($$LASTEXITCODE -ne 0)
 
 .PHONY: help all build run test test-unit test-integration test-e2e \
         test-race fuzz fuzz-quick bench coverage coverage-html lint fmt vet \
-        clean clean-db docker docker-run snapshot release check pre-commit
+        clean clean-db docker docker-run snapshot release check pre-commit \
+        test-frontend test-frontend-coverage coverage-all
 
 all: fmt vet test build
 
@@ -35,6 +36,9 @@ help:
 	@Write-Host "    make bench            run all benchmarks (3s each)"
 	@Write-Host "    make coverage         unit tests + coverage report"
 	@Write-Host "    make coverage-html    unit tests + HTML coverage report"
+	@Write-Host "    make test-frontend   frontend unit tests (vitest)"
+	@Write-Host "    make test-frontend-coverage  frontend tests + coverage report"
+	@Write-Host "    make coverage-all     Go + frontend combined coverage"
 	@Write-Host "    make check            fmt + vet + test (pre-commit gate)"
 	@Write-Host "    make pre-commit       same as check (git hook alias)"
 	@Write-Host ""
@@ -119,6 +123,23 @@ coverage:
 coverage-html: coverage
 	$(GO) tool cover -html=coverage.out -o coverage.html
 	@Write-Host "Open coverage.html in browser"
+
+# ─── Frontend Test ────────────────────────────────────────────────────
+
+test-frontend:
+	cd frontend; npm run test
+
+test-frontend-coverage:
+	cd frontend; npm run test:coverage
+
+# ─── Combined Coverage ────────────────────────────────────────────────
+
+coverage-all: coverage test-frontend-coverage
+	@Write-Host ""
+	@Write-Host "=== ALL COVERAGE REPORTS GENERATED ==="
+	@Write-Host "  Go:        coverage.out"
+	@Write-Host "  Frontend:  frontend/coverage/"
+	@Write-Host ""
 
 # ─── Lint / Format ───────────────────────────────────────────────────────
 
