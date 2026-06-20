@@ -12,7 +12,13 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-      - -ldflags=-s -w -X github.com/kdeerfish/ledger/internal/version.Commit={{.Commit}} -X github.com/kdeerfish/ledger/internal/version.BuildTime={{.Date}}
+    # ldflags 单独列,避免与 goreleaser 的默认 ldflags (-X main.version=...)
+    # 重复触发 'ldflags is defined twice' 警告。
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/kdeerfish/ledger/internal/version.Commit={{.Commit}}
+      - -X github.com/kdeerfish/ledger/internal/version.BuildTime={{.Date}}
     goos:
       - linux
       - windows
@@ -39,105 +45,41 @@ archives:
       - goos: windows
         formats: [zip]
 
-dockers:
-  # Go 版发布到独立的 ledger-go 仓库,与原 Python 版 (zouzhenglu/ledger) 并行,
-  # 避免 latest tag 冲突。原 Python 仓库保持原样不动。
-  # GoReleaser v2: 每个平台单独一个条目,通过 docker_manifests 组合多平台。
-  # ---- Docker Hub (amd64) ----
-  - id: dockerhub-amd64
-    use: buildx
+dockers_v2:
+  # GoReleaser v2.12+ 的新写法,一次 docker buildx build 同时构建多架构
+  # (linux/amd64 + linux/arm64) 并推送 manifest + SBOM。
+  # 取代了 v1 时代的 dockers (每个平台一条) + docker_manifests (合并 manifest) 两段。
+  # 注意: dockers_v2 的构建上下文会把每个平台的二进制放到
+  # $TARGETPLATFORM/<binary> 子目录里,Dockerfile 需要用 ARG TARGETPLATFORM 取出。
+  #
+  # 3 个镜像仓库 (Docker Hub 主 / GHCR 备份 / 阿里云 国内) 写在同一个条目里,
+  # goreleaser 会对 images x tags 做笛卡尔积自动生成所有组合。
+  #
+  # 仓库命名继续用独立的 ledger-go 命名空间,与原 Python 版
+  # (zouzhenglu/ledger) 并行不冲突,避免 latest tag 抢占。
+  - id: ledger-go
     dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: amd64
-    image_templates:
-      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-amd64"
-      - "docker.io/zouzhenglu/ledger-go:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-  # ---- Docker Hub (arm64) ----
-  - id: dockerhub-arm64
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: arm64
-    image_templates:
-      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-arm64"
-      - "docker.io/zouzhenglu/ledger-go:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-  # ---- GHCR (amd64) ----
-  - id: ghcr-amd64
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: amd64
-    image_templates:
-      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-amd64"
-      - "ghcr.io/kdeerfish/ledger-go:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-  # ---- GHCR (arm64) ----
-  - id: ghcr-arm64
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: arm64
-    image_templates:
-      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-arm64"
-      - "ghcr.io/kdeerfish/ledger-go:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-  # ---- Aliyun (amd64) ----
-  - id: aliyun-amd64
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: amd64
-    image_templates:
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-amd64"
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-  # ---- Aliyun (arm64) ----
-  - id: aliyun-arm64
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    goos: linux
-    goarch: arm64
-    image_templates:
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-arm64"
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
-
-docker_manifests:
-  # Docker Hub
-  - name_template: "docker.io/zouzhenglu/ledger-go:{{ .Version }}"
-    image_templates:
-      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-amd64"
-      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-arm64"
-  - name_template: "docker.io/zouzhenglu/ledger-go:latest"
-    image_templates:
-      - "docker.io/zouzhenglu/ledger-go:latest-amd64"
-      - "docker.io/zouzhenglu/ledger-go:latest-arm64"
-  # GHCR
-  - name_template: "ghcr.io/kdeerfish/ledger-go:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-amd64"
-      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/kdeerfish/ledger-go:latest"
-    image_templates:
-      - "ghcr.io/kdeerfish/ledger-go:latest-amd64"
-      - "ghcr.io/kdeerfish/ledger-go:latest-arm64"
-  # Aliyun
-  - name_template: "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}"
-    image_templates:
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-amd64"
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-arm64"
-  - name_template: "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest"
-    image_templates:
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-amd64"
-      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-arm64"
+    images:
+      - docker.io/zouzhenglu/ledger-go
+      - ghcr.io/kdeerfish/ledger-go
+      - crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: "Ledger (Go)"
+      org.opencontainers.image.description: "个人记账系统 - Go 重写版本,体积更小,性能更好"
+      org.opencontainers.image.source: "https://github.com/kdeerfish/ledger"
+      org.opencontainers.image.licenses: "MIT"
+    annotations:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.name: "{{ .ProjectName }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.source: "{{ .GitURL }}"
 
 nfpms:
   - id: packages
@@ -151,15 +93,6 @@ nfpms:
     license: MIT
     section: utils
     priority: optional
-
-brews:
-  - name: ledger
-    repository:
-      owner: kdeerfish
-      name: homebrew-tap
-    commit_author:
-      name: goreleaserbot
-      email: bot@goreleaser.com
 
 release:
   github:
