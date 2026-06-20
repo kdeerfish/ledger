@@ -1,16 +1,5 @@
 {
   "version": "2.0.0",
-  "options": {
-    "env": {
-      "GOPATH": "C:\\Users\\kezhe\\go-pkg",
-      "GOMODCACHE": "C:\\Users\\kezhe\\go-pkg\\mod",
-      "GOCACHE": "C:\\Users\\kezhe\\go-cache",
-      "GOPROXY": "https://goproxy.io,direct",
-      "GOSUMDB": "off",
-      "GOTOOLCHAIN": "local",
-      "LEDGER_DB_PATH": "${workspaceFolder}\\data\\test.db"
-    }
-  },
   "tasks": [
     {
       "label": "Build",
@@ -25,7 +14,35 @@
       "detail": "Build single binary bin/ledger-cli.exe"
     },
     {
-      "label": "Test: Unit",
+      "label": "Package: Windows",
+      "type": "shell",
+      "command": "package.bat",
+      "args": [],
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Cross-compile 5 platforms + create skill zip (Windows)",
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Package: Linux/macOS",
+      "type": "shell",
+      "command": "bash",
+      "args": ["package.sh"],
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Cross-compile 5 platforms + create skill zip (Linux/macOS)",
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-Command", "Remove-Item -Recurse -Force bin, dist, ledger-cli.exe -ErrorAction SilentlyContinue"],
+      "problemMatcher": [],
+      "detail": "Remove build artifacts: bin/, dist/, ledger-cli.exe"
+    },
+    {
+      "label": "Test",
       "type": "shell",
       "command": "go",
       "args": ["test", "-count=1", "-v", "./..."],
@@ -58,16 +75,7 @@
       "detail": "go mod tidy"
     },
     {
-      "label": "Package (local)",
-      "type": "shell",
-      "command": "bash",
-      "args": ["package.sh"],
-      "group": "build",
-      "problemMatcher": [],
-      "detail": "Cross-compile and package skill zip"
-    },
-    {
-      "label": "CLI: --help",
+      "label": "Run: --help",
       "type": "shell",
       "command": "go",
       "args": ["run", ".", "--help"],
