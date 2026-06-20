@@ -41,19 +41,102 @@ archives:
 dockers:
   # Go 版发布到独立的 ledger-go 仓库,与原 Python 版 (zouzhenglu/ledger) 并行,
   # 避免 latest tag 冲突。原 Python 仓库保持原样不动。
-  - id: dockerhub
+  # GoReleaser v2: 每个平台单独一个条目,通过 docker_manifests 组合多平台。
+  # ---- Docker Hub (amd64) ----
+  - id: dockerhub-amd64
     use: buildx
-    dockerfile: Dockerfile
-    images:
-      - docker.io/zouzhenglu/ledger-go
-      - ghcr.io/kdeerfish/ledger-go
-      - crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go
-    tags:
-      - "{{ .Version }}"
-      - latest
-    platforms:
-      - linux/amd64
-      - linux/arm64
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-amd64"
+      - "docker.io/zouzhenglu/ledger-go:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  # ---- Docker Hub (arm64) ----
+  - id: dockerhub-arm64
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-arm64"
+      - "docker.io/zouzhenglu/ledger-go:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  # ---- GHCR (amd64) ----
+  - id: ghcr-amd64
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-amd64"
+      - "ghcr.io/kdeerfish/ledger-go:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  # ---- GHCR (arm64) ----
+  - id: ghcr-arm64
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-arm64"
+      - "ghcr.io/kdeerfish/ledger-go:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+  # ---- Aliyun (amd64) ----
+  - id: aliyun-amd64
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-amd64"
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  # ---- Aliyun (arm64) ----
+  - id: aliyun-arm64
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-arm64"
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  # Docker Hub
+  - name_template: "docker.io/zouzhenglu/ledger-go:{{ .Version }}"
+    image_templates:
+      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-amd64"
+      - "docker.io/zouzhenglu/ledger-go:{{ .Version }}-arm64"
+  - name_template: "docker.io/zouzhenglu/ledger-go:latest"
+    image_templates:
+      - "docker.io/zouzhenglu/ledger-go:latest-amd64"
+      - "docker.io/zouzhenglu/ledger-go:latest-arm64"
+  # GHCR
+  - name_template: "ghcr.io/kdeerfish/ledger-go:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-amd64"
+      - "ghcr.io/kdeerfish/ledger-go:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/kdeerfish/ledger-go:latest"
+    image_templates:
+      - "ghcr.io/kdeerfish/ledger-go:latest-amd64"
+      - "ghcr.io/kdeerfish/ledger-go:latest-arm64"
+  # Aliyun
+  - name_template: "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}"
+    image_templates:
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-amd64"
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:{{ .Version }}-arm64"
+  - name_template: "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest"
+    image_templates:
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-amd64"
+      - "crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger-go:latest-arm64"
 
 nfpms:
   - id: packages

@@ -1,0 +1,31 @@
+# ============================================================
+# GoReleaser Dockerfile - 使用预编译的二进制文件
+# GoReleaser 已经构建好包含前端嵌入的 Go 二进制，
+# 这里只需要打包到最小运行时镜像。
+# ============================================================
+
+FROM gcr.io/distroless/static:nonroot
+
+LABEL org.opencontainers.image.title="Ledger (Go)"
+LABEL org.opencontainers.image.description="个人记账系统 - Go 重写版本,体积更小,性能更好"
+LABEL org.opencontainers.image.source="https://github.com/kdeerfish/ledger"
+LABEL org.opencontainers.image.licenses="MIT"
+
+COPY ledger /usr/local/bin/ledger
+
+WORKDIR /data
+VOLUME ["/data"]
+
+EXPOSE 5800
+
+ENV WEB_HOST=0.0.0.0 \
+    WEB_PORT=5800 \
+    LEDGER_DB_PATH=/data/ledger.db
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD ["/usr/local/bin/ledger", "version"]
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/usr/local/bin/ledger"]
+CMD ["serve"]
