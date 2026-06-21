@@ -519,18 +519,13 @@
 
   // ─── 退出应用 ──────────────────────────────────
   async function quitApp() {
-    if (!confirm('确定要退出 Ledger 吗？\n所有服务将停止，需要重新启动。')) return;
     const a = api();
     if (a && a.quit_app) {
       await a.quit_app();
     } else {
-      // 无 pywebview bridge（浏览器模式），调用 API
       try {
         await fetch('/api/quit', { method: 'POST' });
-        showToast('正在退出...');
-      } catch (e) {
-        showToast('退出失败', 'error');
-      }
+      } catch (e) {}
     }
   }
 
@@ -552,12 +547,18 @@
 
   // ─── 加载配置 ──────────────────────────────────
   async function loadConfig() {
+    let cfg;
     const a = api();
-    if (!a) return;
-    const cfg = await a.get_config();
+    if (a && a.get_config) {
+      cfg = await a.get_config();
+    } else {
+      try {
+        const r = await fetch('/api/config');
+        cfg = await r.json();
+      } catch (e) { return; }
+    }
     if (!cfg) return;
 
-    // 填充表单
     for (const [key, value] of Object.entries(cfg)) {
       const el = document.getElementById('cfg-' + key);
       if (!el) continue;
@@ -568,7 +569,6 @@
       }
     }
 
-    // 特殊处理
     document.getElementById('service-host-row').style.display =
       cfg.service_mode ? '' : 'none';
     document.getElementById('cfg-service_mode').addEventListener('change', function() {
@@ -576,46 +576,47 @@
         this.checked ? '' : 'none';
     });
 
-    // 关于信息
-    document.getElementById('about-config').textContent = cfg._config_file || '-';
-    document.getElementById('about-db').textContent = cfg._db_path || '-';
-    document.getElementById('about-version').textContent = cfg._version || '-';
-    document.getElementById('version-text').textContent = cfg._version || '';
-
-    // 自启状态
+    if (cfg._config_file) document.getElementById('about-config').textContent = cfg._config_file;
+    if (cfg._db_path) document.getElementById('about-db').textContent = cfg._db_path;
+    if (cfg._version) {
+      document.getElementById('about-version').textContent = cfg._version;
+      document.getElementById('version-text').textContent = cfg._version;
+    }
     if (cfg._autostart !== undefined) {
       const badge = document.getElementById('autostart-status');
-      if (cfg._autostart) {
-        badge.textContent = '已启用';
-        badge.className = 'status-badge on';
-      } else {
-        badge.textContent = '未启用';
-        badge.className = 'status-badge off';
-      }
+      badge.textContent = cfg._autostart ? '已启用' : '未启用';
+      badge.className = 'status-badge ' + (cfg._autostart ? 'on' : 'off');
     }
   }
 
   // ─── 保存配置 ──────────────────────────────────
   async function saveConfig() {
-    const a = api();
-    if (!a) return;
-
     const data = {};
     document.querySelectorAll('[id^="cfg-"]').forEach(el => {
       const key = el.id.replace('cfg-', '');
       if (key.startsWith('_')) return;
-      if (el.type === 'checkbox') {
-        data[key] = el.checked;
-      } else {
-        data[key] = el.value;
-      }
+      data[key] = el.type === 'checkbox' ? el.checked : el.value;
     });
 
-    const result = await a.save_config(data);
-    if (result && result.success) {
-      showToast('✅ 设置已保存' + (result.restart_required ? '（部分设置需要重启生效）' : ''));
+    let result;
+    const a = api();
+    if (a && a.save_config) {
+      result = await a.save_config(data);
     } else {
-      showToast('❌ 保存失败: ' + (result ? result.error : '未知错误'), 'error');
+      try {
+        const r = await fetch('/api/config', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(data)
+        });
+        result = await r.json();
+      } catch (e) {
+        result = {success: false, error: e.message};
+      }
+    }
+    if (result && result.success) {
+      showToast('✅ 设置已保存');
+    } else {
+      showToast('❌ 保存失败', 'error');
     }
   }
 

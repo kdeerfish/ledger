@@ -20,12 +20,13 @@ else:
 class DesktopAPI:
     """pywebview 暴露给 JS 的 API"""
 
-    def __init__(self, on_switch_to_service=None, on_quit=None, on_close_dialog_result=None):
+    def __init__(self, on_switch_to_service=None, on_quit=None, on_close_dialog_result=None, on_mode_switch=None):
         from ledger_modules import desktop_config
         self._config = desktop_config
         self._on_switch_to_service = on_switch_to_service
         self._on_quit = on_quit
         self._on_close_dialog_result = on_close_dialog_result
+        self._on_mode_switch = on_mode_switch
 
     def get_config(self):
         """获取全部配置"""
@@ -43,12 +44,14 @@ class DesktopAPI:
             self._config.update(data)
             self._config.save()
 
-            # 应用需要立即生效的设置
             if 'port' in data:
                 os.environ['WEB_PORT'] = str(data['port'])
 
-            restart_required = 'service_mode' in data or 'host' in data
-            return {'success': True, 'restart_required': restart_required}
+            # 模式切换：service_mode 改变时立即生效
+            if 'service_mode' in data and self._on_mode_switch:
+                self._on_mode_switch(data['service_mode'])
+
+            return {'success': True}
         except Exception as e:
             return {'success': False, 'error': str(e)}
 

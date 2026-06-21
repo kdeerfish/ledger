@@ -672,10 +672,18 @@ def run_desktop_mode(port, width, height, debug):
     _tray_on_open_settings = do_open_settings
     _tray_on_toggle_mode = do_toggle_mode
 
+    def on_mode_switch(is_service):
+        """设置页切换模式"""
+        if is_service:
+            do_switch_to_service()
+        else:
+            _relaunch.set()
+
     api = DesktopAPI(
         on_switch_to_service=do_switch_to_service,
         on_quit=do_quit,
         on_close_dialog_result=on_close_dialog_result,
+        on_mode_switch=on_mode_switch,
     )
     api.open_settings = do_open_settings
 
@@ -748,8 +756,12 @@ def run_service_mode(host, port, debug):
         import webbrowser
         webbrowser.open(f'http://127.0.0.1:{port}')
 
+    def open_settings_in_browser():
+        import webbrowser
+        webbrowser.open(f'http://127.0.0.1:{port}/settings')
+
     _tray_on_open_ui = open_in_browser
-    _tray_on_open_settings = open_in_browser
+    _tray_on_open_settings = open_settings_in_browser
 
     _println("=" * 50)
     _println("  Ledger - Service Mode")

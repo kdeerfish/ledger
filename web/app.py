@@ -209,6 +209,39 @@ def quit_app():
     return jsonify({'success': True, 'message': 'Ledger 正在退出...'})
 
 
+@app.route('/settings')
+def settings_page():
+    """设置页面"""
+    settings_file = os.path.join(ROOT_DIR, 'frontend', 'settings.html')
+    if os.path.exists(settings_file):
+        return send_from_directory(os.path.dirname(settings_file), 'settings.html')
+    return 'Settings page not found', 404
+
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """获取桌面配置"""
+    try:
+        from ledger_modules import desktop_config
+        cfg = desktop_config.get()
+        return jsonify(cfg)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config', methods=['POST'])
+def save_config():
+    """保存桌面配置"""
+    try:
+        from ledger_modules import desktop_config
+        data = request.get_json()
+        desktop_config.update(data)
+        desktop_config.save()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ════════════════════════════════════════════════════════
 # 交易 API
 # ════════════════════════════════════════════════════════
