@@ -63,6 +63,12 @@ docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-s
 
 ---
 
+## 🖥️ Windows 桌面端（免安装）
+
+从 [GitHub Releases](https://github.com/kdeerfish/ledger/releases) 下载 `Ledger.zip`，解压后双击 `ledger.exe` 即可运行。
+
+---
+
 ## 🐳 镜像仓库
 
 | 仓库 | 拉取命令 | 适用 |
