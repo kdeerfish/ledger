@@ -233,16 +233,38 @@ _open_ui_callback = None
 _open_settings_callback = None
 _window_show_callback = None # 重建桌面窗口
 
+# ─── 文件日志（console=False 时唯一能看到的调试手段）────
+_LOG_FILE = os.path.join(BUNDLE_DIR, 'ledger_debug.log')
+_last_log_time = 0.0
+
+def _log(msg):
+    """写入文件日志，无论 console 是否存在"""
+    global _last_log_time
+    import time as _t
+    now = _t.time()
+    ts = _t.strftime('%H:%M:%S')
+    delta = f"+{now - _last_log_time:.3f}s" if _last_log_time else ""
+    _last_log_time = now
+    line = f"[{ts}] {delta} {msg}\n"
+    try:
+        with open(_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(line)
+    except Exception:
+        pass
+
 
 def _create_tray_icon():
-    """创建系统托盘图标（使用 run_detached，不阻塞调用线程）"""
+    """创建系统托盘图标（在 daemon 线程中用 run()，带详细文件日志）"""
     global _tray, _tray_ready
+
+    _log("_create_tray_icon: 开始")
 
     try:
         import pystray
         from PIL import Image, ImageDraw
-    except ImportError:
-        _println("[WARN] pystray/Pillow 未安装，无系统托盘")
+        _log(f"pystray OK: {pystray.__file__}")
+    except ImportError as e:
+        _log(f"pystray/Pillow 导入失败: {e}")
         _tray_ready.set()
         return
 
@@ -251,9 +273,7 @@ def _create_tray_icon():
         size = 64
         image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)
-        # 蓝色圆形
         draw.ellipse([4, 4, 60, 60], fill=(9, 132, 227, 255))
-        # 白色 L 字母
         draw.text((18, 14), "L", fill=(255, 255, 255, 255))
         return image
 
@@ -268,6 +288,7 @@ def _create_tray_icon():
             _open_settings_callback()
 
     def on_exit(icon, item):
+        _log("用户点击退出")
         icon.stop()
         shutdown_flask()
         _release_lock()
@@ -281,53 +302,55 @@ def _create_tray_icon():
     )
 
     def _setup_visible(icon):
-        """run_detached 的 setup 回调：标记图标可见"""
-        icon.visible = True
-
-    _tray = pystray.Icon(
-        name='ledger',
-        icon=make_icon(),
-        title=f'Ledger {_get_version()}',
-        menu=menu,
-    )
-
-    # 使用 run_detached：不阻塞调用线程，在内部线程中创建消息循环
-    # pystray 文档要求 run() 在主线程，但 run_detached() 可在任意线程
-    try:
-        _tray.run_detached(setup=_setup_visible)
-        _println("[INFO] 系统托盘已启动 (run_detached)")
-    except Exception as e:
-        _println(f"[ERROR] 托盘图标启动失败: {e}")
-        _tray = None
-
-    _tray_ready.set()
-
-    # 延迟后尝试将托盘图标提升到任务栏可见区域
-    def _delayed_promote():
-        time.sleep(2)  # 等待 Windows 注册图标
-        _promote_tray_icon()
-    threading.Thread(target=_delayed_promote, daemon=True).start()
-
-    # 延迟显示启动通知
-    def _show_startup_notification():
-        time.sleep(2)  # 等待托盘完全初始化
+        """setup 回调：icon.run() 消息循环就绪后调用"""
+        _log("setup 回调: 设置 icon.visible = True ...")
         try:
-            if _tray:
-                _tray.notify(
-                    "Ledger 已启动",
-                    "应用正在后台运行。\n右键此图标可打开界面或退出。\n快捷键 Ctrl+Shift+L 可恢复窗口。"
-                )
-        except Exception:
-            pass
+            icon.visible = True
+            _log(f"setup 回调: visible={icon.visible}, Shell_NotifyIcon 应已调用")
+        except Exception as e:
+            _log(f"setup 回调: 设置 visible 失败: {e}")
+        # 显示启动气泡通知
+        try:
+            icon.notify("Ledger 已启动", "右键此图标可打开界面或退出。")
+            _log("setup 回调: 启动通知已发送")
+        except Exception as e:
+            _log(f"setup 回调: 通知失败: {e}")
+        # 将托盘图标提升到任务栏可见区域（Windows 11 会隐藏新图标）
+        _promote_tray_icon()
+        _log("setup 回调: 完成")
 
-    threading.Thread(target=_show_startup_notification, daemon=True).start()
+    _log(f"创建 Icon 对象 (name='ledger_desktop')...")
+    try:
+        _tray = pystray.Icon(
+            name='ledger_desktop',
+            icon=make_icon(),
+            title=f'Ledger {_get_version()}',
+            menu=menu,
+        )
+        _log(f"Icon 对象创建成功: {_tray}")
+    except Exception as e:
+        _log(f"Icon 对象创建失败: {e}")
+        _tray = None
+        _tray_ready.set()
+        return
+
+    # 在当前 daemon 线程中调用 run()（阻塞，直到 icon.stop()）
+    _log("调用 _tray.run(setup=_setup_visible) ...")
+    _tray_ready.set()  # 先标记就绪，让 start_tray() 不阻塞
+    try:
+        _tray.run(setup=_setup_visible)
+        _log("_tray.run() 已返回（正常退出）")
+    except Exception as e:
+        _log(f"_tray.run() 异常退出: {e}")
 
 
 def start_tray():
     """在后台线程启动托盘"""
+    _log("start_tray: 创建 daemon 线程...")
     t = threading.Thread(target=_create_tray_icon, daemon=True)
     t.start()
     _tray_ready.wait(timeout=5)
+    _log(f"start_tray: _tray_ready 已设置, _tray={'OK' if _tray else 'None'}")
 
 
 def _show_tray_notification(title, message):
@@ -420,6 +443,7 @@ def _promote_tray_icon():
         import winreg
         exe_path = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(sys.argv[0])
         base_key = r"Control Panel\NotifyIconSettings"
+        _log(f"_promote_tray_icon: 搜索 exe={exe_path}")
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base_key) as key:
             i = 0
             while True:
@@ -431,16 +455,16 @@ def _promote_tray_icon():
                             val, _ = winreg.QueryValueEx(sub, "ExecutablePath")
                             if val and os.path.normcase(os.path.normpath(val)) == os.path.normcase(os.path.normpath(exe_path)):
                                 winreg.SetValueEx(sub, "IsPromoted", 0, winreg.REG_DWORD, 1)
-                                _println(f"[INFO] 托盘图标已设为任务栏可见")
+                                _log(f"_promote_tray_icon: 已设置 IsPromoted=1")
                                 return
                         except FileNotFoundError:
                             pass
                     i += 1
                 except OSError:
                     break
-        _println(f"[INFO] 托盘图标注册表条目未找到（首次运行，图标可能在溢出区）")
+        _log("_promote_tray_icon: 未找到注册表条目（首次运行）")
     except Exception as e:
-        _println(f"[WARN] 托盘图标提升失败: {e}")
+        _log(f"_promote_tray_icon: 失败: {e}")
 
 
 # ─── 主窗口注入的工具栏 HTML ──────────────────────────
@@ -555,7 +579,9 @@ def run_desktop_mode(port, width, height, debug):
     _flask_ready.wait(timeout=10)
 
     # 启动托盘（后台线程）
+    _log("run_desktop_mode: 启动托盘...")
     start_tray()
+    _log("run_desktop_mode: 托盘启动完成，继续初始化...")
 
     # ── 轻量模式核心：窗口重建信号 ──
     _relaunch_event = threading.Event()
@@ -810,6 +836,9 @@ def run_service_mode(host, port, debug):
 # ─── 主入口 ────────────────────────────────────────
 
 def main():
+    _log("=== Ledger Desktop 启动 ===")
+    _log(f"frozen={getattr(sys, 'frozen', False)}")
+    _log(f"executable={sys.executable}")
     parser = argparse.ArgumentParser(
         description='Ledger - Personal Finance Manager',
         formatter_class=argparse.RawDescriptionHelpFormatter,
