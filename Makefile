@@ -12,7 +12,7 @@
 .ONESHELL:
 .SILENT:
 
-PYTHON := python
+PYTHON := .venv\Scripts\python.exe
 
 # ─── Testing ────────────────────────────────────────────
 .PHONY: test
