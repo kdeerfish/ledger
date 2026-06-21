@@ -1,122 +1,265 @@
 ---
 name: ledger
-description: 个人记账工具，支持记账、查账、统计、预算管理、数据导入导出等功能
+description: 个人记账工具，支持记账、查账、统计、预算管理等功能
 version: 2.0.0
 ---
 
-# Ledger - 个人记账系统
+# Ledger API
 
-## 概述
+## 基本信息
 
-Ledger 是一个基于 HTTP API 的个人记账系统，通过 Docker 容器部署，提供完整的财务记录和分析功能。
-
-## 调用方式
-
-```bash
-python3 scripts/ledger_cli.py <command> '<json_args>'
+```
+Base URL: http://127.0.0.1:5800
+Content-Type: application/json
 ```
 
-所有命令返回统一的 JSON 格式：
+所有响应格式：
 ```json
-{
-  "success": true,
-  "data": "..."
-}
+{"success": true, "data": {...}}
+{"success": false, "error": "错误信息"}
 ```
 
-## 核心功能
+---
 
-### 交易管理
+## 交易管理
 
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 记账 | `add` | 添加收入或支出记录 |
-| 查账 | `list` | 查看最近记录 |
-| 搜索 | `search` | 按关键词搜索记录 |
-| 筛选 | `filter` | 按条件筛选记录 |
-| 汇总 | `summary` | 按月汇总收支 |
-| 统计 | `stats` | 按类别/账户/月份统计 |
-| 修改 | `update` | 修改已有记录 |
-| 删除 | `delete` | 删除记录 |
-| 恢复 | `restore` | 恢复已删除记录 |
+### 记账
 
-### 预算管理
-
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 设置预算 | `budget_set` | 为类别设置预算限额 |
-| 查看预算 | `budget_check` | 查看预算执行情况 |
-| 预算模板 | `budget_template_*` | 预算模板的增删改查、应用、推荐 |
-
-### 通用记录模板
-
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 模板管理 | `template_*` | 记录模板的增删改查、应用、推荐 |
-
-### 数据与查询
-
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 导出 | `export` | 导出数据 (支持 JSON/CSV) |
-| 分析 | `analyze` | 分析消费习惯 |
-| 账户列表 | `accounts` | 查看所有账户 |
-| 类别列表 | `categories` | 查看所有类别 |
-| 成员列表 | `members` | 查看所有成员 |
-
-### 系统
-
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 健康检查 | `health` | 检查 API 连接状态 |
-
-## 快速开始
-
-### 记一笔账
 ```bash
-python3 scripts/ledger_cli.py add '{"type":"支出","amount":30,"category":"食品酒水","account":"微信零钱"}'
+curl -X POST http://127.0.0.1:5800/api/transactions \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"支出","amount":30,"category":"食品酒水","subcategory":"早餐","account":"微信零钱","note":"包子豆浆"}'
 ```
 
-### 查看最近记录
+必填：`amount`（正数）
+可选：`type`（支出/收入，默认支出）、`category`、`subcategory`、`account`、`project`、`member`、`merchant`、`note`、`date`（格式 YYYY-MM-DD HH:MM:SS）、`force`（true 跳过重复检查）、`tag_ids`（标签ID数组）
+
+返回：`{"success":true,"data":{"id":42}}`
+
+### 查看记录
+
 ```bash
-python3 scripts/ledger_cli.py list '{"limit":10}'
+# 最近 20 条
+curl http://127.0.0.1:5800/api/transactions?limit=20
+
+# 带筛选
+curl "http://127.0.0.1:5800/api/transactions?category=食品酒水&account=微信零钱&limit=10"
+
+# 包含已删除
+curl "http://127.0.0.1:5800/api/transactions?include_deleted=true&limit=5"
 ```
 
-### 查看月度统计
+筛选参数：`type`、`category`、`subcategory`、`account`、`project`、`member`、`merchant`、`keyword`、`tag_ids`、`year`、`month`、`start_date`、`end_date`、`limit`、`offset`
+
+### 查看单条
+
 ```bash
-python3 scripts/ledger_cli.py summary '{"year":2026,"month":6}'
+curl http://127.0.0.1:5800/api/transactions/42
 ```
 
-### 检查连接
+### 搜索
+
 ```bash
-python3 scripts/ledger_cli.py health '{}'
+curl "http://127.0.0.1:5800/api/transactions/search?keyword=早餐&search_type=all&limit=20"
 ```
 
-## 文档索引
+`search_type`: `all`（默认）/ `note` / `category` / `merchant`
 
-详细命令参数请查阅 `references/` 目录：
+### 修改记录
 
-| 文档 | 内容 |
-|------|------|
-| `references/basic.md` | 基础命令 (add/list/search/filter/summary/stats) |
-| `references/modify.md` | 修改命令 (update/delete/restore) |
-| `references/budget.md` | 预算命令 (budget_set/budget_check) |
-| `references/template.md` | 通用记录模板 (template_*) |
-| `references/data.md` | 数据命令 (export/analyze) |
-| `references/field-guide.md` | 字段用途说明、场景示例 |
-
-日常操作示例见 `examples/` 目录。
-
-## 配置
-
-在 `skills/ledger/.env` 中配置 API 地址（如需连接远程服务）：
 ```bash
-LEDGER_API_URL=http://127.0.0.1:5800
+# 单字段
+curl -X PUT http://127.0.0.1:5800/api/transactions/42 \
+  -H 'Content-Type: application/json' \
+  -d '{"field":"amount","value":50}'
+
+# 多字段
+curl -X PUT http://127.0.0.1:5800/api/transactions/42 \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":50,"note":"修改备注","category":"餐饮"}'
 ```
+
+可修改字段：`amount`、`category`、`subcategory`、`account`、`project`、`member`、`merchant`、`note`、`trans_date`、`type`、`tag_ids`
+
+### 删除 / 恢复
+
+```bash
+# 软删除
+curl -X DELETE http://127.0.0.1:5800/api/transactions/42
+
+# 恢复
+curl -X POST http://127.0.0.1:5800/api/transactions/42/restore
+```
+
+---
+
+## 统计查询
+
+### 收支汇总
+
+```bash
+curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
+```
+
+返回：`income`、`expense`、`balance`、`daily_avg_expense`、`income_count`、`expense_count`
+
+### 分组统计
+
+```bash
+# 按类别
+curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
+
+# 按账户、月份、商家、成员、项目、标签、类型
+curl "http://127.0.0.1:5800/api/stats?group_by=account&year=2026"
+```
+
+`group_by`: `category` / `subcategory` / `account` / `merchant` / `project` / `member` / `month` / `tag` / `type`
+可选：`sub_group=subcategory`（二级分组）
+
+### 趋势
+
+```bash
+curl "http://127.0.0.1:5800/api/trends?year=2026&granularity=month"
+```
+
+`granularity`: `day` / `week` / `month`
+
+---
+
+## 枚举查询
+
+```bash
+# 所有类别（含子类别及使用次数）
+curl http://127.0.0.1:5800/api/categories
+
+# 常用子类别 TOP20
+curl http://127.0.0.1:5800/api/categories/quick
+
+# 所有账户
+curl http://127.0.0.1:5800/api/accounts
+
+# 所有成员
+curl http://127.0.0.1:5800/api/members
+
+# 所有项目
+curl http://127.0.0.1:5800/api/projects
+
+# 所有商家
+curl http://127.0.0.1:5800/api/merchants
+
+# 自动建议（综合）
+curl "http://127.0.0.1:5800/api/suggestions?field=all&keyword=早"
+```
+
+`suggestions` 的 `field`: `all` / `categories` / `subcategories` / `accounts` / `merchants` / `projects` / `members`
+
+---
+
+## 预算管理
+
+### 设置预算
+
+```bash
+curl -X POST http://127.0.0.1:5800/api/budgets \
+  -H 'Content-Type: application/json' \
+  -d '{"category":"食品酒水","amount":2000,"year":2026,"month":6}'
+```
+
+可选：`dimension_type`（category/account/member/project/merchant）、`dimension_value`
+
+### 查看预算执行
+
+```bash
+curl "http://127.0.0.1:5800/api/budgets/check?year=2026&month=6"
+```
+
+返回每个预算的 `budget`、`spent`、`remaining`、`percentage`
+
+### 预算列表
+
+```bash
+curl "http://127.0.0.1:5800/api/budgets?year=2026&month=6"
+```
+
+---
+
+## 模板管理
+
+### 列表 / 创建 / 修改 / 删除
+
+```bash
+# 列表
+curl http://127.0.0.1:5800/api/templates
+
+# 创建
+curl -X POST http://127.0.0.1:5800/api/templates \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"早餐","template_type":"日常","type":"支出","amount":15,"category":"食品酒水","subcategory":"早餐","account":"微信零钱"}'
+
+# 修改
+curl -X PUT http://127.0.0.1:5800/api/templates/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":20}'
+
+# 删除
+curl -X DELETE http://127.0.0.1:5800/api/templates/1
+
+# 使用（增加使用次数）
+curl -X POST http://127.0.0.1:5800/api/templates/1/use
+```
+
+---
+
+## 标签管理
+
+```bash
+# 列表
+curl http://127.0.0.1:5800/api/tags
+
+# 创建
+curl -X POST http://127.0.0.1:5800/api/tags \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"报销","color":"#ef4444"}'
+
+# 删除
+curl -X DELETE http://127.0.0.1:5800/api/tags/1
+
+# 按标签查记录
+curl "http://127.0.0.1:5800/api/tags/1/transactions?limit=20"
+```
+
+---
+
+## 数据导出
+
+```bash
+# JSON 格式
+curl "http://127.0.0.1:5800/api/export?format=json&category=食品酒水&start_date=2026-01-01&end_date=2026-06-30"
+
+# CSV 格式
+curl "http://127.0.0.1:5800/api/export?format=csv"
+```
+
+---
+
+## 其他
+
+```bash
+# 健康检查
+curl http://127.0.0.1:5800/api/health
+
+# 数据库信息
+curl http://127.0.0.1:5800/api/info
+
+# 消费分析报告
+curl http://127.0.0.1:5800/api/analyze
+```
+
+---
 
 ## 注意事项
 
-- 添加记录时自动检查重复，如需跳过请设置 `"force": true`
-- 所有日期格式为 `YYYY-MM-DD HH:MM:SS`，不传则使用当前时间
-- 预算模板支持按类别、账户、项目、成员等维度设置
-- 通用模板可快速创建常用记录，支持推荐功能
+- 金额必须为正数
+- 重复记录会被拦截，设置 `"force": true` 跳过检查
+- 日期格式：`YYYY-MM-DD HH:MM:SS`，不传则使用当前时间
+- 删除为软删除，可通过 `/restore` 恢复

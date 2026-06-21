@@ -1,27 +1,31 @@
 # 修改命令
 
-## 修改 (update)
+## 修改记录
 
 ```bash
-python3 scripts/ledger_cli.py update '{"id":123,"field":"amount","value":50.0}'
+# 单字段修改
+curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+  -H 'Content-Type: application/json' \
+  -d '{"field":"amount","value":50.0}'
+
+# 多字段修改
+curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":50,"category":"餐饮","note":"修改备注"}'
 ```
 
-参数：
-- `id`: 记录ID - 必填
-- `field`: 修改字段 (amount/category/subcategory/account/project/member/merchant/note/trans_date) - 必填
-- `value`: 新值 - 必填
+可修改字段：`amount`、`category`、`subcategory`、`account`、`project`、`member`、`merchant`、`note`、`trans_date`、`type`、`tag_ids`
 
-## 删除 (delete)
+## 删除记录
 
 ```bash
-python3 scripts/ledger_cli.py delete '{"id":123}'
+curl -X DELETE http://127.0.0.1:5800/api/transactions/123
 ```
 
 软删除，可恢复。
 
-## 恢复 (restore)
+## 恢复记录
 
 ```bash
-python3 scripts/ledger_cli.py restore '{"id":123}'
+curl -X POST http://127.0.0.1:5800/api/transactions/123/restore
 ```
-

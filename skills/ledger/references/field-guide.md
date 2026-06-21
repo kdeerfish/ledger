@@ -17,7 +17,7 @@
 ## 不确定时怎么办？
 
 1. **查记忆**：参考之前"学习"保存的用户习惯
-2. **查数据**：运行 `analyze` 查看用户的实际数据分布
+2. **查数据**：运行 analyze 查看用户的实际数据分布
 3. **问用户**：不确定就问"这个应该填在哪里？"
 
 ## 场景示例
@@ -33,80 +33,94 @@
 ## 常用场景
 
 ### 用户说"导入数据"或"导入CSV"
+
 **Agent 应回复**：Ledger 运行在 Docker 中，请把 CSV 文件放到 NAS 上，然后我来帮你导入。
 
-**导入方式**：
-1. 用户把 CSV 放到 `/volume1/docker/ledger/data/` 目录
-2. 执行容器内导入：
-   ```bash
-   docker exec -it ledger python scripts/import_ledger.py /data/your-file.csv
-   ```
+```bash
+# 1. 用户把 CSV 放到数据目录
+# 2. 执行容器内导入
+docker exec -it ledger python scripts/import_ledger.py /data/your-file.csv
+```
 
-**导入完成后建议**：
+导入完成后建议：
 > 导入完成！建议说"学习"来分析你的数据，这样我就能记住你的账户、商家、类别等习惯。
 
 ### 用户说"学习"或"分析我的数据"
+
 ```bash
-python3 scripts/ledger_cli.py analyze '{}'
+curl http://127.0.0.1:5800/api/analyze
 ```
+
 然后用 `remember` 保存关键模式到记忆。
 
 ### 用户说"今天花了30块钱买零食"
+
 ```bash
-python3 scripts/ledger_cli.py add '{"type":"支出","amount":30,"category":"食品酒水","subcategory":"零食","account":"微信零钱","note":"零食"}'
+curl -X POST http://127.0.0.1:5800/api/transactions \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"支出","amount":30,"category":"食品酒水","subcategory":"零食","account":"微信零钱","note":"零食"}'
 ```
 
 ### 用户说"帮我看看这个月花了多少"
+
 ```bash
-python3 scripts/ledger_cli.py summary '{"year":2026,"month":6}'
+curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
 ```
 
 ### 用户说"上个月在拼多多买了多少东西"
+
 ```bash
-python3 scripts/ledger_cli.py search '{"keyword":"拼多多","search_type":"merchant"}'
-python3 scripts/ledger_cli.py filter '{"merchant":"拼多多","start_date":"2026-05-01","end_date":"2026-05-31"}'
+curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_type=merchant"
+curl "http://127.0.0.1:5800/api/transactions?merchant=拼多多&start_date=2026-05-01&end_date=2026-05-31"
 ```
 
 ### 用户说"把刚才那笔记错了，改成50"
+
 ```bash
-python3 scripts/ledger_cli.py update '{"id":123,"field":"amount","value":50}'
+curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+  -H 'Content-Type: application/json' \
+  -d '{"field":"amount","value":50}'
 ```
 
 ### 用户说"设个预算，食品酒水每月1000块"
+
 ```bash
-python3 scripts/ledger_cli.py budget_set '{"category":"食品酒水","amount":1000}'
+curl -X POST http://127.0.0.1:5800/api/budgets \
+  -H 'Content-Type: application/json' \
+  -d '{"category":"食品酒水","amount":1000}'
 ```
 
 ### 用户说"给我看看这个月的支出统计"
+
 ```bash
-python3 scripts/ledger_cli.py stats '{"year":2026,"month":6,"group_by":"category"}'
+curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
 ```
 
 ### 用户说"我有哪些银行卡"
+
 ```bash
-python3 scripts/ledger_cli.py accounts
+curl http://127.0.0.1:5800/api/accounts
 ```
 
 ### 用户说"记一笔收入，工资5000"
+
 ```bash
-python3 scripts/ledger_cli.py add '{"type":"收入","amount":5000,"category":"职业收入","account":"招商银行","note":"工资"}'
+curl -X POST http://127.0.0.1:5800/api/transactions \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"收入","amount":5000,"category":"职业收入","account":"招商银行","note":"工资"}'
 ```
 
 ### 用户说"用模板记一笔零食"
+
 ```bash
-# 先查看模板列表，找到零食模板的ID
-python3 scripts/ledger_cli.py template_list '{"template_type":"支出"}'
-# 然后应用模板
-python3 scripts/ledger_cli.py template_apply '{"id":1}'
+# 先查看模板列表
+curl http://127.0.0.1:5800/api/templates
+# 然后使用模板
+curl -X POST http://127.0.0.1:5800/api/templates/1/use
 ```
 
 ### 用户说"帮我看看有哪些模板"
-```bash
-python3 scripts/ledger_cli.py template_list '{}'
-```
 
-### 用户说"推荐一些常用模板"
 ```bash
-python3 scripts/ledger_cli.py template_suggest '{"limit":5}'
+curl http://127.0.0.1:5800/api/templates
 ```
-

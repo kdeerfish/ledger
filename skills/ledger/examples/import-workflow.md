@@ -31,11 +31,6 @@ ls -la /volume1/docker/ledger/data/mymoney_export.csv
 docker exec -it ledger python scripts/import_ledger.py /data/mymoney_export.csv
 ```
 
-**输出**：
-```
-✅ 导入完成: 总行 4128, 成功 4128, 跳过 0
-```
-
 ### 步骤 4：建议学习
 
 **Agent 回复**：
@@ -48,18 +43,10 @@ docker exec -it ledger python scripts/import_ledger.py /data/mymoney_export.csv
 
 **Agent 执行**：
 ```bash
-python3 scripts/ledger_cli.py analyze '{}'
+curl http://127.0.0.1:5800/api/analyze
 ```
 
 **Agent 用 remember 保存关键模式**
-
-**Agent 回复**：
-> 已学习完成！我已经记住你的习惯：
-> - 常用账户：信用卡、微信零钱、招商银行
-> - 常用商家：拼多多、京东、美团
-> - 家庭成员：本人、fish、妈妈
-> 
-> 以后记账时我会自动参考这些习惯。
 
 ## CSV 格式要求
 

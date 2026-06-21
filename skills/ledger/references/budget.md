@@ -1,13 +1,17 @@
 # 预算命令
 
-## 设置预算 (budget_set)
+## 设置预算
 
 ```bash
-# 设置预算
-python3 scripts/ledger_cli.py budget_set '{"category":"食品酒水","amount":1000,"year":2026,"month":6}'
+# 设置类别预算
+curl -X POST http://127.0.0.1:5800/api/budgets \
+  -H 'Content-Type: application/json' \
+  -d '{"category":"食品酒水","amount":1000,"year":2026,"month":6}'
 
 # 按账户维度设置预算
-python3 scripts/ledger_cli.py budget_set '{"category":"餐饮","amount":500,"dimension_type":"account","dimension_value":"xxx信用卡","year":2026,"month":6}'
+curl -X POST http://127.0.0.1:5800/api/budgets \
+  -H 'Content-Type: application/json' \
+  -d '{"category":"餐饮","amount":500,"dimension_type":"account","dimension_value":"信用卡","year":2026,"month":6}'
 ```
 
 参数：
@@ -18,32 +22,16 @@ python3 scripts/ledger_cli.py budget_set '{"category":"餐饮","amount":500,"dim
 - `dimension_type`: 维度类型 (category/account/member/project/merchant) - 可选
 - `dimension_value`: 维度值 - 可选
 
-## 查看预算 (budget_check)
+## 查看预算执行
 
 ```bash
-python3 scripts/ledger_cli.py budget_check '{"year":2026,"month":6}'
+curl "http://127.0.0.1:5800/api/budgets/check?year=2026&month=6"
 ```
 
-## 预算模板 (budget_template_*)
+返回每个预算的 `budget`、`spent`、`remaining`、`percentage`
+
+## 预算列表
 
 ```bash
-# 创建模板
-python3 scripts/ledger_cli.py budget_template_create '{"name":"吃饭模板","description":"日常吃饭","category":"餐饮","amount":400,"dimension_type":"account","dimension_value":"xxx信用卡"}'
-
-# 列出模板
-python3 scripts/ledger_cli.py budget_template_list '{}'
-
-# 应用模板
-python3 scripts/ledger_cli.py budget_template_apply '{"id":1,"year":2026,"month":6}'
-
-# 推荐模板
-python3 scripts/ledger_cli.py budget_template_suggest '{"limit":3}'
-
-# 更新模板
-python3 scripts/ledger_cli.py budget_template_update '{"id":1,"amount":500}'
-
-# 删除模板
-python3 scripts/ledger_cli.py budget_template_delete '{"id":1}'
+curl "http://127.0.0.1:5800/api/budgets?year=2026&month=6"
 ```
-
-
