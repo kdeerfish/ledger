@@ -187,6 +187,7 @@ class TestReset:
         assert data['port'] == 5800
 
 
+@pytest.mark.skipif(sys.platform != 'win32', reason='Windows only: winreg module')
 class TestAutostartWindows:
     def test_autostart_windows_not_win32(self, monkeypatch):
         monkeypatch.setattr(sys, 'platform', 'linux')
@@ -375,6 +376,7 @@ class TestAutostartStatus:
         monkeypatch.setattr(os.path, 'exists', lambda p: 'ledger-web.service' in p)
         assert desktop_config.get_autostart_status() is True
 
+    @pytest.mark.skipif(sys.platform != 'win32', reason='Windows only: winreg module')
     def test_status_on_windows(self, monkeypatch):
         """注册表中有 Ledger 键 → 已启用"""
         monkeypatch.setattr(sys, 'platform', 'win32')
@@ -392,6 +394,7 @@ class TestAutostartStatus:
         monkeypatch.setattr(winreg, 'QueryValueEx', mock_query_value_ex)
         assert desktop_config.get_autostart_status() is True
 
+    @pytest.mark.skipif(sys.platform != 'win32', reason='Windows only: winreg module')
     def test_status_on_windows_not_found(self, monkeypatch):
         """注册表中无 Ledger 键 → 未启用"""
         monkeypatch.setattr(sys, 'platform', 'win32')
