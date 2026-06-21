@@ -193,8 +193,8 @@ jobs:
         run: |
           mkdir -p deploy/_skills
 
-          # 复制 AI Agent 技能
-          cp -r skills/ledger/scripts deploy/_skills/scripts
+          # 复制 AI Agent 技能（scripts 目录可能不存在）
+          [ -d skills/ledger/scripts ] && cp -r skills/ledger/scripts deploy/_skills/scripts
           cp skills/ledger/SKILL.md deploy/_skills/
           cp skills/ledger/.env.example deploy/_skills/.env.example
 
