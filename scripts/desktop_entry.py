@@ -303,21 +303,17 @@ def _create_tray_icon():
 
     def _setup_visible(icon):
         """setup 回调：icon.run() 消息循环就绪后调用"""
-        _log("setup 回调: 设置 icon.visible = True ...")
+        _log("setup: visible=True")
         try:
             icon.visible = True
-            _log(f"setup 回调: visible={icon.visible}, Shell_NotifyIcon 应已调用")
         except Exception as e:
-            _log(f"setup 回调: 设置 visible 失败: {e}")
-        # 显示启动气泡通知
+            _log(f"setup: visible 失败: {e}")
         try:
             icon.notify("Ledger 已启动", "右键此图标可打开界面或退出。")
-            _log("setup 回调: 启动通知已发送")
-        except Exception as e:
-            _log(f"setup 回调: 通知失败: {e}")
-        # 将托盘图标提升到任务栏可见区域（Windows 11 会隐藏新图标）
+        except Exception:
+            pass
         _promote_tray_icon()
-        _log("setup 回调: 完成")
+        _log("setup: 完成")
 
     _log(f"创建 Icon 对象 (name='ledger_desktop')...")
     try:
@@ -353,18 +349,6 @@ def start_tray():
     _log(f"start_tray: _tray_ready 已设置, _tray={'OK' if _tray else 'None'}")
 
 
-def _show_tray_notification(title, message):
-    """显示 Windows 通知提醒用户托盘图标位置"""
-    if _tray is None:
-        return
-    try:
-        # pystray 的 notify 方法在 Windows 上显示气泡通知
-        _tray.notify(title, message)
-    except Exception:
-        # 某些 pystray 版本或平台可能不支持 notify
-        pass
-
-
 def update_tray_tooltip(text):
     """更新托盘提示文字"""
     if _tray:
@@ -375,24 +359,6 @@ def update_tray_tooltip(text):
 
 
 # ─── Windows 原生通知 + 全局快捷键 ──────────────────────
-
-def _show_windows_messagebox(title, message):
-    """使用 Windows 原生 MessageBox 显示通知（保证用户可见，不依赖托盘图标）"""
-    if sys.platform != 'win32':
-        return
-    try:
-        import ctypes
-        MB_ICONINFORMATION = 0x40
-
-        def _show():
-            try:
-                ctypes.windll.user32.MessageBoxW(0, message, title, MB_ICONINFORMATION)
-            except Exception:
-                pass
-        threading.Thread(target=_show, daemon=True).start()
-    except Exception:
-        pass
-
 
 def _start_global_hotkey(relaunch_event):
     """注册全局快捷键 Ctrl+Shift+L 恢复窗口（仅 Windows）"""
@@ -530,16 +496,7 @@ TOOLBAR_JS = """
         }
     };
     window.switchToService = function() {
-        if (confirm(
-            '切换到轻量模式？\\n\\n' +
-            '窗口将隐藏，服务继续在后台运行。\\n\\n' +
-            '恢复方式（三选一）：\\n' +
-            '  1. 右键系统托盘蓝色 L 图标 → 打开界面\\n' +
-            '  2. 再次双击 exe 文件\\n' +
-            '  3. 按 Ctrl+Shift+L 快捷键\\n\\n' +
-            '如果找不到托盘图标，请点击任务栏右侧的 ∧ 箭头。\\n\\n' +
-            '确认切换？'
-        )) {
+        if (confirm('切换到轻量模式？\\n窗口将隐藏，服务继续在后台运行。\\n\\n可从托盘图标恢复界面。')) {
             if (window.pywebview && window.pywebview.api) {
                 window.pywebview.api.switch_to_service();
             }
@@ -616,68 +573,43 @@ def run_desktop_mode(port, width, height, debug):
             webbrowser.open(f'http://127.0.0.1:{_port}')
 
     def show_window():
-        """托盘「打开界面」：触发主线程重建窗口"""
-        _relaunch_event.set()
+        """托盘「打开界面」：窗口已打开则激活，否则触发重建"""
+        if _main_window[0] is not None:
+            # 窗口已打开，尝试激活/置顶
+            try:
+                _main_window[0].evaluate_js(
+                    'window.focus(); document.title=document.title;'
+                )
+            except Exception:
+                pass
+        else:
+            _relaunch_event.set()
 
     def switch_to_service():
         """轻量模式：销毁窗口释放内存，Flask + 托盘继续"""
         _switched_to_service[0] = True
+        _relaunch_event.clear()  # 防止关闭后立即重建窗口
         if _main_window[0] is not None:
             try:
-                _main_window[0].destroy()  # 释放浏览器引擎内存
+                _main_window[0].destroy()
             except Exception:
                 pass
         update_tray_tooltip(f'Ledger {_version} (轻量模式)')
-        # 显示 Windows 原生对话框（保证可见，不依赖托盘图标）
-        _show_windows_messagebox(
-            "Ledger - 已切换到轻量模式",
-            "界面已隐藏，服务继续在后台运行。\n\n"
-            "恢复界面的方式：\n"
-            "  ● 右键系统托盘蓝色 \"L\" 图标 → 打开界面\n"
-            "  ● 再次双击 exe 文件\n"
-            "  ● 按 Ctrl+Shift+L 快捷键\n\n"
-            "如果找不到托盘图标，请点击任务栏右侧的 ∧ 箭头，\n"
-            "找到蓝色圆形 \"L\" 图标。"
-        )
-        # 同时尝试托盘气泡通知
-        _show_tray_notification(
-            "Ledger 已切换到轻量模式",
-            "右键托盘图标或按 Ctrl+Shift+L 可恢复界面。"
-        )
 
     def on_main_closed():
         """窗口关闭事件"""
         if not _switched_to_service[0]:
-            # 用户手动点 X
             if _cfg('minimize_to_tray'):
-                # 配置了最小化到托盘 → 转为轻量模式
-                _println("[INFO] 窗口关闭，最小化到托盘...")
                 _switched_to_service[0] = True
-                # 这里不需要 destroy，窗口已经关闭了
-                # webview.start() 会返回，主循环会处理后续
-                # 更新托盘提示
-                _show_windows_messagebox(
-                    "Ledger - 已最小化到托盘",
-                    "应用正在后台运行。\n\n"
-                    "恢复界面的方式：\n"
-                    "  ● 右键系统托盘蓝色 \"L\" 图标 → 打开界面\n"
-                    "  ● 再次双击 exe 文件\n"
-                    "  ● 按 Ctrl+Shift+L 快捷键\n\n"
-                    "如果找不到托盘图标，请点击任务栏右侧的 ∧ 箭头。"
-                )
-                _show_tray_notification(
-                    "Ledger 已最小化",
-                    "右键托盘图标或按 Ctrl+Shift+L 可恢复界面。"
-                )
+                _relaunch_event.clear()
+                update_tray_tooltip(f'Ledger {_version} (轻量模式)')
             else:
-                # 彻底退出
                 _exit_requested[0] = True
                 shutdown_flask()
                 if _tray:
                     _tray.stop()
                 _release_lock()
                 os._exit(0)
-        # 轻量模式：destroy() 触发 → webview.start() 返回 → 主循环处理
 
     def open_in_browser():
         import webbrowser
@@ -724,8 +656,15 @@ def run_desktop_mode(port, width, height, debug):
     def _signal_watcher():
         while not _exit_requested[0]:
             if _check_signal_file():
-                _println("[INFO] 收到唤醒信号，正在打开界面...")
-                _relaunch_event.set()
+                if _main_window[0] is not None:
+                    try:
+                        _main_window[0].evaluate_js(
+                            'window.focus(); document.title=document.title;'
+                        )
+                    except Exception:
+                        pass
+                else:
+                    _relaunch_event.set()
             time.sleep(0.5)
     watcher = threading.Thread(target=_signal_watcher, daemon=True)
     watcher.start()
