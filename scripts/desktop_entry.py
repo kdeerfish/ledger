@@ -229,46 +229,22 @@ def shutdown_flask():
 
 _tray = None
 _tray_ready = threading.Event()
-_open_ui_callback = None
-_open_settings_callback = None
-_window_show_callback = None # 重建桌面窗口
-
-# ─── 文件日志（console=False 时唯一能看到的调试手段）────
-_LOG_FILE = os.path.join(BUNDLE_DIR, 'ledger_debug.log')
-_last_log_time = 0.0
-
-def _log(msg):
-    """写入文件日志，无论 console 是否存在"""
-    global _last_log_time
-    import time as _t
-    now = _t.time()
-    ts = _t.strftime('%H:%M:%S')
-    delta = f"+{now - _last_log_time:.3f}s" if _last_log_time else ""
-    _last_log_time = now
-    line = f"[{ts}] {delta} {msg}\n"
-    try:
-        with open(_LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(line)
-    except Exception:
-        pass
+# 桌面模式下由 run_desktop_mode 注册的回调
+_tray_on_open_ui = None
+_tray_on_open_settings = None
 
 
 def _create_tray_icon():
-    """创建系统托盘图标（在 daemon 线程中用 run()，带详细文件日志）"""
+    """创建系统托盘图标"""
     global _tray, _tray_ready
-
-    _log("_create_tray_icon: 开始")
 
     try:
         import pystray
         from PIL import Image, ImageDraw
-        _log(f"pystray OK: {pystray.__file__}")
-    except ImportError as e:
-        _log(f"pystray/Pillow 导入失败: {e}")
+    except ImportError:
         _tray_ready.set()
         return
 
-    # 生成一个简单的蓝色圆形图标
     def make_icon():
         size = 64
         image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
@@ -278,17 +254,14 @@ def _create_tray_icon():
         return image
 
     def on_open_ui(icon, item):
-        if _window_show_callback:
-            _window_show_callback()
-        elif _open_ui_callback:
-            _open_ui_callback()
+        if _tray_on_open_ui:
+            _tray_on_open_ui()
 
     def on_open_settings(icon, item):
-        if _open_settings_callback:
-            _open_settings_callback()
+        if _tray_on_open_settings:
+            _tray_on_open_settings()
 
     def on_exit(icon, item):
-        _log("用户点击退出")
         icon.stop()
         shutdown_flask()
         _release_lock()
@@ -302,51 +275,35 @@ def _create_tray_icon():
     )
 
     def _setup_visible(icon):
-        """setup 回调：icon.run() 消息循环就绪后调用"""
-        _log("setup: visible=True")
         try:
             icon.visible = True
-        except Exception as e:
-            _log(f"setup: visible 失败: {e}")
+        except Exception:
+            pass
         try:
             icon.notify("Ledger 已启动", "右键此图标可打开界面或退出。")
         except Exception:
             pass
         _promote_tray_icon()
-        _log("setup: 完成")
 
-    _log(f"创建 Icon 对象 (name='ledger_desktop')...")
-    try:
-        _tray = pystray.Icon(
-            name='ledger_desktop',
-            icon=make_icon(),
-            title=f'Ledger {_get_version()}',
-            menu=menu,
-        )
-        _log(f"Icon 对象创建成功: {_tray}")
-    except Exception as e:
-        _log(f"Icon 对象创建失败: {e}")
-        _tray = None
-        _tray_ready.set()
-        return
+    _tray = pystray.Icon(
+        name='ledger_desktop',
+        icon=make_icon(),
+        title=f'Ledger {_get_version()}',
+        menu=menu,
+    )
+    _tray_ready.set()
 
-    # 在当前 daemon 线程中调用 run()（阻塞，直到 icon.stop()）
-    _log("调用 _tray.run(setup=_setup_visible) ...")
-    _tray_ready.set()  # 先标记就绪，让 start_tray() 不阻塞
     try:
         _tray.run(setup=_setup_visible)
-        _log("_tray.run() 已返回（正常退出）")
-    except Exception as e:
-        _log(f"_tray.run() 异常退出: {e}")
+    except Exception:
+        pass
 
 
 def start_tray():
     """在后台线程启动托盘"""
-    _log("start_tray: 创建 daemon 线程...")
     t = threading.Thread(target=_create_tray_icon, daemon=True)
     t.start()
     _tray_ready.wait(timeout=5)
-    _log(f"start_tray: _tray_ready 已设置, _tray={'OK' if _tray else 'None'}")
 
 
 def update_tray_tooltip(text):
@@ -375,23 +332,17 @@ def _start_global_hotkey(relaunch_event):
         VK_L = 0x4C
 
         if not user32.RegisterHotKey(None, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_L):
-            _println("[WARN] 全局快捷键 Ctrl+Shift+L 注册失败（可能被其他程序占用）")
             return
-
-        _println("[INFO] 全局快捷键 Ctrl+Shift+L 已注册（轻量模式下可用）")
 
         msg = wintypes.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
-            if msg.message == 0x0312 and msg.wParam == HOTKEY_ID:  # WM_HOTKEY
-                _println("[INFO] 检测到快捷键 Ctrl+Shift+L，正在打开界面...")
-                if _window_show_callback:
-                    _window_show_callback()
-                elif _open_ui_callback:
-                    _open_ui_callback()
+            if msg.message == 0x0312 and msg.wParam == HOTKEY_ID:
+                if _tray_on_open_ui:
+                    _tray_on_open_ui()
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
-    except Exception as e:
-        _println(f"[WARN] 全局快捷键线程异常: {e}")
+    except Exception:
+        pass
     finally:
         try:
             import ctypes
@@ -401,15 +352,13 @@ def _start_global_hotkey(relaunch_event):
 
 
 def _promote_tray_icon():
-    """让 Windows 11 在任务栏显示托盘图标（不藏到溢出区）
-    通过修改 HKCU\\Control Panel\\NotifyIconSettings 中的 IsPromoted 值实现"""
+    """让 Windows 11 在任务栏显示托盘图标（不藏到溢出区）"""
     if sys.platform != 'win32':
         return
     try:
         import winreg
         exe_path = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(sys.argv[0])
         base_key = r"Control Panel\NotifyIconSettings"
-        _log(f"_promote_tray_icon: 搜索 exe={exe_path}")
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base_key) as key:
             i = 0
             while True:
@@ -421,16 +370,14 @@ def _promote_tray_icon():
                             val, _ = winreg.QueryValueEx(sub, "ExecutablePath")
                             if val and os.path.normcase(os.path.normpath(val)) == os.path.normcase(os.path.normpath(exe_path)):
                                 winreg.SetValueEx(sub, "IsPromoted", 0, winreg.REG_DWORD, 1)
-                                _log(f"_promote_tray_icon: 已设置 IsPromoted=1")
                                 return
                         except FileNotFoundError:
                             pass
                     i += 1
                 except OSError:
                     break
-        _log("_promote_tray_icon: 未找到注册表条目（首次运行）")
-    except Exception as e:
-        _log(f"_promote_tray_icon: 失败: {e}")
+    except Exception:
+        pass
 
 
 # ─── 主窗口注入的工具栏 HTML ──────────────────────────
@@ -509,23 +456,22 @@ TOOLBAR_JS = """
 # ─── 桌面模式 ──────────────────────────────────────
 
 def run_desktop_mode(port, width, height, debug):
-    """桌面模式：pywebview 窗口 + Flask + 托盘（支持轻量模式窗口重建）"""
+    """桌面模式：pywebview 窗口 + Flask + 托盘（轻量模式释放窗口内存）"""
     try:
         import webview
     except ImportError:
         print("[ERROR] pywebview 未安装，请运行: pip install pywebview", file=sys.stderr)
         sys.exit(1)
 
-    from web.app import app
     from scripts.webview_api import DesktopAPI
 
-    global _open_ui_callback, _open_settings_callback
-    global _window_show_callback
+    global _tray_on_open_ui, _tray_on_open_settings
 
     _main_window = [None]
     _settings_window = [None]
-    _switched_to_service = [False]
-    _port = port
+    _is_lightweight = [False]   # True = 轻量模式（无窗口）
+    _relaunch = threading.Event()
+    _quit = [False]
     _version = _get_version()
 
     # 启动 Flask
@@ -535,14 +481,10 @@ def run_desktop_mode(port, width, height, debug):
     flask_thread.start()
     _flask_ready.wait(timeout=10)
 
-    # 启动托盘（后台线程）
-    _log("run_desktop_mode: 启动托盘...")
+    # 启动托盘
     start_tray()
-    _log("run_desktop_mode: 托盘启动完成，继续初始化...")
 
-    # ── 轻量模式核心：窗口重建信号 ──
-    _relaunch_event = threading.Event()
-    _exit_requested = [False]
+    # ── 回调定义 ──────────────────────────────────
 
     def inject_toolbar(win):
         try:
@@ -550,10 +492,24 @@ def run_desktop_mode(port, width, height, debug):
         except Exception:
             pass
 
-    def open_settings():
-        """打开设置（窗口存在用 pywebview，否则用浏览器）"""
+    def do_open_ui():
+        """托盘/快捷键「打开界面」"""
         if _main_window[0] is not None:
-            # 窗口在前台，用 pywebview 子窗口
+            # 窗口已打开 → 激活
+            try:
+                _main_window[0].evaluate_js(
+                    'window.focus(); document.title=document.title;'
+                )
+            except Exception:
+                pass
+        else:
+            # 轻量模式 → 触发重建窗口
+            _relaunch.set()
+
+    def do_open_settings():
+        """托盘「设置」"""
+        if _main_window[0] is not None:
+            # 窗口已打开 → 在 pywebview 子窗口打开设置
             if _settings_window[0] is not None:
                 try:
                     _settings_window[0].show()
@@ -568,27 +524,13 @@ def run_desktop_mode(port, width, height, debug):
                 resizable=True, js_api=api,
             )
         else:
-            # 轻量模式（无窗口），用浏览器
-            import webbrowser
-            webbrowser.open(f'http://127.0.0.1:{_port}')
+            # 轻量模式 → 先重建主窗口，再通过它打开设置
+            _relaunch.set()
 
-    def show_window():
-        """托盘「打开界面」：窗口已打开则激活，否则触发重建"""
-        if _main_window[0] is not None:
-            # 窗口已打开，尝试激活/置顶
-            try:
-                _main_window[0].evaluate_js(
-                    'window.focus(); document.title=document.title;'
-                )
-            except Exception:
-                pass
-        else:
-            _relaunch_event.set()
-
-    def switch_to_service():
-        """轻量模式：销毁窗口释放内存，Flask + 托盘继续"""
-        _switched_to_service[0] = True
-        _relaunch_event.clear()  # 防止关闭后立即重建窗口
+    def do_switch_to_service():
+        """工具栏「轻量模式」：销毁窗口，保留 Flask + 托盘"""
+        _is_lightweight[0] = True
+        _relaunch.clear()
         if _main_window[0] is not None:
             try:
                 _main_window[0].destroy()
@@ -596,29 +538,9 @@ def run_desktop_mode(port, width, height, debug):
                 pass
         update_tray_tooltip(f'Ledger {_version} (轻量模式)')
 
-    def on_main_closed():
-        """窗口关闭事件"""
-        if not _switched_to_service[0]:
-            if _cfg('minimize_to_tray'):
-                _switched_to_service[0] = True
-                _relaunch_event.clear()
-                update_tray_tooltip(f'Ledger {_version} (轻量模式)')
-            else:
-                _exit_requested[0] = True
-                shutdown_flask()
-                if _tray:
-                    _tray.stop()
-                _release_lock()
-                os._exit(0)
-
-    def open_in_browser():
-        import webbrowser
-        webbrowser.open(f'http://127.0.0.1:{_port}')
-
-    def quit_application():
-        """退出整个应用：关闭窗口、停止 Flask、释放锁"""
-        _println("[INFO] 用户请求退出...")
-        _exit_requested[0] = True
+    def do_quit():
+        """退出整个应用"""
+        _quit[0] = True
         if _main_window[0] is not None:
             try:
                 _main_window[0].destroy()
@@ -633,56 +555,51 @@ def run_desktop_mode(port, width, height, debug):
         _release_lock()
         os._exit(0)
 
+    def on_window_closed():
+        """pywebview 窗口关闭事件"""
+        if not _is_lightweight[0]:
+            # 用户点 X（非轻量模式触发）
+            if _cfg('minimize_to_tray'):
+                _is_lightweight[0] = True
+                _relaunch.clear()
+                update_tray_tooltip(f'Ledger {_version} (轻量模式)')
+            else:
+                do_quit()
+
     # 注册回调
-    _open_ui_callback = open_in_browser
-    _open_settings_callback = open_settings
-    _window_show_callback = show_window
+    _tray_on_open_ui = do_open_ui
+    _tray_on_open_settings = do_open_settings
 
-    # 创建 API
-    api = DesktopAPI(on_switch_to_service=switch_to_service, on_quit=quit_application)
-    api.open_settings = open_settings
+    api = DesktopAPI(on_switch_to_service=do_switch_to_service, on_quit=do_quit)
+    api.open_settings = do_open_settings
 
-    _println("=" * 50)
-    _println(f"  Ledger Desktop {_version}")
-    _println("=" * 50)
-    _println(f"  Database:  {os.environ.get('LEDGER_DB_PATH', '?')}")
-    _println(f"  Address:   http://127.0.0.1:{port}")
-    _println("  托盘:      右键图标可操作")
-    _println("  快捷键:    Ctrl+Shift+L 恢复窗口")
-    _println("  工具栏:    顶部「设置」和「轻量模式」按钮")
-    _println("=" * 50)
-
-    # 启动信号文件检查线程（检测第二次双击 exe）
-    def _signal_watcher():
-        while not _exit_requested[0]:
-            if _check_signal_file():
-                if _main_window[0] is not None:
-                    try:
-                        _main_window[0].evaluate_js(
-                            'window.focus(); document.title=document.title;'
-                        )
-                    except Exception:
-                        pass
-                else:
-                    _relaunch_event.set()
-            time.sleep(0.5)
-    watcher = threading.Thread(target=_signal_watcher, daemon=True)
-    watcher.start()
-
-    # 启动全局快捷键监听 (Ctrl+Shift+L)
+    # 启动快捷键
     hotkey_thread = threading.Thread(
-        target=_start_global_hotkey, args=(_relaunch_event,), daemon=True
+        target=_start_global_hotkey, args=(_relaunch,), daemon=True
     )
     hotkey_thread.start()
 
-    # ══════════════════════════════════════════════════
-    #  主循环：窗口创建 → 运行 → 销毁 → 等待信号 → 重建
-    # ══════════════════════════════════════════════════
-    while not _exit_requested[0]:
-        _switched_to_service[0] = False
-        _relaunch_event.clear()
+    # 启动信号文件检查（第二次双击 exe）
+    def _signal_watcher():
+        while not _quit[0]:
+            if _check_signal_file():
+                do_open_ui()
+            time.sleep(0.5)
+    threading.Thread(target=_signal_watcher, daemon=True).start()
 
-        # 创建主窗口
+    _println("=" * 50)
+    _println(f"  Ledger Desktop {_version}")
+    _println(f"  Address: http://127.0.0.1:{port}")
+    _println("  托盘:    右键图标可操作")
+    _println("=" * 50)
+
+    # ════════════════════════════════════════════════
+    #  主循环：创建窗口 → 运行 → (轻量模式) → 等待 → 重建
+    # ════════════════════════════════════════════════
+    while not _quit[0]:
+        _is_lightweight[0] = False
+        _relaunch.clear()
+
         _main_window[0] = webview.create_window(
             title=f'Ledger 记账系统 {_version}',
             url=f'http://127.0.0.1:{port}',
@@ -690,31 +607,25 @@ def run_desktop_mode(port, width, height, debug):
             min_size=(900, 600),
             text_select=True, js_api=api,
         )
-        _main_window[0].events.closed += on_main_closed
+        _main_window[0].events.closed += on_window_closed
         _main_window[0].events.loaded += lambda: inject_toolbar(_main_window[0])
 
         update_tray_tooltip(f'Ledger {_version}')
+        webview.start(debug=debug)  # 阻塞，直到窗口关闭
 
-        # 启动 pywebview（阻塞，窗口关闭后返回）
-        webview.start(debug=debug)
-
-        if _exit_requested[0]:
+        if _quit[0]:
             break
 
         # ── 窗口已销毁（轻量模式），内存已释放 ──
         _main_window[0] = None
         _settings_window[0] = None
-        _println(f"[INFO] 轻量模式：界面已关闭，服务继续运行")
         update_tray_tooltip(f'Ledger {_version} (轻量模式)')
 
-        # 等待「打开界面」信号 → 重建窗口
-        while not _relaunch_event.is_set():
-            if _exit_requested[0]:
+        # 等待「打开界面」信号
+        while not _relaunch.is_set():
+            if _quit[0]:
                 break
-            _relaunch_event.wait(timeout=1.0)
-
-        if not _exit_requested[0]:
-            _println("[INFO] 正在恢复桌面窗口...")
+            _relaunch.wait(timeout=1.0)
 
     _release_lock()
 
@@ -725,18 +636,16 @@ def run_service_mode(host, port, debug):
     """纯服务模式：Flask + 托盘，无窗口"""
     from web.app import app
 
-    global _open_ui_callback, _open_settings_callback
+    global _tray_on_open_ui, _tray_on_open_settings
 
-    # 启动托盘
     start_tray()
 
     def open_in_browser():
-        """服务模式下用浏览器打开界面"""
         import webbrowser
         webbrowser.open(f'http://127.0.0.1:{port}')
 
-    _open_ui_callback = open_in_browser
-    _open_settings_callback = open_in_browser
+    _tray_on_open_ui = open_in_browser
+    _tray_on_open_settings = open_in_browser
 
     _println("=" * 50)
     _println("  Ledger - Service Mode")
@@ -751,9 +660,8 @@ def run_service_mode(host, port, debug):
     def _signal_watcher():
         while True:
             if _check_signal_file():
-                _println("[INFO] 收到唤醒信号，正在打开浏览器...")
-                if _open_ui_callback:
-                    _open_ui_callback()
+                if _tray_on_open_ui:
+                    _tray_on_open_ui()
             time.sleep(0.5)
     watcher = threading.Thread(target=_signal_watcher, daemon=True)
     watcher.start()
@@ -775,9 +683,6 @@ def run_service_mode(host, port, debug):
 # ─── 主入口 ────────────────────────────────────────
 
 def main():
-    _log("=== Ledger Desktop 启动 ===")
-    _log(f"frozen={getattr(sys, 'frozen', False)}")
-    _log(f"executable={sys.executable}")
     parser = argparse.ArgumentParser(
         description='Ledger - Personal Finance Manager',
         formatter_class=argparse.RawDescriptionHelpFormatter,
