@@ -12,16 +12,6 @@ block_cipher = None
 # 项目根目录
 ROOT = os.path.abspath('.')
 
-# ─── pywebview 需要的 DLL 搜索路径 ──────────────────────
-# pywebview 在 Windows 上依赖 EdgeChromium (mshtml) 或 CEF
-# PyInstaller 需要知道这些 DLL 的位置
-webview_import_path = None
-try:
-    import webview
-    webview_import_path = os.path.dirname(webview.__file__)
-except ImportError:
-    pass
-
 a = Analysis(
     ['scripts/desktop_entry.py'],
     pathex=[ROOT],
@@ -35,10 +25,7 @@ a = Analysis(
         ('ledger_modules', 'ledger_modules'),
         # 项目配置
         ('pyproject.toml', '.'),
-    ] + (
-        # pywebview 数据文件（DLL、HTML 等）
-        [(webview_import_path, 'webview')] if webview_import_path else []
-    ),
+    ],
     hiddenimports=[
         # Flask
         'flask',
@@ -51,19 +38,10 @@ a = Analysis(
         'ledger_modules.config',
         'ledger_modules.transactions',
         'ledger_modules.budgets',
+        'ledger_modules.desktop_config',
         'web',
         'web.app',
-        # pywebview 及其平台后端
-        'webview',
-        'webview.platforms.edgechromium',
-        'webview.platforms.mshtml',
-        'webview.platforms.cef',
-        'clr_loader',
-        'pythonnet',
-        # 桌面配置模块
-        'scripts.webview_api',
-        'ledger_modules.desktop_config',
-        # 系统托盘 (可选 - 源码用 try/except 守护, 包内未安装 pystray 也能跑)
+        # 系统托盘
         'pystray',
         # 图标处理（托盘图标需要）
         'PIL', 'PIL.Image', 'PIL.ImageDraw',
@@ -76,6 +54,10 @@ a = Analysis(
         'scipy', 'cv2', 'torch',
         'PyQt5', 'PyQt6', 'PySide2', 'PySide6',
         'pytest', 'coverage',
+        # pywebview 不再需要
+        'webview',
+        'clr_loader',
+        'pythonnet',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -97,8 +79,6 @@ exe = EXE(
     upx=True,
     console=False,  # 桌面应用：不显示控制台窗口
     icon=None,  # 可以后续添加 .ico 图标
-    # 管理员权限提示（UAC）- 可选
-    # uac_admin=True,
 )
 
 coll = COLLECT(

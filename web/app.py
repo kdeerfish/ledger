@@ -224,6 +224,11 @@ def get_config():
     try:
         from ledger_modules import desktop_config
         cfg = desktop_config.get()
+        # 附加只读信息
+        cfg['_config_file'] = desktop_config.CONFIG_FILE
+        cfg['_version'] = _get_version()
+        cfg['_db_path'] = os.environ.get('LEDGER_DB_PATH', '')
+        cfg['_autostart'] = desktop_config.get_autostart_status()
         return jsonify(cfg)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -240,6 +245,69 @@ def save_config():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/reset', methods=['POST'])
+def reset_config():
+    """恢复默认配置"""
+    try:
+        from ledger_modules import desktop_config
+        desktop_config.reset()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/autostart', methods=['POST'])
+def set_autostart():
+    """设置开机自启"""
+    try:
+        from ledger_modules import desktop_config
+        data = request.get_json()
+        enable = data.get('enable', False)
+        if getattr(sys, 'frozen', False):
+            exe_path = sys.executable
+        else:
+            exe_path = os.path.abspath(sys.argv[0])
+        ok, msg = desktop_config.set_autostart_windows(enable, exe_path)
+        if ok:
+            desktop_config.set('auto_start', enable)
+            desktop_config.save()
+        return jsonify({'success': ok, 'error': msg if not ok else None})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/pick-folder', methods=['POST'])
+def pick_folder():
+    """打开系统文件夹选择对话框，返回选中的路径"""
+    import subprocess
+    try:
+        # 使用 PowerShell 调用 Windows 原生文件夹选择对话框
+        ps_script = (
+            'Add-Type -AssemblyName System.Windows.Forms; '
+            '$f = New-Object System.Windows.Forms.FolderBrowserDialog; '
+            '$f.Description = "选择数据库存放文件夹"; '
+            '$f.ShowNewFolderButton = $true; '
+            'if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { '
+            '  $f.SelectedPath '
+            '} else { '
+            '  "CANCEL" '
+            '}'
+        )
+        # CREATE_NO_WINDOW 隐藏 PowerShell 黑窗
+        CREATE_NO_WINDOW = 0x08000000
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-Command', ps_script],
+            capture_output=True, text=True, timeout=60,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        path = result.stdout.strip()
+        if path and path != 'CANCEL':
+            return jsonify({'success': True, 'path': path})
+        return jsonify({'success': False, 'error': '用户取消'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 
 # ════════════════════════════════════════════════════════

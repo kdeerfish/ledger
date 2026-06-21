@@ -96,7 +96,7 @@ def run_tests():
 def build_deploy():
     """运行打包脚本"""
     log("[2/6] 打包...", "yellow")
-    run("python scripts/deploy.py")
+    run("make build")
     log("  打包完成 ✓", "green")
 
 

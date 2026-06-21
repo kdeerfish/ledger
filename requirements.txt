@@ -2,3 +2,7 @@
 # 用于 Docker 构建，锁定版本确保可重现
 flask>=3.0,<4.0
 flask-cors>=4.0,<5.0
+
+# 桌面应用（Windows 打包时需要）
+pystray>=0.19
+Pillow>=10.0

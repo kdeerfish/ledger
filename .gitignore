@@ -21,6 +21,13 @@ coverage.json
 ledger.db
 *.db
 
+# 桌面配置（用户自己的设置）
+ledger_desktop.json
+
+# 单实例锁文件
+.ledger.pid
+.ledger.signal
+
 # 个人隐私数据
 data/sample/*.csv
 
@@ -38,6 +45,9 @@ Thumbs.db
 .codegraph/
 .reasonix/
 reasonix.toml
+
+# 打包工具 (NSSM)
+tools/nssm*
 
 # 部署目录（构建产物，不纳入版本管理）
 deploy/

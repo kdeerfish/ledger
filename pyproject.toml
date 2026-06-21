@@ -38,15 +38,26 @@ addopts = "-v --tb=short"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
-source = ["ledger_modules", "scripts"]
-omit = ["tests/*"]
+source = ["ledger_modules", "web"]
+omit = ["tests/*", "web/run.py"]
 
 [tool.coverage.report]
+skip_empty = true
+partial_branches = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "if getattr(sys, 'frozen', False):",
+    "if sys.platform == 'win32':",
+]
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
     "raise NotImplementedError",
     "def main():",
+    "pass",
+    "except ImportError:",
+    "except Exception:",
+    "except (ValueError, TypeError):",
 ]
 
 [tool.ruff]

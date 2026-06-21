@@ -122,6 +122,11 @@
     width: 220px;
   }
 
+  .form-control-wide {
+    flex: 1;
+    max-width: 480px;
+  }
+
   input[type="text"],
   input[type="number"],
   select {
@@ -250,14 +255,11 @@
       Ledger 设置
       <span id="version-text">v0.0.0</span>
     </div>
-    <div class="nav-item active" data-section="general" onclick="switchTab('general')">
-      <span class="icon">⚙️</span> 常规
-    </div>
-    <div class="nav-item" data-section="server" onclick="switchTab('server')">
+    <div class="nav-item active" data-section="server" onclick="switchTab('server')">
       <span class="icon">🌐</span> 服务
     </div>
     <div class="nav-item" data-section="startup" onclick="switchTab('startup')">
-      <span class="icon">🚀</span> 启动行为
+      <span class="icon">🚀</span> 启动
     </div>
     <div class="nav-item" data-section="data" onclick="switchTab('data')">
       <span class="icon">💾</span> 数据
@@ -266,51 +268,12 @@
       <span class="icon">ℹ️</span> 关于
     </div>
     <div style="flex:1"></div>
-    <div class="nav-item" onclick="quitApp()" style="color:#d63031;margin-top:auto">
-      <span class="icon">⏻</span> 退出 Ledger
-    </div>
   </div>
 
   <!-- 主内容 -->
   <div class="content">
-    <!-- 常规 -->
-    <div class="section active" id="section-general">
-      <div class="section-title">常规设置</div>
-      <div class="section-desc">窗口和界面基本配置</div>
-
-      <div class="form-group">
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">语言</span>
-          </div>
-          <div class="form-control">
-            <select id="cfg-language">
-              <option value="zh-CN">简体中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">窗口宽度</span>
-          </div>
-          <div class="form-control">
-            <input type="number" id="cfg-window_width" min="900" max="3840">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">窗口高度</span>
-          </div>
-          <div class="form-control">
-            <input type="number" id="cfg-window_height" min="600" max="2160">
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 服务 -->
-    <div class="section" id="section-server">
+    <div class="section active" id="section-server">
       <div class="section-title">服务设置</div>
       <div class="section-desc">配置 Web 服务的端口和访问方式</div>
 
@@ -336,25 +299,10 @@
             </label>
           </div>
         </div>
-      </div>
-
-      <div class="form-group">
         <div class="form-row">
           <div class="form-label">
-            <span class="label-text">服务模式（无窗口）</span>
-            <span class="label-hint">仅运行后台服务，不显示界面窗口。适合只给 AI 调用 API</span>
-          </div>
-          <div class="form-control" style="text-align:right">
-            <label class="switch">
-              <input type="checkbox" id="cfg-service_mode">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="form-row" id="service-host-row" style="display:none">
-          <div class="form-label">
-            <span class="label-text">服务绑定地址</span>
-            <span class="label-hint">127.0.0.1 仅本机；0.0.0.0 允许外部访问</span>
+            <span class="label-text">绑定地址</span>
+            <span class="label-hint">127.0.0.1 仅本机；0.0.0.0 允许局域网访问</span>
           </div>
           <div class="form-control">
             <select id="cfg-service_host">
@@ -364,73 +312,18 @@
           </div>
         </div>
       </div>
-
-      <div class="form-group" style="background:#fff3cd; border-left:4px solid #ffc107">
-        <div class="form-row" style="border:none">
-          <div class="form-label">
-            <span class="label-text" style="color:#856404">⚠️ 服务模式提示</span>
-            <span class="label-hint" style="color:#856404">
-              开启后双击 exe 不会弹出窗口，需通过托盘图标管理。
-              也可在托盘右键菜单中随时切换。
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 启动 -->
     <div class="section" id="section-startup">
       <div class="section-title">启动行为</div>
-      <div class="section-desc">配置双击 exe 时的启动方式</div>
-
-      <div class="form-group">
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">双击启动模式</span>
-            <span class="label-hint">选择双击 exe 时默认打开方式</span>
-          </div>
-          <div class="form-control">
-            <select id="cfg-launch_with_gui">
-              <option value="true">显示界面（桌面窗口）</option>
-              <option value="false">仅服务（无窗口，后台运行）</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group" style="background:#e8f4fd; border-left:4px solid #74b9ff">
-        <div class="form-row" style="border:none">
-          <div class="form-label">
-            <span class="label-text" style="color:#0769b5">💡 说明</span>
-            <span class="label-hint" style="color:#0769b5">
-              显示界面：双击后弹出桌面窗口，可随时点击「仅服务」按钮切换到后台模式<br>
-              仅服务：双击后只在后台运行 API 服务，通过系统托盘图标管理
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">关闭窗口时</span>
-            <span class="label-hint">点击窗口关闭按钮时的行为</span>
-          </div>
-          <div class="form-control">
-            <select id="cfg-close_action">
-              <option value="ask">每次询问</option>
-              <option value="minimize">缩小到托盘</option>
-              <option value="exit">关闭整个系统</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <div class="section-desc">配置开机自启和浏览器打开方式</div>
 
       <div class="form-group">
         <div class="form-row">
           <div class="form-label">
             <span class="label-text">开机自动启动</span>
-            <span class="label-hint">登录系统后自动运行 Ledger 服务（纯服务模式）</span>
+            <span class="label-hint">登录系统后自动运行 Ledger 服务</span>
           </div>
           <div class="form-control" style="text-align:right; display:flex; align-items:center; gap:10px">
             <span id="autostart-status" class="status-badge off">未启用</span>
@@ -447,10 +340,8 @@
           <div class="form-label">
             <span class="label-text" style="color:#0769b5">💡 说明</span>
             <span class="label-hint" style="color:#0769b5">
-              开机自启默认以纯服务模式启动（无界面窗口）
-              Windows: 使用任务计划程序<br>
-              Linux: 使用 systemd 服务<br>
-              Docker: 在 docker-compose 中设置 restart: always 即可
+              Ledger 启动后会自动在浏览器中打开，服务常驻系统托盘。<br>
+              开机自启以服务模式运行，双击托盘图标或再次双击 exe 可随时打开界面。
             </span>
           </div>
         </div>
@@ -463,14 +354,13 @@
       <div class="section-desc">数据库文件路径配置</div>
 
       <div class="form-group">
-        <div class="form-row">
-          <div class="form-label">
-            <span class="label-text">数据库路径</span>
-            <span class="label-hint">留空使用默认路径（exe 同目录 data/ledger.db）</span>
-          </div>
-          <div class="form-control">
-            <input type="text" id="cfg-db_path" placeholder="默认: data/ledger.db">
-          </div>
+        <div style="margin-bottom:10px">
+          <span class="label-text" style="font-weight:500">数据库路径</span>
+          <span class="label-hint" style="display:block; font-size:12px; color:#b2bec3; margin-top:2px">留空默认存放在 exe 同目录 data 文件夹下；点「选择」可指定其他位置</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <input type="text" id="cfg-db_path" placeholder="默认: data/ledger.db" style="flex:1; padding:8px 12px; border:1px solid #dfe6e9; border-radius:6px; font-size:14px; outline:none">
+          <button class="btn btn-outline" onclick="pickFolder()" style="white-space:nowrap; padding:8px 16px">📁 选择文件夹</button>
         </div>
       </div>
     </div>
@@ -493,10 +383,15 @@
           <div class="form-label"><span class="label-text">数据库</span></div>
           <div class="form-control" id="about-db" style="font-size:12px;word-break:break-all;color:#636e72">-</div>
         </div>
+        <div class="form-row">
+          <div class="form-label"><span class="label-text">访问地址</span></div>
+          <div class="form-control" id="about-url" style="font-size:12px;word-break:break-all;color:#636e72">-</div>
+        </div>
       </div>
 
       <div class="btn-group">
-        <button class="btn btn-outline" onclick="resetConfig()">恢复默认设置</button>
+        <button class="btn btn-outline" onclick="openMainUI()">打开主界面</button>
+        <button class="btn btn-danger" onclick="resetConfig()">恢复默认设置</button>
       </div>
     </div>
 
@@ -512,21 +407,24 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // ─── pywebview bridge ──────────────────────────
-  function api() {
-    return window.pywebview ? window.pywebview.api : null;
+  // ─── 选择文件夹 ────────────────────────────────
+  async function pickFolder() {
+    try {
+      const r = await fetch('/api/pick-folder', { method: 'POST' });
+      const result = await r.json();
+      if (result.success && result.path) {
+        // 选择的是文件夹，自动拼接 ledger.db
+        const sep = result.path.includes('\\') ? '\\' : '/';
+        document.getElementById('cfg-db_path').value = result.path + sep + 'ledger.db';
+      }
+    } catch (e) {
+      showToast('无法打开文件夹选择器', 'error');
+    }
   }
 
-  // ─── 退出应用 ──────────────────────────────────
-  async function quitApp() {
-    const a = api();
-    if (a && a.quit_app) {
-      await a.quit_app();
-    } else {
-      try {
-        await fetch('/api/quit', { method: 'POST' });
-      } catch (e) {}
-    }
+  // ─── 打开主界面 ────────────────────────────────
+  function openMainUI() {
+    window.open('/', '_blank');
   }
 
   // ─── Tab 切换 ──────────────────────────────────
@@ -548,15 +446,10 @@
   // ─── 加载配置 ──────────────────────────────────
   async function loadConfig() {
     let cfg;
-    const a = api();
-    if (a && a.get_config) {
-      cfg = await a.get_config();
-    } else {
-      try {
-        const r = await fetch('/api/config');
-        cfg = await r.json();
-      } catch (e) { return; }
-    }
+    try {
+      const r = await fetch('/api/config');
+      cfg = await r.json();
+    } catch (e) { return; }
     if (!cfg) return;
 
     for (const [key, value] of Object.entries(cfg)) {
@@ -569,19 +462,14 @@
       }
     }
 
-    document.getElementById('service-host-row').style.display =
-      cfg.service_mode ? '' : 'none';
-    document.getElementById('cfg-service_mode').addEventListener('change', function() {
-      document.getElementById('service-host-row').style.display =
-        this.checked ? '' : 'none';
-    });
-
     if (cfg._config_file) document.getElementById('about-config').textContent = cfg._config_file;
     if (cfg._db_path) document.getElementById('about-db').textContent = cfg._db_path;
     if (cfg._version) {
       document.getElementById('about-version').textContent = cfg._version;
       document.getElementById('version-text').textContent = cfg._version;
     }
+    // 显示当前访问地址
+    document.getElementById('about-url').textContent = window.location.origin;
     if (cfg._autostart !== undefined) {
       const badge = document.getElementById('autostart-status');
       badge.textContent = cfg._autostart ? '已启用' : '未启用';
@@ -599,32 +487,34 @@
     });
 
     let result;
-    const a = api();
-    if (a && a.save_config) {
-      result = await a.save_config(data);
-    } else {
-      try {
-        const r = await fetch('/api/config', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(data)
-        });
-        result = await r.json();
-      } catch (e) {
-        result = {success: false, error: e.message};
-      }
+    try {
+      const r = await fetch('/api/config', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(data)
+      });
+      result = await r.json();
+    } catch (e) {
+      result = {success: false, error: e.message};
     }
     if (result && result.success) {
       showToast('✅ 设置已保存');
     } else {
-      showToast('❌ 保存失败', 'error');
+      showToast('❌ 保存失败: ' + (result ? result.error : ''), 'error');
     }
   }
 
   // ─── 开机自启 ──────────────────────────────────
   async function toggleAutostart(enable) {
-    const a = api();
-    if (!a) return;
-    const result = await a.set_autostart(enable);
+    let result;
+    try {
+      const r = await fetch('/api/autostart', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ enable })
+      });
+      result = await r.json();
+    } catch (e) {
+      result = { success: false, error: e.message };
+    }
     const badge = document.getElementById('autostart-status');
     if (result && result.success) {
       badge.textContent = enable ? '已启用' : '未启用';
@@ -632,7 +522,6 @@
       showToast(enable ? '已设置开机自启' : '已取消开机自启');
     } else {
       showToast('操作失败: ' + (result ? result.error : ''), 'error');
-      // 回滚开关状态
       document.getElementById('cfg-auto_start').checked = !enable;
     }
   }
@@ -640,15 +529,17 @@
   // ─── 恢复默认 ──────────────────────────────────
   async function resetConfig() {
     if (!confirm('确定要恢复默认设置吗？')) return;
-    const a = api();
-    if (!a) return;
-    await a.reset_config();
-    await loadConfig();
-    showToast('已恢复默认设置');
+    try {
+      await fetch('/api/config/reset', { method: 'POST' });
+      await loadConfig();
+      showToast('已恢复默认设置');
+    } catch (e) {
+      showToast('操作失败', 'error');
+    }
   }
 
   // ─── 初始化 ────────────────────────────────────
-  window.addEventListener('pywebviewready', loadConfig);
+  loadConfig();
 </script>
 </body>
 </html>

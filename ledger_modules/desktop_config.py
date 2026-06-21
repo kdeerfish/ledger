@@ -30,21 +30,12 @@ DEFAULTS = {
     # 数据库
     "db_path": "",              # 空 = 默认 data/ledger.db
 
-    # 窗口
-    "window_width": 1200,
-    "window_height": 800,
-
     # 系统
     "auto_start": False,        # 开机自启
-    "close_action": "ask",      # 关闭窗口行为: ask/minimize/exit
     "language": "zh-CN",
 
-    # 服务模式
-    "service_mode": False,      # 无窗口纯服务模式
-    "service_host": "0.0.0.0",  # 服务模式绑定地址（允许外部访问）
-
-    # 启动行为
-    "launch_with_gui": True,       # 双击 exe 时是否显示界面
+    # 绑定地址
+    "service_host": "127.0.0.1",  # 127.0.0.1 仅本机；0.0.0.0 允许外部访问
 }
 
 # ─── 读写 ──────────────────────────────────────────
@@ -140,35 +131,28 @@ def reset():
 # ─── 开机自启管理 ────────────────────────────────────
 
 def set_autostart_windows(enable: bool, exe_path: str = None):
-    """Windows: 使用任务计划程序设置开机自启"""
+    """Windows: 使用注册表 Run 键设置开机自启（无需管理员权限）"""
     if sys.platform != 'win32':
         return False, "仅支持 Windows"
 
-    import subprocess
-    task_name = "LedgerDesktop_AutoStart"
-    if not exe_path:
-        exe_path = sys.executable if getattr(sys, 'frozen', False) else os.path.join(
-            _BUNDLE_DIR, 'dist', 'ledger', 'ledger.exe'
-        )
+    import winreg
+    reg_key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    app_name = "Ledger"
 
-    if enable:
-        # 创建任务计划
-        cmd = (
-            f'schtasks /create /tn "{task_name}" '
-            f'/tr "\"{exe_path}\" --service" '
-            f'/sc onlogon /rl highest /f'
-        )
-    else:
-        # 删除任务计划
-        cmd = f'schtasks /delete /tn "{task_name}" /f'
+    if not exe_path:
+        exe_path = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(sys.argv[0])
 
     try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=10
-        )
-        if result.returncode == 0:
-            return True, "设置成功"
-        return False, result.stderr.strip()
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key, 0, winreg.KEY_SET_VALUE) as key:
+            if enable:
+                # 值为 "exe路径" --no-browser
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{exe_path}" --no-browser')
+            else:
+                try:
+                    winreg.DeleteValue(key, app_name)
+                except FileNotFoundError:
+                    pass  # 不存在也视为成功
+        return True, "设置成功"
     except Exception as e:
         return False, str(e)
 
@@ -221,13 +205,14 @@ WantedBy=multi-user.target
 def get_autostart_status():
     """检查当前自启状态"""
     if sys.platform == 'win32':
-        import subprocess
-        task_name = "LedgerDesktop_AutoStart"
-        result = subprocess.run(
-            f'schtasks /query /tn "{task_name}"',
-            shell=True, capture_output=True, text=True, timeout=10
-        )
-        return result.returncode == 0
+        import winreg
+        reg_key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key, 0, winreg.KEY_READ) as key:
+                winreg.QueryValueEx(key, "Ledger")
+                return True
+        except FileNotFoundError:
+            return False
     else:
         service_path = "/etc/systemd/system/ledger-web.service"
         return os.path.exists(service_path)
