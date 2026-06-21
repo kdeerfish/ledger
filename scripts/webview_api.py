@@ -20,11 +20,12 @@ else:
 class DesktopAPI:
     """pywebview 暴露给 JS 的 API"""
 
-    def __init__(self, on_switch_to_service=None, on_quit=None):
+    def __init__(self, on_switch_to_service=None, on_quit=None, on_close_dialog_result=None):
         from ledger_modules import desktop_config
         self._config = desktop_config
         self._on_switch_to_service = on_switch_to_service
         self._on_quit = on_quit
+        self._on_close_dialog_result = on_close_dialog_result
 
     def get_config(self):
         """获取全部配置"""
@@ -86,6 +87,13 @@ class DesktopAPI:
         """退出整个应用"""
         if self._on_quit:
             self._on_quit()
+            return {'success': True}
+        return {'success': False, 'error': 'callback not set'}
+
+    def close_dialog_result(self, action, remember):
+        """关闭对话框结果"""
+        if self._on_close_dialog_result:
+            self._on_close_dialog_result(action, remember)
             return {'success': True}
         return {'success': False, 'error': 'callback not set'}
 

@@ -232,6 +232,7 @@ _tray_ready = threading.Event()
 # 桌面模式下由 run_desktop_mode 注册的回调
 _tray_on_open_ui = None
 _tray_on_open_settings = None
+_tray_on_toggle_mode = None   # 切换服务/桌面模式
 
 
 def _create_tray_icon():
@@ -261,6 +262,10 @@ def _create_tray_icon():
         if _tray_on_open_settings:
             _tray_on_open_settings()
 
+    def on_toggle_mode(icon, item):
+        if _tray_on_toggle_mode:
+            _tray_on_toggle_mode()
+
     def on_exit(icon, item):
         icon.stop()
         shutdown_flask()
@@ -270,6 +275,8 @@ def _create_tray_icon():
     menu = pystray.Menu(
         pystray.MenuItem('打开界面', on_open_ui, default=True),
         pystray.MenuItem('设置', on_open_settings),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem('切换为仅服务模式', on_toggle_mode),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem('退出', on_exit),
     )
@@ -455,6 +462,53 @@ TOOLBAR_JS = """
 
 # ─── 桌面模式 ──────────────────────────────────────
 
+# 关闭对话框 HTML
+CLOSE_DIALOG_HTML = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>关闭</title>
+<style>
+body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:#f5f6fa;display:flex;
+flex-direction:column;align-items:center;justify-content:center;height:100vh}
+.box{background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.1);text-align:center;max-width:380px}
+h3{margin:0 0 8px;color:#2d3436}p{color:#636e72;margin:0 0 20px;font-size:14px}
+.btns{display:flex;gap:12px;justify-content:center}
+.btn{padding:10px 24px;border:none;border-radius:8px;font-size:14px;cursor:pointer}
+.btn-min{background:#0984e3;color:#fff}.btn-min:hover{background:#0769b5}
+.btn-exit{background:#dfe6e9;color:#2d3436}.btn-exit:hover{background:#b2bec3}
+.remember{margin-top:16px;font-size:12px;color:#b2bec3}
+.remember label{cursor:pointer}
+</style></head><body>
+<div class="box">
+<h3>关闭 Ledger</h3>
+<p>你想怎么处理？</p>
+<div class="btns">
+<button class="btn btn-min" onclick="choose('minimize')">缩小到托盘</button>
+<button class="btn btn-exit" onclick="choose('exit')">关闭整个系统</button>
+</div>
+<div class="remember"><label><input type="checkbox" id="remember"> 以后都这么选择</label></div>
+</div>
+<script>
+function choose(action){
+  var remember=document.getElementById('remember').checked;
+  if(window.pywebview&&window.pywebview.api){
+    window.pywebview.api.close_dialog_result(action,remember);
+  }
+}
+</script></body></html>"""
+
+# 加载中遮罩 HTML（轻量模式恢复时显示）
+LOADING_OVERLAY_JS = """
+(function(){
+  if(document.getElementById('ledger-loading'))return;
+  var d=document.createElement('div');
+  d.id='ledger-loading';
+  d.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(245,246,250,.95);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:Microsoft YaHei,sans-serif';
+  d.innerHTML='<div style="text-align:center"><div style="font-size:32px;margin-bottom:16px">⏳</div><div style="color:#636e72;font-size:14px">正在加载界面...</div></div>';
+  document.body.appendChild(d);
+  setTimeout(function(){var o=document.getElementById('ledger-loading');if(o)o.remove()},8000);
+})();
+"""
+
+
 def run_desktop_mode(port, width, height, debug):
     """桌面模式：pywebview 窗口 + Flask + 托盘（轻量模式释放窗口内存）"""
     try:
@@ -465,14 +519,15 @@ def run_desktop_mode(port, width, height, debug):
 
     from scripts.webview_api import DesktopAPI
 
-    global _tray_on_open_ui, _tray_on_open_settings
+    global _tray_on_open_ui, _tray_on_open_settings, _tray_on_toggle_mode
 
     _main_window = [None]
     _settings_window = [None]
-    _is_lightweight = [False]   # True = 轻量模式（无窗口）
+    _is_lightweight = [False]
     _relaunch = threading.Event()
     _quit = [False]
     _version = _get_version()
+    _close_dialog_window = [None]
 
     # 启动 Flask
     flask_thread = threading.Thread(
@@ -484,7 +539,7 @@ def run_desktop_mode(port, width, height, debug):
     # 启动托盘
     start_tray()
 
-    # ── 回调定义 ──────────────────────────────────
+    # ── 回调 ──────────────────────────────────────
 
     def inject_toolbar(win):
         try:
@@ -492,10 +547,15 @@ def run_desktop_mode(port, width, height, debug):
         except Exception:
             pass
 
+    def show_loading(win):
+        """在窗口中注入加载遮罩"""
+        try:
+            win.evaluate_js(LOADING_OVERLAY_JS)
+        except Exception:
+            pass
+
     def do_open_ui():
-        """托盘/快捷键「打开界面」"""
         if _main_window[0] is not None:
-            # 窗口已打开 → 激活
             try:
                 _main_window[0].evaluate_js(
                     'window.focus(); document.title=document.title;'
@@ -503,13 +563,10 @@ def run_desktop_mode(port, width, height, debug):
             except Exception:
                 pass
         else:
-            # 轻量模式 → 触发重建窗口
             _relaunch.set()
 
     def do_open_settings():
-        """托盘「设置」"""
         if _main_window[0] is not None:
-            # 窗口已打开 → 在 pywebview 子窗口打开设置
             if _settings_window[0] is not None:
                 try:
                     _settings_window[0].show()
@@ -524,11 +581,9 @@ def run_desktop_mode(port, width, height, debug):
                 resizable=True, js_api=api,
             )
         else:
-            # 轻量模式 → 先重建主窗口，再通过它打开设置
             _relaunch.set()
 
     def do_switch_to_service():
-        """工具栏「轻量模式」：销毁窗口，保留 Flask + 托盘"""
         _is_lightweight[0] = True
         _relaunch.clear()
         if _main_window[0] is not None:
@@ -538,8 +593,19 @@ def run_desktop_mode(port, width, height, debug):
                 pass
         update_tray_tooltip(f'Ledger {_version} (轻量模式)')
 
+    def do_toggle_mode():
+        """托盘切换服务/桌面模式"""
+        current = _cfg('service_mode')
+        desktop_config.set('service_mode', not current)
+        desktop_config.save()
+        if not current:
+            # 切到服务模式：销毁窗口
+            do_switch_to_service()
+        else:
+            # 切到桌面模式：重建窗口
+            _relaunch.set()
+
     def do_quit():
-        """退出整个应用"""
         _quit[0] = True
         if _main_window[0] is not None:
             try:
@@ -555,31 +621,70 @@ def run_desktop_mode(port, width, height, debug):
         _release_lock()
         os._exit(0)
 
+    def show_close_dialog():
+        """显示关闭选择对话框"""
+        if _close_dialog_window[0] is not None:
+            try:
+                _close_dialog_window[0].show()
+                return
+            except Exception:
+                pass
+        dialog = webview.create_window(
+            '关闭 Ledger',
+            html=CLOSE_DIALOG_HTML,
+            width=420, height=260,
+            resizable=False, frameless=True,
+            js_api=api,
+        )
+        _close_dialog_window[0] = dialog
+
+    def on_close_dialog_result(action, remember):
+        """关闭对话框的回调"""
+        if _close_dialog_window[0] is not None:
+            try:
+                _close_dialog_window[0].destroy()
+            except Exception:
+                pass
+            _close_dialog_window[0] = None
+        if remember:
+            desktop_config.set('close_action', action)
+            desktop_config.save()
+        if action == 'minimize':
+            do_switch_to_service()
+        else:
+            do_quit()
+
     def on_window_closed():
         """pywebview 窗口关闭事件"""
-        if not _is_lightweight[0]:
-            # 用户点 X（非轻量模式触发）
-            if _cfg('minimize_to_tray'):
-                _is_lightweight[0] = True
-                _relaunch.clear()
-                update_tray_tooltip(f'Ledger {_version} (轻量模式)')
-            else:
-                do_quit()
+        if _is_lightweight[0]:
+            return  # 轻量模式触发的关闭，忽略
+        action = _cfg('close_action')
+        if action == 'minimize':
+            do_switch_to_service()
+        elif action == 'exit':
+            do_quit()
+        else:
+            # ask: 弹出选择对话框
+            show_close_dialog()
 
     # 注册回调
     _tray_on_open_ui = do_open_ui
     _tray_on_open_settings = do_open_settings
+    _tray_on_toggle_mode = do_toggle_mode
 
-    api = DesktopAPI(on_switch_to_service=do_switch_to_service, on_quit=do_quit)
+    api = DesktopAPI(
+        on_switch_to_service=do_switch_to_service,
+        on_quit=do_quit,
+        on_close_dialog_result=on_close_dialog_result,
+    )
     api.open_settings = do_open_settings
 
     # 启动快捷键
-    hotkey_thread = threading.Thread(
+    threading.Thread(
         target=_start_global_hotkey, args=(_relaunch,), daemon=True
-    )
-    hotkey_thread.start()
+    ).start()
 
-    # 启动信号文件检查（第二次双击 exe）
+    # 启动信号文件检查
     def _signal_watcher():
         while not _quit[0]:
             if _check_signal_file():
@@ -590,7 +695,6 @@ def run_desktop_mode(port, width, height, debug):
     _println("=" * 50)
     _println(f"  Ledger Desktop {_version}")
     _println(f"  Address: http://127.0.0.1:{port}")
-    _println("  托盘:    右键图标可操作")
     _println("=" * 50)
 
     # ════════════════════════════════════════════════
@@ -611,12 +715,12 @@ def run_desktop_mode(port, width, height, debug):
         _main_window[0].events.loaded += lambda: inject_toolbar(_main_window[0])
 
         update_tray_tooltip(f'Ledger {_version}')
-        webview.start(debug=debug)  # 阻塞，直到窗口关闭
+        webview.start(debug=debug)
 
         if _quit[0]:
             break
 
-        # ── 窗口已销毁（轻量模式），内存已释放 ──
+        # 窗口已销毁（轻量模式）
         _main_window[0] = None
         _settings_window[0] = None
         update_tray_tooltip(f'Ledger {_version} (轻量模式)')

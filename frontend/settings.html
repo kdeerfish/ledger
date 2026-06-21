@@ -370,8 +370,8 @@
           <div class="form-label">
             <span class="label-text" style="color:#856404">⚠️ 服务模式提示</span>
             <span class="label-hint" style="color:#856404">
-              开启后双击 exe 不会弹出窗口。需通过任务管理器或命令行停止服务。
-              可配合开机自启作为后台服务运行。
+              开启后双击 exe 不会弹出窗口，需通过托盘图标管理。
+              也可在托盘右键菜单中随时切换。
             </span>
           </div>
         </div>
@@ -413,14 +413,15 @@
       <div class="form-group">
         <div class="form-row">
           <div class="form-label">
-            <span class="label-text">关闭窗口时最小化到托盘</span>
-            <span class="label-hint">关闭窗口后服务继续运行，从托盘图标恢复</span>
+            <span class="label-text">关闭窗口时</span>
+            <span class="label-hint">点击窗口关闭按钮时的行为</span>
           </div>
-          <div class="form-control" style="text-align:right">
-            <label class="switch">
-              <input type="checkbox" id="cfg-minimize_to_tray">
-              <span class="slider"></span>
-            </label>
+          <div class="form-control">
+            <select id="cfg-close_action">
+              <option value="ask">每次询问</option>
+              <option value="minimize">缩小到托盘</option>
+              <option value="exit">关闭整个系统</option>
+            </select>
           </div>
         </div>
       </div>
