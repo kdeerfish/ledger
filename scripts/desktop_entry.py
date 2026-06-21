@@ -302,6 +302,12 @@ def _create_tray_icon():
 
     _tray_ready.set()
 
+    # 延迟后尝试将托盘图标提升到任务栏可见区域
+    def _delayed_promote():
+        time.sleep(2)  # 等待 Windows 注册图标
+        _promote_tray_icon()
+    threading.Thread(target=_delayed_promote, daemon=True).start()
+
     # 延迟显示启动通知
     def _show_startup_notification():
         time.sleep(2)  # 等待托盘完全初始化
@@ -403,6 +409,38 @@ def _start_global_hotkey(relaunch_event):
             ctypes.windll.user32.UnregisterHotKey(None, 1)
         except Exception:
             pass
+
+
+def _promote_tray_icon():
+    """让 Windows 11 在任务栏显示托盘图标（不藏到溢出区）
+    通过修改 HKCU\\Control Panel\\NotifyIconSettings 中的 IsPromoted 值实现"""
+    if sys.platform != 'win32':
+        return
+    try:
+        import winreg
+        exe_path = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(sys.argv[0])
+        base_key = r"Control Panel\NotifyIconSettings"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base_key) as key:
+            i = 0
+            while True:
+                try:
+                    sub_name = winreg.EnumKey(key, i)
+                    sub_path = f"{base_key}\\{sub_name}"
+                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as sub:
+                        try:
+                            val, _ = winreg.QueryValueEx(sub, "ExecutablePath")
+                            if val and os.path.normcase(os.path.normpath(val)) == os.path.normcase(os.path.normpath(exe_path)):
+                                winreg.SetValueEx(sub, "IsPromoted", 0, winreg.REG_DWORD, 1)
+                                _println(f"[INFO] 托盘图标已设为任务栏可见")
+                                return
+                        except FileNotFoundError:
+                            pass
+                    i += 1
+                except OSError:
+                    break
+        _println(f"[INFO] 托盘图标注册表条目未找到（首次运行，图标可能在溢出区）")
+    except Exception as e:
+        _println(f"[WARN] 托盘图标提升失败: {e}")
 
 
 # ─── 主窗口注入的工具栏 HTML ──────────────────────────
@@ -619,13 +657,31 @@ def run_desktop_mode(port, width, height, debug):
         import webbrowser
         webbrowser.open(f'http://127.0.0.1:{_port}')
 
+    def quit_application():
+        """退出整个应用：关闭窗口、停止 Flask、释放锁"""
+        _println("[INFO] 用户请求退出...")
+        _exit_requested[0] = True
+        if _main_window[0] is not None:
+            try:
+                _main_window[0].destroy()
+            except Exception:
+                pass
+        shutdown_flask()
+        if _tray:
+            try:
+                _tray.stop()
+            except Exception:
+                pass
+        _release_lock()
+        os._exit(0)
+
     # 注册回调
     _open_ui_callback = open_in_browser
     _open_settings_callback = open_settings
     _window_show_callback = show_window
 
     # 创建 API
-    api = DesktopAPI(on_switch_to_service=switch_to_service)
+    api = DesktopAPI(on_switch_to_service=switch_to_service, on_quit=quit_application)
     api.open_settings = open_settings
 
     _println("=" * 50)

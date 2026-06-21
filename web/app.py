@@ -14,8 +14,13 @@ from functools import wraps
 
 # 修复 Windows GBK 编码问题
 if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    try:
+        if sys.stdout is not None:
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if sys.stderr is not None:
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
     os.environ['PYTHONUTF8'] = '1'
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,6 +61,8 @@ WEB_PORT = int(os.environ.get('WEB_PORT', '5800'))
 WEB_DEBUG = os.environ.get('WEB_DEBUG', '').lower() in ('true', '1', 'yes')
 
 
+
+
 def _get_version():
     try:
         import tomllib
@@ -64,6 +71,8 @@ def _get_version():
             return tomllib.load(f).get('project', {}).get('version', '0.0.0')
     except Exception:
         return '0.0.0'
+
+
 
 
 # ─── 辅助函数 ──────────────────────────────────────────
@@ -186,6 +195,18 @@ def health():
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/quit', methods=['POST'])
+def quit_app():
+    """退出整个应用（仅限本地访问）"""
+    import threading
+    def _delayed_quit():
+        import time
+        time.sleep(0.5)
+        os._exit(0)
+    threading.Thread(target=_delayed_quit, daemon=True).start()
+    return jsonify({'success': True, 'message': 'Ledger 正在退出...'})
 
 
 # ════════════════════════════════════════════════════════

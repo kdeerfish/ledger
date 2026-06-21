@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger 设置</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #f5f6fa;
+    color: #2d3436;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* 侧边栏 */
+  .layout {
+    display: flex;
+    height: 100vh;
+  }
+
+  .sidebar {
+    width: 200px;
+    background: #2d3436;
+    color: #dfe6e9;
+    padding: 20px 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-title {
+    padding: 0 20px 16px;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid #636e72;
+    margin-bottom: 8px;
+  }
+
+  .sidebar-title span {
+    color: #74b9ff;
+    font-size: 12px;
+    font-weight: normal;
+    display: block;
+    margin-top: 2px;
+  }
+
+  .nav-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+  }
+
+  .nav-item:hover { background: #3d4446; }
+  .nav-item.active {
+    background: #3d4446;
+    border-left-color: #74b9ff;
+    color: #74b9ff;
+  }
+
+  .nav-item .icon { margin-right: 8px; }
+
+  /* 主内容 */
+  .content {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-y: auto;
+  }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .section-desc {
+    color: #636e72;
+    margin-bottom: 24px;
+    font-size: 13px;
+  }
+
+  /* 表单 */
+  .form-group {
+    background: white;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .form-row + .form-row {
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .form-label {
+    flex: 1;
+  }
+
+  .form-label .label-text {
+    font-weight: 500;
+    display: block;
+  }
+
+  .form-label .label-hint {
+    font-size: 12px;
+    color: #b2bec3;
+    margin-top: 2px;
+  }
+
+  .form-control {
+    width: 220px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dfe6e9;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus {
+    border-color: #74b9ff;
+    box-shadow: 0 0 0 2px rgba(116, 185, 255, 0.2);
+  }
+
+  /* 开关 */
+  .switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+  }
+
+  .switch input { display: none; }
+
+  .switch .slider {
+    position: absolute;
+    inset: 0;
+    background: #b2bec3;
+    border-radius: 24px;
+    transition: 0.3s;
+  }
+
+  .switch .slider::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+
+  .switch input:checked + .slider { background: #0984e3; }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+
+  /* 按钮 */
+  .btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #0984e3;
+    color: white;
+  }
+
+  .btn-primary:hover { background: #0769b5; }
+
+  .btn-danger {
+    background: #ff7675;
+    color: white;
+  }
+
+  .btn-danger:hover { background: #d63031; }
+
+  .btn-outline {
+    background: white;
+    border: 1px solid #dfe6e9;
+    color: #636e72;
+  }
+
+  .btn-outline:hover { border-color: #74b9ff; color: #0984e3; }
+
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  /* 状态提示 */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    z-index: 100;
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: #00b894; }
+  .toast.error { background: #d63031; }
+
+  /* 状态标签 */
+  .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .status-badge.on { background: #dfe6e9; color: #00b894; }
+  .status-badge.off { background: #dfe6e9; color: #b2bec3; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-title">
+      Ledger 设置
+      <span id="version-text">v0.0.0</span>
+    </div>
+    <div class="nav-item active" data-section="general" onclick="switchTab('general')">
+      <span class="icon">⚙️</span> 常规
+    </div>
+    <div class="nav-item" data-section="server" onclick="switchTab('server')">
+      <span class="icon">🌐</span> 服务
+    </div>
+    <div class="nav-item" data-section="startup" onclick="switchTab('startup')">
+      <span class="icon">🚀</span> 启动行为
+    </div>
+    <div class="nav-item" data-section="data" onclick="switchTab('data')">
+      <span class="icon">💾</span> 数据
+    </div>
+    <div class="nav-item" data-section="about" onclick="switchTab('about')">
+      <span class="icon">ℹ️</span> 关于
+    </div>
+    <div style="flex:1"></div>
+    <div class="nav-item" onclick="quitApp()" style="color:#d63031;margin-top:auto">
+      <span class="icon">⏻</span> 退出 Ledger
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="content">
+    <!-- 常规 -->
+    <div class="section active" id="section-general">
+      <div class="section-title">常规设置</div>
+      <div class="section-desc">窗口和界面基本配置</div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">语言</span>
+          </div>
+          <div class="form-control">
+            <select id="cfg-language">
+              <option value="zh-CN">简体中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">窗口宽度</span>
+          </div>
+          <div class="form-control">
+            <input type="number" id="cfg-window_width" min="900" max="3840">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">窗口高度</span>
+          </div>
+          <div class="form-control">
+            <input type="number" id="cfg-window_height" min="600" max="2160">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 服务 -->
+    <div class="section" id="section-server">
+      <div class="section-title">服务设置</div>
+      <div class="section-desc">配置 Web 服务的端口和访问方式</div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">监听端口</span>
+            <span class="label-hint">默认 5800，0 = 自动分配可用端口</span>
+          </div>
+          <div class="form-control">
+            <input type="number" id="cfg-port" min="0" max="65535">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">自动分配端口</span>
+            <span class="label-hint">端口被占用时自动切换</span>
+          </div>
+          <div class="form-control" style="text-align:right">
+            <label class="switch">
+              <input type="checkbox" id="cfg-auto_port">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">服务模式（无窗口）</span>
+            <span class="label-hint">仅运行后台服务，不显示界面窗口。适合只给 AI 调用 API</span>
+          </div>
+          <div class="form-control" style="text-align:right">
+            <label class="switch">
+              <input type="checkbox" id="cfg-service_mode">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="form-row" id="service-host-row" style="display:none">
+          <div class="form-label">
+            <span class="label-text">服务绑定地址</span>
+            <span class="label-hint">127.0.0.1 仅本机；0.0.0.0 允许外部访问</span>
+          </div>
+          <div class="form-control">
+            <select id="cfg-service_host">
+              <option value="127.0.0.1">127.0.0.1（仅本机）</option>
+              <option value="0.0.0.0">0.0.0.0（局域网）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="background:#fff3cd; border-left:4px solid #ffc107">
+        <div class="form-row" style="border:none">
+          <div class="form-label">
+            <span class="label-text" style="color:#856404">⚠️ 服务模式提示</span>
+            <span class="label-hint" style="color:#856404">
+              开启后双击 exe 不会弹出窗口。需通过任务管理器或命令行停止服务。
+              可配合开机自启作为后台服务运行。
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 启动 -->
+    <div class="section" id="section-startup">
+      <div class="section-title">启动行为</div>
+      <div class="section-desc">配置双击 exe 时的启动方式</div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">双击启动模式</span>
+            <span class="label-hint">选择双击 exe 时默认打开方式</span>
+          </div>
+          <div class="form-control">
+            <select id="cfg-launch_with_gui">
+              <option value="true">显示界面（桌面窗口）</option>
+              <option value="false">仅服务（无窗口，后台运行）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="background:#e8f4fd; border-left:4px solid #74b9ff">
+        <div class="form-row" style="border:none">
+          <div class="form-label">
+            <span class="label-text" style="color:#0769b5">💡 说明</span>
+            <span class="label-hint" style="color:#0769b5">
+              显示界面：双击后弹出桌面窗口，可随时点击「仅服务」按钮切换到后台模式<br>
+              仅服务：双击后只在后台运行 API 服务，通过系统托盘图标管理
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">关闭窗口时最小化到托盘</span>
+            <span class="label-hint">关闭窗口后服务继续运行，从托盘图标恢复</span>
+          </div>
+          <div class="form-control" style="text-align:right">
+            <label class="switch">
+              <input type="checkbox" id="cfg-minimize_to_tray">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">开机自动启动</span>
+            <span class="label-hint">登录系统后自动运行 Ledger 服务（纯服务模式）</span>
+          </div>
+          <div class="form-control" style="text-align:right; display:flex; align-items:center; gap:10px">
+            <span id="autostart-status" class="status-badge off">未启用</span>
+            <label class="switch">
+              <input type="checkbox" id="cfg-auto_start" onchange="toggleAutostart(this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="background:#e8f4fd; border-left:4px solid #74b9ff">
+        <div class="form-row" style="border:none">
+          <div class="form-label">
+            <span class="label-text" style="color:#0769b5">💡 说明</span>
+            <span class="label-hint" style="color:#0769b5">
+              开机自启默认以纯服务模式启动（无界面窗口）
+              Windows: 使用任务计划程序<br>
+              Linux: 使用 systemd 服务<br>
+              Docker: 在 docker-compose 中设置 restart: always 即可
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据 -->
+    <div class="section" id="section-data">
+      <div class="section-title">数据设置</div>
+      <div class="section-desc">数据库文件路径配置</div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label">
+            <span class="label-text">数据库路径</span>
+            <span class="label-hint">留空使用默认路径（exe 同目录 data/ledger.db）</span>
+          </div>
+          <div class="form-control">
+            <input type="text" id="cfg-db_path" placeholder="默认: data/ledger.db">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="section" id="section-about">
+      <div class="section-title">关于</div>
+      <div class="section-desc">Ledger 个人记账系统</div>
+
+      <div class="form-group">
+        <div class="form-row">
+          <div class="form-label"><span class="label-text">版本</span></div>
+          <div class="form-control" id="about-version">-</div>
+        </div>
+        <div class="form-row">
+          <div class="form-label"><span class="label-text">配置文件</span></div>
+          <div class="form-control" id="about-config" style="font-size:12px;word-break:break-all;color:#636e72">-</div>
+        </div>
+        <div class="form-row">
+          <div class="form-label"><span class="label-text">数据库</span></div>
+          <div class="form-control" id="about-db" style="font-size:12px;word-break:break-all;color:#636e72">-</div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="resetConfig()">恢复默认设置</button>
+      </div>
+    </div>
+
+    <!-- 保存按钮（固定底部） -->
+    <div style="position:sticky; bottom:0; padding:16px 0; background:#f5f6fa; border-top:1px solid #dfe6e9; margin-top:20px; display:flex; justify-content:flex-end; gap:10px">
+      <button class="btn btn-outline" onclick="loadConfig()">取消</button>
+      <button class="btn btn-primary" onclick="saveConfig()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ─── pywebview bridge ──────────────────────────
+  function api() {
+    return window.pywebview ? window.pywebview.api : null;
+  }
+
+  // ─── 退出应用 ──────────────────────────────────
+  async function quitApp() {
+    if (!confirm('确定要退出 Ledger 吗？\n所有服务将停止，需要重新启动。')) return;
+    const a = api();
+    if (a && a.quit_app) {
+      await a.quit_app();
+    } else {
+      // 无 pywebview bridge（浏览器模式），调用 API
+      try {
+        await fetch('/api/quit', { method: 'POST' });
+        showToast('正在退出...');
+      } catch (e) {
+        showToast('退出失败', 'error');
+      }
+    }
+  }
+
+  // ─── Tab 切换 ──────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.nav-item[data-section="${name}"]`).classList.add('active');
+    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+    document.getElementById('section-' + name).classList.add('active');
+  }
+
+  // ─── Toast ─────────────────────────────────────
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => { t.className = 'toast'; }, 2500);
+  }
+
+  // ─── 加载配置 ──────────────────────────────────
+  async function loadConfig() {
+    const a = api();
+    if (!a) return;
+    const cfg = await a.get_config();
+    if (!cfg) return;
+
+    // 填充表单
+    for (const [key, value] of Object.entries(cfg)) {
+      const el = document.getElementById('cfg-' + key);
+      if (!el) continue;
+      if (el.type === 'checkbox') {
+        el.checked = !!value;
+      } else {
+        el.value = value;
+      }
+    }
+
+    // 特殊处理
+    document.getElementById('service-host-row').style.display =
+      cfg.service_mode ? '' : 'none';
+    document.getElementById('cfg-service_mode').addEventListener('change', function() {
+      document.getElementById('service-host-row').style.display =
+        this.checked ? '' : 'none';
+    });
+
+    // 关于信息
+    document.getElementById('about-config').textContent = cfg._config_file || '-';
+    document.getElementById('about-db').textContent = cfg._db_path || '-';
+    document.getElementById('about-version').textContent = cfg._version || '-';
+    document.getElementById('version-text').textContent = cfg._version || '';
+
+    // 自启状态
+    if (cfg._autostart !== undefined) {
+      const badge = document.getElementById('autostart-status');
+      if (cfg._autostart) {
+        badge.textContent = '已启用';
+        badge.className = 'status-badge on';
+      } else {
+        badge.textContent = '未启用';
+        badge.className = 'status-badge off';
+      }
+    }
+  }
+
+  // ─── 保存配置 ──────────────────────────────────
+  async function saveConfig() {
+    const a = api();
+    if (!a) return;
+
+    const data = {};
+    document.querySelectorAll('[id^="cfg-"]').forEach(el => {
+      const key = el.id.replace('cfg-', '');
+      if (key.startsWith('_')) return;
+      if (el.type === 'checkbox') {
+        data[key] = el.checked;
+      } else {
+        data[key] = el.value;
+      }
+    });
+
+    const result = await a.save_config(data);
+    if (result && result.success) {
+      showToast('✅ 设置已保存' + (result.restart_required ? '（部分设置需要重启生效）' : ''));
+    } else {
+      showToast('❌ 保存失败: ' + (result ? result.error : '未知错误'), 'error');
+    }
+  }
+
+  // ─── 开机自启 ──────────────────────────────────
+  async function toggleAutostart(enable) {
+    const a = api();
+    if (!a) return;
+    const result = await a.set_autostart(enable);
+    const badge = document.getElementById('autostart-status');
+    if (result && result.success) {
+      badge.textContent = enable ? '已启用' : '未启用';
+      badge.className = 'status-badge ' + (enable ? 'on' : 'off');
+      showToast(enable ? '已设置开机自启' : '已取消开机自启');
+    } else {
+      showToast('操作失败: ' + (result ? result.error : ''), 'error');
+      // 回滚开关状态
+      document.getElementById('cfg-auto_start').checked = !enable;
+    }
+  }
+
+  // ─── 恢复默认 ──────────────────────────────────
+  async function resetConfig() {
+    if (!confirm('确定要恢复默认设置吗？')) return;
+    const a = api();
+    if (!a) return;
+    await a.reset_config();
+    await loadConfig();
+    showToast('已恢复默认设置');
+  }
+
+  // ─── 初始化 ────────────────────────────────────
+  window.addEventListener('pywebviewready', loadConfig);
+</script>
+</body>
+</html>
