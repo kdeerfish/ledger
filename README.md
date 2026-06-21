@@ -9,23 +9,27 @@
 [![License](https://img.shields.io/github/license/kdeerfish/ledger)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 
-**🐳 [`docker`](https://hub.docker.com/r/zouzhenglu/ledger) · [📖 完整文档](https://kdeerfish.github.io/ledger)**
+**🐳 [`docker`](https://hub.docker.com/r/zouzhenglu/ledger) · [📖 完整文档](https://kdeerfish.github.io/ledger) · [📦 Releases](https://github.com/kdeerfish/ledger/releases)**
 
 </div>
 
 ---
 
-## 🚀 30 秒启动
+## 🚀 快速开始
 
-> 已经装了 Docker？一行命令搞定。
+根据你的环境选择安装方式：
 
-```bash
-docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-stopped zouzhenglu/ledger:latest
-```
+| 你的环境 | 安装方式 | 命令 / 下载 |
+|---------|---------|------------|
+| **Windows** | 桌面端 EXE | [下载 Ledger.zip](https://github.com/kdeerfish/ledger/releases) 解压双击 |
+| **NAS / 服务器** | Docker 镜像 | `docker run -d -p 5800:5800 -v $(pwd)/data:/data zouzhenglu/ledger` |
+| **开发者** | 源码运行 | `git clone` → `pip install -e .` → `python web/run.py` |
+| **AI Agent** | 技能包 | [下载 ledger-skills.zip](https://github.com/kdeerfish/ledger/releases) |
 
-浏览器打开 **http://localhost:5800** 即可使用。
+> 🇨🇳 国内用户：Docker 镜像可用阿里云加速  
+> `crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest`
 
-国内用户把镜像换成 `crpi-1bkinvfgt16i5pgx.cn-shenzhen.personal.cr.aliyuncs.com/deerfish/ledger:latest` 拉取更快。
+详细部署指南：👉 [DEPLOY.md](DEPLOY.md)
 
 ---
 
@@ -63,13 +67,7 @@ docker run -d --name ledger -p 5800:5800 -v $(pwd)/data:/data --restart unless-s
 
 ---
 
-## 🖥️ Windows 桌面端（免安装）
-
-从 [GitHub Releases](https://github.com/kdeerfish/ledger/releases) 下载 `Ledger.zip`，解压后双击 `ledger.exe` 即可运行。
-
----
-
-## 🐳 镜像仓库
+## 🐳 Docker 镜像仓库
 
 | 仓库 | 拉取命令 | 适用 |
 |------|----------|------|
