@@ -4,8 +4,26 @@
 
 | 包 | 说明 |
 |----|------|
+| `Ledger.zip` | Windows 桌面端（EXE，解压即用） |
 | `ledger-service.zip` | 核心服务（已容器化，推荐 Docker 部署） |
 | `ledger-skills.zip` | AI Agent 技能（HTTP API 客户端） |
+
+---
+
+## 🖥️ Windows 桌面端
+
+从 GitHub Release 下载 `Ledger.zip`，解压后双击 `ledger.exe` 即可运行，无需安装 Python 或其他依赖。
+
+### 特点
+- 自带 Flask 后端 + React 前端，解压即用
+- 系统托盘图标，支持最小化到托盘
+- 默认端口 5800，访问 http://localhost:5800
+
+### 命令行参数
+```bash
+ledger.exe --port 8080          # 指定端口
+ledger.exe --width 1400 --height 900  # 指定窗口大小
+```
 
 ---
 
