@@ -56,3 +56,6 @@ deploy/
 website/build/
 website/.docusaurus/
 website/node_modules/
+
+# Go build output
+bin/

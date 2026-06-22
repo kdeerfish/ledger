@@ -1,4 +1,4 @@
----
+﻿---
 name: ledger
 description: 个人记账工具，支持记账、查账、统计、预算管理等功能
 version: 2.0.0
@@ -259,7 +259,67 @@ curl http://127.0.0.1:5800/api/analyze
 
 ## 其他客户端
 
-如果环境中没有 curl（如 Docker 容器），可使用 wget，详见 [references/wget.md](references/wget.md)。
+### Go CLI (ledger-cli)
+
+单二进制，不依赖 curl/wget/python，适用于任何 Linux/Docker 环境。
+
+```bash
+# 设置 API 地址（默认 http://127.0.0.1:5800）
+export LEDGER_API_URL=http://127.0.0.1:5800
+
+# 交易管理
+ledger-cli tx add --amount 30 --category 食品酒水 --note 早餐
+ledger-cli tx list --limit 10
+ledger-cli tx get 42
+ledger-cli tx search 早餐
+ledger-cli tx update 42 --amount 50
+ledger-cli tx delete 42
+ledger-cli tx restore 42
+
+# 统计查询
+ledger-cli stats summary --year 2026 --month 6
+ledger-cli stats group --by category --year 2026 --month 6
+ledger-cli stats trends --year 2026 --granularity month
+
+# 枚举查询
+ledger-cli meta categories
+ledger-cli meta accounts
+ledger-cli meta suggest --field all --keyword 早
+
+# 预算管理
+ledger-cli budget set --category 食品酒水 --amount 2000 --year 2026 --month 6
+ledger-cli budget check --year 2026 --month 6
+ledger-cli budget list --year 2026 --month 6
+
+# 模板管理
+ledger-cli template list
+ledger-cli template add --name 早餐 --amount 15 --category 食品酒水
+ledger-cli template update 1 --amount 20
+ledger-cli template delete 1
+ledger-cli template use 1
+
+# 标签管理
+ledger-cli tag list
+ledger-cli tag add --name 报销 --color "#ef4444"
+ledger-cli tag delete 1
+ledger-cli tag tx 1
+
+# 数据导出
+ledger-cli export --format json --category 食品酒水
+ledger-cli export --format csv
+
+# 其他
+ledger-cli misc health
+ledger-cli misc info
+ledger-cli misc analyze
+```
+
+编译：`go build -o bin/ledger-cli ./cmd/ledger-cli`
+交叉编译：`GOOS=linux GOARCH=arm64 go build -o bin/ledger-cli-linux-arm64 ./cmd/ledger-cli`
+
+### wget
+
+如果环境没有 curl，可使用 wget，详见 [references/wget.md](references/wget.md)。
 
 ---
 
@@ -269,3 +329,4 @@ curl http://127.0.0.1:5800/api/analyze
 - 重复记录会被拦截，设置 `"force": true` 跳过检查
 - 日期格式：`YYYY-MM-DD HH:MM:SS`，不传则使用当前时间
 - 删除为软删除，可通过 `/restore` 恢复
+
