@@ -29,7 +29,7 @@ const CHART_TYPES = [
 
 export default function Stats() {
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
+  const [year, setYear] = useState('all');  // 'all' 或具体年份
   const [groupBy, setGroupBy] = useState('category');
   const [chartType, setChartType] = useState('doughnut');
   const [excludeTagged, setExcludeTagged] = useState(true);
@@ -53,11 +53,12 @@ export default function Stats() {
 
   const loadData = async () => {
     try {
-      const params = { year, exclude_tagged: excludeTagged.toString() };
+      const params = { exclude_tagged: excludeTagged.toString() };
+      if (year !== 'all') params.year = year;
       const [s, st, t] = await Promise.all([
         api.getSummary(params),
         api.getStats({ ...params, group_by: groupBy }),
-        api.getTrends({ ...params, granularity: 'month' }),
+        api.getTrends({ ...params, granularity: 'month', year: year === 'all' ? now.getFullYear() : year }),
       ]);
       if (s.data) setSummary(s.data);
       if (st.data) setStats(st.data);
@@ -83,7 +84,7 @@ export default function Stats() {
       else if (groupBy === 'merchant') params.merchant = label;
       else if (groupBy === 'project') params.project = label;
       else if (groupBy === 'member') params.member = label;
-      if (year) {
+      if (year !== 'all') {
         params.start_date = `${year}-01-01`;
         params.end_date = `${year}-12-31`;
       }
@@ -172,8 +173,30 @@ export default function Stats() {
     } : {},
   });
 
-  const years = [];
-  for (let i = now.getFullYear() - 2; i <= now.getFullYear() + 1; i++) years.push(i);
+  const years = ['all'];
+  for (let i = now.getFullYear(); i >= now.getFullYear() - 2; i--) years.push(i);
+
+  // 明细排序
+  const [detailSortBy, setDetailSortBy] = useState('date');
+  const [detailSortOrder, setDetailSortOrder] = useState('DESC');
+
+  const sortedDetailTx = [...detailTx].sort((a, b) => {
+    let va = a[detailSortBy] ?? '', vb = b[detailSortBy] ?? '';
+    if (detailSortBy === 'amount') { va = Number(va); vb = Number(vb); }
+    if (detailSortBy === 'date') { va = va || ''; vb = vb || ''; }
+    if (va < vb) return detailSortOrder === 'ASC' ? -1 : 1;
+    if (va > vb) return detailSortOrder === 'ASC' ? 1 : -1;
+    return 0;
+  });
+
+  const handleDetailSort = (col) => {
+    if (detailSortBy === col) {
+      setDetailSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setDetailSortBy(col);
+      setDetailSortOrder('DESC');
+    }
+  };
 
   const renderChart = (data, isExpense) => {
     if (chartType === 'line') {
@@ -182,7 +205,17 @@ export default function Stats() {
       }
       return <Line data={lineChartData} options={{
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { boxWidth: 12 } },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ¥${Number(ctx.raw).toLocaleString()}`,
+            },
+          },
+        },
         scales: { y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } } },
       }} />;
     }
@@ -214,8 +247,8 @@ export default function Stats() {
             <label className="form-check-label small" htmlFor="excludeToggle">排除标记交易</label>
           </div>
           <select className="form-select form-select-sm" style={{ width: 'auto' }}
-            value={year} onChange={e => setYear(Number(e.target.value))}>
-            {years.map(y => <option key={y} value={y}>{y}年</option>)}
+            value={year} onChange={e => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
+            {years.map(y => <option key={y} value={y}>{y === 'all' ? '全部' : `${y}年`}</option>)}
           </select>
           <select className="form-select form-select-sm" style={{ width: 'auto' }}
             value={groupBy} onChange={e => setGroupBy(e.target.value)}>
@@ -350,10 +383,7 @@ export default function Stats() {
                       <tr key={`${idx}-detail`} style={{ backgroundColor: '#f8f9ff' }}>
                         <td colSpan="5" style={{ padding: 0 }}>
                           <div style={{ padding: '8px 12px' }}>
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                              <small className="fw-bold text-primary">
-                                <i className="bi bi-list-ul me-1"></i>{i.group} · {i.count}笔 · ¥{fmt(i.total)}
-                              </small>
+                            <div className="d-flex justify-content-end mb-1">
                               <button className="btn btn-sm btn-outline-secondary py-0 px-2"
                                 style={{ fontSize: 11 }}
                                 onClick={e => { e.stopPropagation(); setSelectedGroup(null); setDetailTx([]); }}>
@@ -368,10 +398,18 @@ export default function Stats() {
                               <div style={{ maxHeight: 250, overflowY: 'auto' }}>
                                 <table className="table table-sm mb-0" style={{ fontSize: 12 }}>
                                   <thead className="table-light">
-                                    <tr><th>日期</th><th>类型</th><th>金额</th><th>类别</th><th>账户</th><th>商家</th><th>备注</th></tr>
+                                    <tr>
+                                      <th style={{ cursor: 'pointer' }} onClick={() => handleDetailSort('date')}>日期</th>
+                                      <th style={{ cursor: 'pointer' }} onClick={() => handleDetailSort('type')}>类型</th>
+                                      <th style={{ cursor: 'pointer' }} onClick={() => handleDetailSort('amount')}>金额</th>
+                                      <th>类别</th>
+                                      <th>账户</th>
+                                      <th>商家</th>
+                                      <th>备注</th>
+                                    </tr>
                                   </thead>
                                   <tbody>
-                                    {detailTx.map(tx => (
+                                    {sortedDetailTx.map(tx => (
                                       <tr key={tx.id}>
                                         <td>{tx.date?.slice(0, 10)}</td>
                                         <td><span className={`badge ${tx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`} style={{ fontSize: 10 }}>{tx.type}</span></td>

@@ -117,6 +117,15 @@ export default function Transactions() {
     const currentTags = tx.tags || [];
     const isExcluded = currentTags.some(t => t.name === excludeTagName);
 
+    // 乐观更新：先改 UI，再发请求
+    const optimisticTags = isExcluded
+      ? currentTags.filter(t => t.name !== excludeTagName)
+      : [...currentTags, { id: -1, name: excludeTagName, color: '#6b7280' }];
+
+    setTxs(prev => prev.map(item =>
+      item.id === tx.id ? { ...item, tags: optimisticTags } : item
+    ));
+
     let excludeTag = tags.find(t => t.name === excludeTagName);
     if (!excludeTag) {
       try {
@@ -142,8 +151,14 @@ export default function Transactions() {
 
     try {
       await api.updateTransaction(tx.id, { tag_ids: newTagIds });
+      // 成功后刷新获取真实数据
       loadData();
-    } catch (e) {}
+    } catch (e) {
+      // 失败则回滚
+      setTxs(prev => prev.map(item =>
+        item.id === tx.id ? { ...item, tags: currentTags } : item
+      ));
+    }
   };
 
   const handleTagClick = (tagId) => {
