@@ -19,6 +19,14 @@ const GROUP_OPTIONS = [
 
 const CHART_COLORS = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#e11d48','#0891b2','#a855f7','#06b6d4','#d946ef','#22c55e'];
 
+const CHART_TYPES = [
+  { value: 'doughnut', label: '环形图', icon: '○' },
+  { value: 'pie', label: '饼图', icon: '◕' },
+  { value: 'bar', label: '柱状图', icon: '▃' },
+  { value: 'hbar', label: '水平柱状图', icon: '▎' },
+  { value: 'line', label: '趋势图', icon: '╱' },
+];
+
 export default function Stats() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -27,11 +35,15 @@ export default function Stats() {
   const [excludeTagged, setExcludeTagged] = useState(true);
   const [stats, setStats] = useState({ items: [] });
   const [summary, setSummary] = useState(null);
+  const [trendData, setTrendData] = useState([]);
 
-  // 展开明细相关 state
+  // 展开明细
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [detailTx, setDetailTx] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // 大额筛选
+  const [largeAmount, setLargeAmount] = useState('');
 
   useEffect(() => {
     loadData();
@@ -42,16 +54,18 @@ export default function Stats() {
   const loadData = async () => {
     try {
       const params = { year, exclude_tagged: excludeTagged.toString() };
-      const [s, st] = await Promise.all([
+      const [s, st, t] = await Promise.all([
         api.getSummary(params),
         api.getStats({ ...params, group_by: groupBy }),
+        api.getTrends({ ...params, granularity: 'month' }),
       ]);
       if (s.data) setSummary(s.data);
       if (st.data) setStats(st.data);
+      if (t.data) setTrendData(t.data.items || []);
     } catch (e) {}
   };
 
-  // 点击图表/表格行 → 展开明细（不跳转）
+  // 点击 → 展开明细
   const handleGroupClick = useCallback(async (label) => {
     if (!label) return;
     if (selectedGroup === label) {
@@ -62,13 +76,17 @@ export default function Stats() {
     setSelectedGroup(label);
     setDetailLoading(true);
     try {
-      const params = { limit: 50, year };
+      const params = { limit: 100 };
       if (groupBy === 'category') params.category = label;
       else if (groupBy === 'subcategory') params.subcategory = label;
       else if (groupBy === 'account') params.account = label;
       else if (groupBy === 'merchant') params.merchant = label;
       else if (groupBy === 'project') params.project = label;
       else if (groupBy === 'member') params.member = label;
+      if (year) {
+        params.start_date = `${year}-01-01`;
+        params.end_date = `${year}-12-31`;
+      }
       const res = await api.getTransactions(params);
       setDetailTx(res.data?.transactions || []);
     } catch (e) {
@@ -81,6 +99,11 @@ export default function Stats() {
   const items = stats.items || [];
   const expenseItems = items.filter(i => i.type === '支出').sort((a, b) => b.total - a.total);
   const incomeItems = items.filter(i => i.type === '收入').sort((a, b) => b.total - a.total);
+
+  // 大额交易筛选
+  const filteredItems = largeAmount
+    ? items.filter(i => i.total >= Number(largeAmount))
+    : items;
 
   const expenseChartData = {
     labels: expenseItems.map(i => i.group),
@@ -102,17 +125,9 @@ export default function Stats() {
     }],
   };
 
-  // 折线图数据：按月度趋势（需要按月数据）
-  const [trendData, setTrendData] = useState([]);
-  useEffect(() => {
-    if (groupBy !== 'month') return;
-    api.getTrends({ year, granularity: 'month' }).then(res => {
-      if (res.data) setTrendData(res.data.items || []);
-    }).catch(() => {});
-  }, [year, groupBy]);
-
+  // 趋势折线图：各类别月度趋势
   const lineChartData = (() => {
-    if (groupBy !== 'month' || !trendData.length) return null;
+    if (!trendData.length) return null;
     const months = [...new Set(trendData.map(i => i.period))].sort();
     const income = months.map(m => trendData.find(i => i.period === m && i.type === '收入')?.amount || 0);
     const expense = months.map(m => trendData.find(i => i.period === m && i.type === '支出')?.amount || 0);
@@ -128,13 +143,13 @@ export default function Stats() {
   const chartOptions = (isBar) => ({
     responsive: true,
     maintainAspectRatio: false,
-    onClick: (e, elements) => {
+    onClick: chartType !== 'line' ? (e, elements) => {
       if (elements.length > 0) {
         const idx = elements[0].index;
         const label = e.chart.data.labels[idx];
         handleGroupClick(label);
       }
-    },
+    } : undefined,
     plugins: {
       legend: {
         display: !isBar && chartType !== 'line',
@@ -160,32 +175,23 @@ export default function Stats() {
   const years = [];
   for (let i = now.getFullYear() - 2; i <= now.getFullYear() + 1; i++) years.push(i);
 
-  // 图表类型列表（包含新增的）
-  const CHART_TYPES = [
-    { value: 'doughnut', label: '环形图', icon: '○' },
-    { value: 'pie', label: '饼图', icon: '◕' },
-    { value: 'bar', label: '柱状图', icon: '▃' },
-    { value: 'hbar', label: '水平柱状图', icon: '▎' },
-    { value: 'line', label: '折线图', icon: '╱' },
-  ];
-
   const renderChart = (data, isExpense) => {
+    if (chartType === 'line') {
+      if (!lineChartData || !lineChartData.labels.length) {
+        return <div className="empty-state"><div className="icon">📈</div><p>暂无趋势数据</p></div>;
+      }
+      return <Line data={lineChartData} options={{
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } } },
+      }} />;
+    }
     if (!data || !data.datasets[0].data.length) {
       return <div className="empty-state"><div className="icon">📊</div><p>暂无数据</p></div>;
     }
-    const color = isExpense ? '#ef4444' : '#10b981';
     switch (chartType) {
       case 'hbar':
         return <Bar data={data} options={{ ...chartOptions(true), indexAxis: 'y' }} />;
-      case 'line':
-        if (lineChartData) {
-          return <Line data={lineChartData} options={{
-            ...chartOptions(false),
-            plugins: { ...chartOptions(false).plugins, legend: { display: true, position: 'top', labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } } },
-          }} />;
-        }
-        return <Bar data={data} options={chartOptions(true)} />;
       case 'bar':
         return <Bar data={data} options={chartOptions(true)} />;
       case 'pie':
@@ -195,7 +201,6 @@ export default function Stats() {
     }
   };
 
-  // 详情交易列表的选中组信息
   const selectedGroupInfo = items.find(i => i.group === selectedGroup);
 
   return (
@@ -206,9 +211,7 @@ export default function Stats() {
           <div className="form-check form-switch">
             <input className="form-check-input" type="checkbox" id="excludeToggle"
               checked={excludeTagged} onChange={e => setExcludeTagged(e.target.checked)} />
-            <label className="form-check-label small" htmlFor="excludeToggle">
-              排除标记交易
-            </label>
+            <label className="form-check-label small" htmlFor="excludeToggle">排除标记交易</label>
           </div>
           <select className="form-select form-select-sm" style={{ width: 'auto' }}
             value={year} onChange={e => setYear(Number(e.target.value))}>
@@ -224,38 +227,21 @@ export default function Stats() {
       {/* Summary Cards — 不跳转 */}
       {summary && (
         <div className="row g-3 mb-4">
-          <div className="col-md-3">
-            <div className="summary-card" style={{ borderLeft: '4px solid #10b981' }}>
-              <div className="card-body">
-                <div className="card-title">总收入</div>
-                <p className="amount" style={{ color: '#10b981' }}>¥ {fmt(summary.income)}</p>
+          {[
+            { label: '总收入', value: summary.income, color: '#10b981' },
+            { label: '总支出', value: summary.expense, color: '#ef4444' },
+            { label: '结余', value: summary.balance, color: '#4f46e5' },
+            { label: '笔数', value: summary.total_count, color: '#f59e0b' },
+          ].map(c => (
+            <div key={c.label} className="col-md-3">
+              <div className="summary-card" style={{ borderLeft: `4px solid ${c.color}` }}>
+                <div className="card-body">
+                  <div className="card-title">{c.label}</div>
+                  <p className="amount" style={{ color: c.color }}>¥ {fmt(c.value)}</p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="col-md-3">
-            <div className="summary-card" style={{ borderLeft: '4px solid #ef4444' }}>
-              <div className="card-body">
-                <div className="card-title">总支出</div>
-                <p className="amount" style={{ color: '#ef4444' }}>¥ {fmt(summary.expense)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="summary-card" style={{ borderLeft: '4px solid #4f46e5' }}>
-              <div className="card-body">
-                <div className="card-title">结余</div>
-                <p className="amount" style={{ color: '#4f46e5' }}>¥ {fmt(summary.balance)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="summary-card" style={{ borderLeft: '4px solid #f59e0b' }}>
-              <div className="card-body">
-                <div className="card-title">笔数</div>
-                <p className="amount" style={{ color: '#f59e0b' }}>{summary.total_count || 0}</p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
@@ -271,42 +257,59 @@ export default function Stats() {
       </div>
 
       {/* Charts */}
-      <div className="row g-3 mb-4">
-        <div className="col-lg-6">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title mb-3">
-                <i className="bi bi-arrow-up-circle text-danger"></i> 支出分布
-                <small className="text-muted ms-2">（点击查看详情）</small>
-              </h6>
-              <div className="chart-container">
-                {renderChart(expenseChartData, true)}
+      {chartType === 'line' ? (
+        <div className="card shadow-sm mb-4">
+          <div className="card-body">
+            <h6 className="card-title mb-3">
+              <i className="bi bi-graph-up text-primary"></i> 月度收支趋势
+            </h6>
+            <div className="chart-container">
+              {renderChart(null, false)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="row g-3 mb-4">
+          <div className="col-lg-6">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h6 className="card-title mb-3">
+                  <i className="bi bi-arrow-up-circle text-danger"></i> 支出分布
+                  <small className="text-muted ms-2">（点击查看详情）</small>
+                </h6>
+                <div className="chart-container">{renderChart(expenseChartData, true)}</div>
+              </div>
+            </div>
+          </div>
+          <div className="col-lg-6">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h6 className="card-title mb-3">
+                  <i className="bi bi-arrow-down-circle text-success"></i> 收入分布
+                  <small className="text-muted ms-2">（点击查看详情）</small>
+                </h6>
+                <div className="chart-container">{renderChart(incomeChartData, false)}</div>
               </div>
             </div>
           </div>
         </div>
-        <div className="col-lg-6">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title mb-3">
-                <i className="bi bi-arrow-down-circle text-success"></i> 收入分布
-                <small className="text-muted ms-2">（点击查看详情）</small>
-              </h6>
-              <div className="chart-container">
-                {renderChart(incomeChartData, false)}
-              </div>
-            </div>
-          </div>
-        </div>
+      )}
+
+      {/* 大额筛选 */}
+      <div className="d-flex align-items-center gap-2 mb-2">
+        <small className="text-muted">筛选金额 ≥</small>
+        <input type="number" className="form-control form-control-sm" style={{ width: 120 }}
+          placeholder="如 1000" value={largeAmount} onChange={e => setLargeAmount(e.target.value)} />
+        {largeAmount && <span className="badge bg-warning text-dark">筛选: {filteredItems.length} 项</span>}
       </div>
 
       {/* Data Table — 点击行展开明细 */}
       <div className="card shadow-sm mb-3">
         <div className="card-body">
           <h6 className="card-title mb-3"><i className="bi bi-table"></i> 数据明细（点击行查看详情）</h6>
-          <div className="table-responsive">
-            <table className="table stats-table">
-              <thead>
+          <div className="table-responsive" style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <table className="table stats-table table-hover">
+              <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
                 <tr>
                   <th>分组</th>
                   <th>类型</th>
@@ -316,9 +319,9 @@ export default function Stats() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {(largeAmount ? filteredItems : items).length === 0 ? (
                   <tr><td colSpan="5" className="text-center text-muted py-3">暂无数据</td></tr>
-                ) : items.map((i, idx) => {
+                ) : (largeAmount ? filteredItems : items).map((i, idx) => {
                   const totalByType = items.filter(x => x.type === i.type).reduce((s, x) => s + x.total, 0);
                   const pct = totalByType > 0 ? ((i.total / totalByType) * 100).toFixed(1) : '0.0';
                   const isSelected = selectedGroup === i.group;
@@ -353,13 +356,8 @@ export default function Stats() {
         <div className="card shadow-sm border-primary mb-3">
           <div className="card-header d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
             <h6 className="mb-0">
-              <i className="bi bi-list-ul me-2"></i>
-              {selectedGroup}
-              {selectedGroupInfo && (
-                <span className="text-muted ms-2">
-                  · {selectedGroupInfo.count}笔 · ¥{fmt(selectedGroupInfo.total)}
-                </span>
-              )}
+              <i className="bi bi-list-ul me-2"></i>{selectedGroup}
+              {selectedGroupInfo && <span className="text-muted ms-2">· {selectedGroupInfo.count}笔 · ¥{fmt(selectedGroupInfo.total)}</span>}
             </h6>
             <button className="btn btn-sm btn-outline-secondary" onClick={() => { setSelectedGroup(null); setDetailTx([]); }}>
               <i className="bi bi-x"></i> 收起
@@ -371,18 +369,10 @@ export default function Stats() {
             ) : detailTx.length === 0 ? (
               <div className="text-center text-muted py-4">暂无交易记录</div>
             ) : (
-              <div className="table-responsive">
+              <div className="table-responsive" style={{ maxHeight: 300, overflowY: 'auto' }}>
                 <table className="table table-sm table-hover mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th>日期</th>
-                      <th>类型</th>
-                      <th>金额</th>
-                      <th>类别</th>
-                      <th>账户</th>
-                      <th>商家</th>
-                      <th>备注</th>
-                    </tr>
+                  <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
+                    <tr><th>日期</th><th>类型</th><th>金额</th><th>类别</th><th>账户</th><th>商家</th><th>备注</th></tr>
                   </thead>
                   <tbody>
                     {detailTx.map(tx => (
@@ -398,11 +388,6 @@ export default function Stats() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            )}
-            {detailTx.length > 0 && (
-              <div className="text-center py-2 border-top">
-                <small className="text-muted">共 {selectedGroupInfo?.count || detailTx.length} 笔，合计 ¥{fmt(selectedGroupInfo?.total)}</small>
               </div>
             )}
           </div>

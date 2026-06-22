@@ -10,7 +10,7 @@ test.describe('导航栏', () => {
 
   test('导航链接全部可点击', async ({ page }) => {
     await page.goto('/');
-    const navLinks = ['概览', '交易', '预算', '类别', '统计', '导入', '导出'];
+    const navLinks = ['概览', '交易', '预算', '标签', '统计', '导入', '导出'];
     for (const label of navLinks) {
       const link = page.locator('.nav-link', { hasText: label });
       await expect(link).toBeVisible();
@@ -228,10 +228,10 @@ test.describe('预算页', () => {
   });
 });
 
-test.describe('类别页', () => {
+test.describe('标签页', () => {
   test('页面加载', async ({ page }) => {
     await page.goto('/categories');
-    await expect(page.locator('body')).toContainText(/类别|标签/);
+    await expect(page.locator('body')).toContainText(/标签/);
   });
 });
 
@@ -255,10 +255,9 @@ test.describe('统计页', () => {
 
   test('图表类型选择器', async ({ page }) => {
     await page.goto('/stats');
-    // 应该有多种图表类型按钮
     await expect(page.locator('body')).toContainText('环形图');
     await expect(page.locator('body')).toContainText('水平柱状图');
-    await expect(page.locator('body')).toContainText('折线图');
+    await expect(page.locator('body')).toContainText('趋势图');
   });
 
   test('排除标记交易 toggle', async ({ page }) => {
@@ -276,18 +275,12 @@ test.describe('统计页', () => {
   test('图表类型切换', async ({ page }) => {
     await page.goto('/stats');
     await page.waitForTimeout(1000);
-    // 点击水平柱状图
     const hbarBtn = page.locator('button', { hasText: '水平柱状图' });
-    if (await hbarBtn.count() > 0) {
-      await hbarBtn.click();
-      await page.waitForTimeout(500);
-    }
-    // 点击折线图
-    const lineBtn = page.locator('button', { hasText: '折线图' });
-    if (await lineBtn.count() > 0) {
-      await lineBtn.click();
-      await page.waitForTimeout(500);
-    }
+    if (await hbarBtn.count() > 0) await hbarBtn.click();
+    await page.waitForTimeout(500);
+    const lineBtn = page.locator('button', { hasText: '趋势图' });
+    if (await lineBtn.count() > 0) await lineBtn.click();
+    await page.waitForTimeout(500);
   });
 });
 
