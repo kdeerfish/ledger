@@ -32,6 +32,8 @@ from flask_cors import CORS
 import ledger_modules.db as db_module
 import ledger_modules.transactions as tx_module
 import ledger_modules.budgets as budget_module
+import ledger_modules.import_engine as import_engine
+import ledger_modules.export_engine as export_engine
 from ledger_modules.config import get_db_path, load_env_file
 
 load_env_file()
@@ -47,7 +49,7 @@ def sync_db_path():
 sync_db_path()
 db_module.init_db()
 
-app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
+app = Flask(__name__, static_folder=None)
 
 
 # ─── _method 覆盖中间件（WSGI 层，在路由匹配之前执行）───
@@ -111,6 +113,23 @@ def api_success(data=None, message=None):
     if message:
         result['message'] = message
     return jsonify(result)
+
+
+def get_exclude_clause(exclude_tagged, table_alias='t'):
+    """
+    返回排除"排除统计"标签的 SQL 子句和额外参数
+
+    返回 (clause, extra_params)
+    clause 为空字符串表示不排除
+    """
+    if not exclude_tagged:
+        return '', []
+    clause = f""" AND {table_alias}.id NOT IN (
+        SELECT tt.transaction_id FROM transaction_tags tt
+        JOIN tags tg ON tt.tag_id = tg.id
+        WHERE tg.name = '排除统计'
+    )"""
+    return clause, []
 
 
 def require_json(f):
@@ -815,6 +834,7 @@ def get_suggestions():
 def get_summary():
     sync_db_path()
     year, month, start_date, end_date = parse_date_params()
+    exclude_tagged = request.args.get('exclude_tagged', 'false').lower() == 'true'
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -832,6 +852,13 @@ def get_summary():
     if end_date:
         where += " AND trans_date <= ?"
         params.append(end_date)
+
+    # 排除标记交易
+    if exclude_tagged:
+        where += """ AND id NOT IN (
+            SELECT tt.transaction_id FROM transaction_tags tt
+            JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = '排除统计'
+        )"""
 
     c.execute(f"SELECT type, SUM(amount), COUNT(*) FROM transactions {where} GROUP BY type", params)
     rows = c.fetchall()
@@ -869,7 +896,8 @@ def get_stats():
     sync_db_path()
     year, month, start_date, end_date = parse_date_params()
     group_by = request.args.get('group_by', 'category')
-    sub_group = request.args.get('sub_group', '')  # 二级分组
+    sub_group = request.args.get('sub_group', '')
+    exclude_tagged = request.args.get('exclude_tagged', 'false').lower() == 'true'
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -877,6 +905,14 @@ def get_stats():
     params = []
     time_clauses = build_time_where(params, 't.trans_date')
     where_clauses.extend(time_clauses)
+
+    # 排除标记交易
+    if exclude_tagged:
+        where_clauses.append("""t.id NOT IN (
+            SELECT tt.transaction_id FROM transaction_tags tt
+            JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = '排除统计'
+        )""")
+
     where_sql = " AND ".join(where_clauses)
 
     if group_by == 'category':
@@ -966,7 +1002,8 @@ def get_trends():
     """获取趋势数据（日/周/月粒度）"""
     sync_db_path()
     year = request.args.get('year', type=int) or datetime.now().year
-    granularity = request.args.get('granularity', 'month')  # day, week, month
+    granularity = request.args.get('granularity', 'month')
+    exclude_tagged = request.args.get('exclude_tagged', 'false').lower() == 'true'
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -978,10 +1015,17 @@ def get_trends():
     else:
         fmt = '%Y-%m'
 
+    exclude_clause = ""
+    if exclude_tagged:
+        exclude_clause = """ AND id NOT IN (
+            SELECT tt.transaction_id FROM transaction_tags tt
+            JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = '排除统计'
+        )"""
+
     c.execute(f'''SELECT strftime('{fmt}', trans_date) as period,
                          type, SUM(amount), COUNT(*)
                   FROM transactions
-                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ?
+                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ? {exclude_clause}
                   GROUP BY period, type
                   ORDER BY period''', (str(year),))
     rows = c.fetchall()
@@ -991,7 +1035,7 @@ def get_trends():
                          SUM(CASE WHEN type='收入' THEN amount ELSE 0 END),
                          SUM(CASE WHEN type='支出' THEN amount ELSE 0 END)
                   FROM transactions
-                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ?
+                  WHERE is_deleted = 0 AND strftime('%Y', trans_date) = ? {exclude_clause}
                   GROUP BY period
                   ORDER BY period''', (str(year),))
     cumulative = c.fetchall()
@@ -1267,6 +1311,239 @@ def db_info():
         'tag_count': tag_count,
         'db_path': DB_PATH,
     })
+
+
+# ════════════════════════════════════════════════════════
+# 智能导入 API
+# ════════════════════════════════════════════════════════
+
+@app.route('/api/import/preview', methods=['POST'])
+def import_preview():
+    """上传 CSV，返回映射建议 + 预览数据"""
+    sync_db_path()
+    import_engine.DB_PATH = DB_PATH
+
+    if 'file' not in request.files:
+        return api_error('请上传 CSV 文件')
+
+    file = request.files['file']
+    if not file.filename:
+        return api_error('文件名为空')
+
+    if not file.filename.lower().endswith('.csv'):
+        return api_error('只支持 CSV 文件')
+
+    file_bytes = file.read()
+
+    # 限制文件大小 (10MB)
+    if len(file_bytes) > 10 * 1024 * 1024:
+        return api_error('文件过大，最大支持 10MB')
+
+    # 用户提供的映射（可选）
+    user_mapping = None
+    mapping_str = request.form.get('mapping')
+    if mapping_str:
+        try:
+            user_mapping = json.loads(mapping_str)
+        except Exception:
+            pass
+
+    result = import_engine.preview_import(
+        file_bytes,
+        user_mapping=user_mapping,
+        filename=file.filename
+    )
+
+    if 'error' in result:
+        return api_error(result['error'])
+
+    return api_success(result)
+
+
+@app.route('/api/import/execute', methods=['POST'])
+def import_execute():
+    """确认后执行导入"""
+    sync_db_path()
+    import_engine.DB_PATH = DB_PATH
+
+    if 'file' not in request.files:
+        return api_error('请上传 CSV 文件')
+
+    file = request.files['file']
+    if not file.filename:
+        return api_error('文件名为空')
+
+    file_bytes = file.read()
+
+    # 限制文件大小
+    if len(file_bytes) > 10 * 1024 * 1024:
+        return api_error('文件过大，最大支持 10MB')
+
+    # 获取映射
+    mapping_str = request.form.get('mapping', '{}')
+    try:
+        mapping = json.loads(mapping_str)
+    except Exception:
+        return api_error('映射参数格式错误')
+
+    if not mapping:
+        return api_error('请提供列映射')
+
+    # 获取标签
+    tags_str = request.form.get('tags', '[]')
+    try:
+        tags = json.loads(tags_str)
+    except Exception:
+        tags = []
+
+    # 是否跳过重复
+    skip_duplicates = request.form.get('skip_duplicates', 'true').lower() == 'true'
+
+    # 数据来源
+    batch_source = request.form.get('source')
+
+    result = import_engine.execute_import(
+        file_bytes=file_bytes,
+        mapping=mapping,
+        tags=tags,
+        skip_duplicates=skip_duplicates,
+        filename=file.filename,
+        batch_source=batch_source
+    )
+
+    if 'error' in result:
+        return api_error(result['error'])
+
+    return api_success(result, message=f"导入完成: {result['imported']} 条")
+
+
+@app.route('/api/import/batches', methods=['GET'])
+def get_import_batches():
+    """获取导入批次列表"""
+    sync_db_path()
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT id, source, filename, row_count, mapping, tags, created_at
+                 FROM import_batches ORDER BY created_at DESC''')
+    rows = c.fetchall()
+    conn.close()
+
+    batches = []
+    for r in rows:
+        batches.append({
+            'id': r[0], 'source': r[1], 'filename': r[2],
+            'row_count': r[3], 'mapping': r[4], 'tags': r[5],
+            'created_at': r[6],
+        })
+
+    return api_success(batches)
+
+
+# ════════════════════════════════════════════════════════
+# 增强导出 API
+# ════════════════════════════════════════════════════════
+
+@app.route('/api/export/preview', methods=['GET'])
+def export_preview():
+    """获取导出预览（记录数、日期范围）"""
+    sync_db_path()
+    export_engine.DB_PATH = DB_PATH
+
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    category = request.args.get('category')
+    account = request.args.get('account')
+    type_ = request.args.get('type')
+    tag_ids_str = request.args.get('tag_ids')
+    tag_ids = None
+    if tag_ids_str:
+        try:
+            tag_ids = [int(x) for x in tag_ids_str.split(',')]
+        except Exception:
+            pass
+
+    result = export_engine.get_export_preview(
+        start_date=start_date, end_date=end_date,
+        category=category, account=account,
+        type_=type_, tag_ids=tag_ids
+    )
+    return api_success(result)
+
+
+@app.route('/api/export/v2', methods=['GET'])
+def export_v2():
+    """增强导出（支持 Excel/PDF/CSV/JSON）"""
+    sync_db_path()
+    export_engine.DB_PATH = DB_PATH
+
+    format_type = request.args.get('format', 'excel')
+    if format_type not in ('excel', 'csv', 'pdf', 'json'):
+        return api_error('不支持的格式，可选: excel, csv, pdf, json')
+
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    category = request.args.get('category')
+    account = request.args.get('account')
+    type_ = request.args.get('type')
+    tag_ids_str = request.args.get('tag_ids')
+    tag_ids = None
+    if tag_ids_str:
+        try:
+            tag_ids = [int(x) for x in tag_ids_str.split(',')]
+        except Exception:
+            pass
+
+    # Sheet 选项
+    sheets_str = request.args.get('sheets', '明细,月度汇总,分类统计,账户统计')
+    sheets = [s.strip() for s in sheets_str.split(',')]
+
+    # 获取数据
+    data = export_engine.get_export_data(
+        start_date=start_date, end_date=end_date,
+        category=category, account=account,
+        type_=type_, tag_ids=tag_ids
+    )
+
+    if data['count'] == 0:
+        return api_error('没有数据可导出')
+
+    # 生成临时文件
+    import tempfile
+    tmp_dir = tempfile.mkdtemp()
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+    format_map = {
+        'excel': ('xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+        'csv': ('csv', 'text/csv'),
+        'json': ('json', 'application/json'),
+        'pdf': ('pdf', 'application/pdf'),
+    }
+
+    ext, mime = format_map[format_type]
+    filename = f'ledger_export_{timestamp}.{ext}'
+    output_path = os.path.join(tmp_dir, filename)
+
+    try:
+        if format_type == 'excel':
+            export_engine.export_excel(data, output_path, sheets=sheets)
+        elif format_type == 'csv':
+            import_compatible = request.args.get('import_compatible', 'true').lower() == 'true'
+            export_engine.export_csv(data, output_path, import_compatible=import_compatible)
+        elif format_type == 'json':
+            export_engine.export_json(data, output_path)
+        elif format_type == 'pdf':
+            title = request.args.get('title', '收支报告')
+            export_engine.export_pdf(data, output_path, title=title)
+    except Exception as e:
+        return api_error(f'导出失败: {str(e)}')
+
+    from flask import send_file
+    return send_file(
+        output_path,
+        mimetype=mime,
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 # ─── 启动 ──────────────────────────────────────────

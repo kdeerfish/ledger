@@ -258,15 +258,98 @@ curl "$BASE_URL/api/tags/1/transactions?limit=20"
 
 ---
 
-## 数据导出
+## 智能导入
+
+### 上传预览
+
+上传 CSV 文件，自动推断列映射，返回预览数据：
 
 ```bash
-# JSON 格式
-curl "$BASE_URL/api/export?format=json&category=食品酒水&start_date=2026-01-01&end_date=2026-06-30"
-
-# CSV 格式
-curl "$BASE_URL/api/export?format=csv"
+curl -X POST $BASE_URL/api/import/preview \
+  -F "file=@/path/to/data.csv"
 ```
+
+返回：
+- `detected_source`：检测到的数据来源（支付宝/微信/随手记/银行）
+- `headers`：CSV 表头列表
+- `mapping`：列映射建议（含置信度）
+- `unmapped_columns`：未映射的列（将存入 extra_data）
+- `preview_rows`：前5行转换后数据
+- `total_rows`：总行数
+- `suggested_tags`：建议标签
+- `duplicate_estimate`：预估重复数
+
+### 执行导入
+
+```bash
+curl -X POST $BASE_URL/api/import/execute \
+  -F "file=@/path/to/data.csv" \
+  -F 'mapping={"交易时间":"date","支付金额":"amount","交易对方":"merchant"}' \
+  -F 'tags=["支付宝导入","2024-06"]' \
+  -F "skip_duplicates=true" \
+  -F "source=支付宝"
+```
+
+参数：
+- `file`：CSV 文件（必填）
+- `mapping`：列映射 JSON（必填，key=CSV列名，value=目标字段）
+- `tags`：标签数组 JSON（可选）
+- `skip_duplicates`：是否跳过重复（可选，默认 true）
+- `source`：数据来源（可选，不传则自动检测）
+
+目标字段：`type`（交易类型）、`amount`（金额）、`date`（日期）、`category`（类别）、`subcategory`（子类别）、`account`（账户）、`merchant`（商家）、`member`（成员）、`project`（项目）、`note`（备注）
+
+返回：`imported`（成功数）、`skipped`（跳过数）、`duplicates_found`（重复数）、`batch_id`（批次ID）、`tags_applied`
+
+### 导入批次历史
+
+```bash
+curl $BASE_URL/api/import/batches
+```
+
+### 智能映射说明
+
+导入引擎会自动：
+1. **检测编码**：UTF-8 / GBK / GB2312
+2. **推断列名**：支付宝"交易对方"→merchant，微信"支付方式"→account 等
+3. **标准化值**：根据数据库已有数据自动归类（如"招行"→"招商银行"）
+4. **管理别名**：映射结果自动学习为别名，下次导入更准确
+5. **保留未映射数据**：未匹配的列值存入 `extra_data` 字段，不丢失
+6. **自动打标签**：来源标签（"微信导入"）+ 时间标签（"2024-06"）
+
+---
+
+## 增强导出
+
+### 导出预览
+
+```bash
+curl "$BASE_URL/api/export/preview?start_date=2024-01-01&end_date=2024-06-30"
+```
+
+返回：`count`（记录数）、`date_range`、`income`、`expense`、`balance`
+
+### 导出文件
+
+```bash
+# Excel（多 Sheet：明细+月度汇总+分类统计+账户统计）
+curl "$BASE_URL/api/export/v2?format=excel&start_date=2024-01-01" -o export.xlsx
+
+# CSV（与导入格式兼容，可直接重新导入）
+curl "$BASE_URL/api/export/v2?format=csv" -o export.csv
+
+# PDF（月度报告）
+curl "$BASE_URL/api/export/v2?format=pdf&title=2024上半年报告" -o report.pdf
+
+# JSON
+curl "$BASE_URL/api/export/v2?format=json" -o export.json
+```
+
+筛选参数：`start_date`、`end_date`、`category`、`account`、`type`（支出/收入）、`tag_ids`（逗号分隔）
+
+Excel/PDF 额外参数：`sheets`（逗号分隔：明细,月度汇总,分类统计,账户统计）
+
+CSV 额外参数：`import_compatible`（true=列名与导入一致，默认 true）
 
 ---
 
@@ -297,3 +380,5 @@ curl $BASE_URL/api/analyze
 - 重复记录会被拦截，设置 `"force": true` 跳过检查
 - 日期格式：`YYYY-MM-DD HH:MM:SS`，不传则使用当前时间
 - 删除为软删除，可通过 `/restore` 恢复
+- 导入文件大小限制：10MB
+- CSV 导出默认与导入格式兼容，可直接重新导入

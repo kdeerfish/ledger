@@ -8,7 +8,7 @@ from .config import get_db_path
 DB_PATH = get_db_path()
 
 # 数据库版本管理
-DB_VERSION = 2
+DB_VERSION = 3
 
 
 def _get_db_version(c):
@@ -180,6 +180,42 @@ def init_db():
         if 'idx_trans_type' not in indexes:
             c.execute("CREATE INDEX idx_trans_type ON transactions(type)")
         c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('db_version', '2')")
+
+    if current_version < 3:
+        # 迁移到 v3: 导入批次追踪 + extra_data 兜底字段
+        c.execute('''CREATE TABLE IF NOT EXISTS import_batches (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            source      TEXT NOT NULL,
+            filename    TEXT,
+            row_count   INTEGER DEFAULT 0,
+            mapping     TEXT,
+            tags        TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )''')
+
+        # transactions 新增列
+        c.execute("PRAGMA table_info(transactions)")
+        tx_cols = [row[1] for row in c.fetchall()]
+        if 'extra_data' not in tx_cols:
+            try:
+                c.execute('ALTER TABLE transactions ADD COLUMN extra_data TEXT')
+            except Exception:
+                pass
+        if 'batch_id' not in tx_cols:
+            try:
+                c.execute('ALTER TABLE transactions ADD COLUMN batch_id INTEGER')
+            except Exception:
+                pass
+
+        # 新索引
+        c.execute("PRAGMA index_list(transactions)")
+        indexes = [row[2] for row in c.fetchall()]
+        if 'idx_trans_merchant' not in indexes:
+            c.execute("CREATE INDEX idx_trans_merchant ON transactions(merchant)")
+        if 'idx_trans_account' not in indexes:
+            c.execute("CREATE INDEX idx_trans_account ON transactions(account)")
+
+        c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('db_version', '3')")
 
     conn.commit()
     conn.close()

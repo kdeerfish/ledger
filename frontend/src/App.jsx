@@ -5,6 +5,8 @@ import Transactions from './pages/Transactions';
 import Budgets from './pages/Budgets';
 import Categories from './pages/Categories';
 import Stats from './pages/Stats';
+import Import from './pages/Import';
+import Export from './pages/Export';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
@@ -19,6 +21,8 @@ function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/import" element={<Import />} />
+          <Route path="/export" element={<Export />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

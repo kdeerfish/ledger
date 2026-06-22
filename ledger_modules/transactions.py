@@ -200,74 +200,14 @@ def hard_delete_transaction(tid, confirm=False):
 
 
 def import_csv(csv_file):
-    if not os.path.exists(csv_file):
-        _safe_print(f"❌ 文件不存在: {csv_file}")
-        return False
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    total, imported, skipped = 0, 0, 0
+    """
+    向后兼容的 CSV 导入函数
 
-    # 先收集所有行，按日期排序后再插入（确保最早的数据 ID 最小）
-    rows_to_import = []
-
-    with open(csv_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            total += 1
-            type_raw = row.get('交易类型', '').strip()
-            if type_raw == '支出':
-                tx_type = '支出'
-            elif type_raw == '收入':
-                tx_type = '收入'
-            else:
-                skipped += 1
-                continue
-            try:
-                amount = float(row.get('金额', 0))
-            except Exception:
-                amount = 0.0
-            if amount == 0:
-                skipped += 1
-                continue
-            raw_date = row.get('日期', '').strip()
-            if not raw_date:
-                skipped += 1
-                continue
-            try:
-                dt = datetime.strptime(raw_date, '%Y/%m/%d %H:%M')
-                trans_date = dt.strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
-                try:
-                    dt = datetime.strptime(raw_date, '%Y/%m/%d')
-                    trans_date = dt.strftime('%Y-%m-%d 00:00:00')
-                except Exception:
-                    _safe_print(f"⚠️ 日期格式错误: {raw_date}")
-                    skipped += 1
-                    continue
-            category = row.get('类别', '').strip()
-            subcategory = row.get('子类别', '').strip()
-            account = row.get('账户', '').strip()
-            project = row.get('项目', '').strip()
-            member = row.get('成员', '').strip()
-            merchant = row.get('商家', '').strip()
-            note = row.get('备注', '').strip()
-            rows_to_import.append((tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
-
-    # 按日期升序排序（最早在前）
-    rows_to_import.sort(key=lambda x: x[9])
-
-    # 按排序后的顺序插入
-    for tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date in rows_to_import:
-        c.execute('''INSERT INTO transactions
-            (type, amount, category, subcategory, account, project, member, merchant, note, trans_date, is_deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)''',
-            (tx_type, amount, category, subcategory, account, project, member, merchant, note, trans_date))
-        imported += 1
-
-    conn.commit()
-    conn.close()
-    _safe_print(f"✅ 导入完成: 总行 {total}, 成功 {imported}, 跳过 {skipped}")
-    return True
+    内部转调 import_engine.import_csv_compat()
+    """
+    from . import import_engine
+    import_engine.DB_PATH = DB_PATH
+    return import_engine.import_csv_compat(csv_file)
 
 
 def reconcile_guide():

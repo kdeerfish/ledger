@@ -110,4 +110,27 @@ export const api = {
   getInfo() {
     return request('/info');
   },
+
+  // 导入
+  importPreview(formData) {
+    return fetch(BASE + '/import/preview', { method: 'POST', body: formData })
+      .then(res => res.json());
+  },
+  importExecute(formData) {
+    return fetch(BASE + '/import/execute', { method: 'POST', body: formData })
+      .then(res => res.json());
+  },
+  getImportBatches() {
+    return request('/import/batches');
+  },
+
+  // 导出
+  getExportPreview(params) {
+    const q = new URLSearchParams(params || {}).toString();
+    return request('/export/preview' + (q ? '?' + q : ''));
+  },
+  getExportDownloadUrl(params) {
+    const q = new URLSearchParams(params || {}).toString();
+    return BASE + '/export/v2?' + q;
+  },
 };

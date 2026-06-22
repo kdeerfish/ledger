@@ -541,6 +541,69 @@ class TestErrorHandling:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 测试：排除标记交易
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestExcludeTagged:
+    def _insert_and_exclude(self, client):
+        """插入数据，给一笔交易打上"排除统计"标签"""
+        db_path = os.environ.get("LEDGER_DB_PATH", TEST_DB)
+        _insert_sample_data(db_path)
+
+        # 创建"排除统计"标签
+        resp = client.post("/api/tags", json={"name": "排除统计", "color": "#6b7280"})
+        tag_id = _get_json(resp)["data"]["id"]
+
+        # 给第一笔交易打标签
+        resp = client.get("/api/transactions?limit=1")
+        tx_id = _get_json(resp)["data"]["transactions"][0]["id"]
+        client.put(f"/api/transactions/{tx_id}", json={"tag_ids": [tag_id]})
+
+        return tag_id
+
+    def test_summary_exclude_tagged(self, client, reset_db):
+        self._insert_and_exclude(client)
+
+        # 不排除
+        resp = client.get("/api/summary?exclude_tagged=false")
+        data = _get_json(resp)["data"]
+        assert data["total_count"] == 4
+
+        # 排除
+        resp = client.get("/api/summary?exclude_tagged=true")
+        data = _get_json(resp)["data"]
+        assert data["total_count"] == 3
+
+    def test_stats_exclude_tagged(self, client, reset_db):
+        self._insert_and_exclude(client)
+
+        # 不排除
+        resp = client.get("/api/stats?group_by=category&exclude_tagged=false")
+        data = _get_json(resp)["data"]
+        total_items = len(data["items"])
+        assert total_items >= 3
+
+        # 排除
+        resp = client.get("/api/stats?group_by=category&exclude_tagged=true")
+        data_ex = _get_json(resp)["data"]
+        assert len(data_ex["items"]) <= total_items
+
+    def test_trends_exclude_tagged(self, client, reset_db):
+        self._insert_and_exclude(client)
+
+        resp1 = client.get("/api/trends?year=2026&granularity=month&exclude_tagged=false")
+        resp2 = client.get("/api/trends?year=2026&granularity=month&exclude_tagged=true")
+        d1 = _get_json(resp1)["data"]
+        d2 = _get_json(resp2)["data"]
+
+        # 排除后总金额应该更少
+        total1 = sum(i["amount"] for i in d1["items"])
+        total2 = sum(i["amount"] for i in d2["items"])
+        assert total2 <= total1
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 清理
 # ═══════════════════════════════════════════════════════════════════════════════
 

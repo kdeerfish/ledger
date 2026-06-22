@@ -1,30 +1,55 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { Bar, Line, Doughnut, Pie } from 'react-chartjs-2';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { api } from '../api';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const year = new Date().getFullYear();
   const [summary, setSummary] = useState(null);
   const [trendData, setTrendData] = useState({ items: [], cumulative: [] });
   const [categoryStats, setCategoryStats] = useState([]);
   const [recentTx, setRecentTx] = useState([]);
   const [selectedYear, setSelectedYear] = useState(year);
+  const [excludeTagged, setExcludeTagged] = useState(true);
+
+  // 展开明细
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [detailTx, setDetailTx] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [selectedYear]);
+  }, [selectedYear, excludeTagged]);
+
+  // 饼图点击 → 展开明细（不跳转）
+  const handleCategoryClick = useCallback(async (label) => {
+    if (!label) return;
+    if (selectedCategory === label) {
+      setSelectedCategory(null);
+      setDetailTx([]);
+      return;
+    }
+    setSelectedCategory(label);
+    setDetailLoading(true);
+    try {
+      const res = await api.getTransactions({ category: label, limit: 50, year: selectedYear });
+      setDetailTx(res.data?.transactions || []);
+    } catch (e) {
+      setDetailTx([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [selectedCategory, selectedYear]);
 
   const loadData = async () => {
     try {
+      const params = { year: selectedYear, exclude_tagged: excludeTagged.toString() };
       const [s, t, cs, r] = await Promise.all([
-        api.getSummary({ year: selectedYear }),
-        api.getTrends({ year: selectedYear, granularity: 'month' }),
-        api.getStats({ year: selectedYear, group_by: 'category' }),
+        api.getSummary(params),
+        api.getTrends({ ...params, granularity: 'month' }),
+        api.getStats({ ...params, group_by: 'category' }),
         api.getTransactions({ limit: 5 }),
       ]);
       if (s.data) setSummary(s.data);
@@ -96,10 +121,19 @@ export default function Dashboard() {
     <div className="page-content">
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h4 className="mb-0"><i className="bi bi-speedometer2"></i> 收支概览</h4>
-        <select className="form-select form-select-sm" style={{ width: 'auto' }}
-          value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
-          {years.map(y => <option key={y} value={y}>{y}年</option>)}
-        </select>
+        <div className="d-flex gap-2 align-items-center">
+          <div className="form-check form-switch">
+            <input className="form-check-input" type="checkbox" id="dashboardExcludeToggle"
+              checked={excludeTagged} onChange={e => setExcludeTagged(e.target.checked)} />
+            <label className="form-check-label small" htmlFor="dashboardExcludeToggle">
+              排除标记交易
+            </label>
+          </div>
+          <select className="form-select form-select-sm" style={{ width: 'auto' }}
+            value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
+            {years.map(y => <option key={y} value={y}>{y}年</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -155,9 +189,7 @@ export default function Dashboard() {
               <div className="chart-container">
                 {pieChart.datasets[0].data.length > 0 ? (
                   <Doughnut data={pieChart} options={{
-                    ...chartOpts((label) => {
-                      navigate(`/transactions?category=${encodeURIComponent(label)}`);
-                    }),
+                    ...chartOpts((label) => handleCategoryClick(label)),
                     plugins: { legend: { position: 'right', labels: { boxWidth: 10, padding: 6, font: { size: 10 } } } },
                     cutout: '55%',
                   }} />
@@ -194,9 +226,9 @@ export default function Dashboard() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h6 className="mb-0"><i className="bi bi-clock-history"></i> 最近交易</h6>
-                <button className="btn btn-sm btn-outline-ledger" onClick={() => navigate('/transactions')}>
+                <a href="/transactions" className="btn btn-sm btn-outline-ledger">
                   查看全部
-                </button>
+                </a>
               </div>
               <div>
                 {recentTx.length === 0 ? (
@@ -204,7 +236,7 @@ export default function Dashboard() {
                 ) : recentTx.map(t => (
                   <div key={t.id} className="d-flex justify-content-between align-items-center py-2 border-bottom"
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/transactions?search=${t.id}`)}>
+                    onClick={() => {}}>
                     <div>
                       <small className="text-muted">{t.date?.slice(0, 10)}</small>
                       <div>
@@ -223,6 +255,58 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* 饼图点击后展开的明细区域 */}
+      {selectedCategory && (
+        <div className="card shadow-sm border-primary mb-3">
+          <div className="card-header d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
+            <h6 className="mb-0">
+              <i className="bi bi-list-ul me-2"></i>
+              {selectedCategory}
+              <span className="text-muted ms-2">
+                · 共 {detailTx.length} 笔
+              </span>
+            </h6>
+            <button className="btn btn-sm btn-outline-secondary" onClick={() => { setSelectedCategory(null); setDetailTx([]); }}>
+              <i className="bi bi-x"></i> 收起
+            </button>
+          </div>
+          <div className="card-body p-0">
+            {detailLoading ? (
+              <div className="text-center py-4"><span className="spinner-border spinner-border-sm"></span> 加载中...</div>
+            ) : detailTx.length === 0 ? (
+              <div className="text-center text-muted py-4">暂无交易记录</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm table-hover mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>日期</th>
+                      <th>类型</th>
+                      <th>金额</th>
+                      <th>账户</th>
+                      <th>商家</th>
+                      <th>备注</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailTx.map(tx => (
+                      <tr key={tx.id}>
+                        <td><small>{tx.date?.slice(0, 10)}</small></td>
+                        <td><span className={`badge ${tx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{tx.type}</span></td>
+                        <td className={tx.type === '收入' ? 'amount-income' : 'amount-expense'}>¥ {fmt(tx.amount)}</td>
+                        <td><small>{tx.account}</small></td>
+                        <td><small>{tx.merchant}</small></td>
+                        <td><small className="text-muted">{trunc(tx.note, 12)}</small></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

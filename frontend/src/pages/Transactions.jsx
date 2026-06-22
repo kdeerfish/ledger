@@ -109,6 +109,41 @@ export default function Transactions() {
     } catch (e) {}
   };
 
+  const handleToggleExclude = async (tx) => {
+    const excludeTagName = '排除统计';
+    const currentTags = tx.tags || [];
+    const isExcluded = currentTags.some(t => t.name === excludeTagName);
+
+    // 获取"排除统计"标签（如果不存在则创建）
+    let excludeTag = tags.find(t => t.name === excludeTagName);
+    if (!excludeTag) {
+      try {
+        await api.createTag({ name: excludeTagName, color: '#6b7280' });
+        const res = await api.getTags();
+        if (res.data) {
+          setTags(res.data);
+          excludeTag = res.data.find(t => t.name === excludeTagName);
+        }
+      } catch (e) {}
+    }
+
+    let newTagIds;
+    if (isExcluded) {
+      newTagIds = currentTags.filter(t => t.name !== excludeTagName).map(t => t.id);
+    } else {
+      const excludeId = excludeTag?.id;
+      newTagIds = [...currentTags.map(t => t.id)];
+      if (excludeId && !newTagIds.includes(excludeId)) {
+        newTagIds.push(excludeId);
+      }
+    }
+
+    try {
+      await api.updateTransaction(tx.id, { tag_ids: newTagIds });
+      loadData();
+    } catch (e) {}
+  };
+
   const handleTagClick = (tagId) => {
     const current = filters.tag_ids ? filters.tag_ids.split(',').map(Number) : [];
     if (current.includes(tagId)) {
@@ -241,8 +276,10 @@ export default function Transactions() {
               <tbody>
                 {txs.length === 0 ? (
                   <tr><td colSpan="12" className="text-center text-muted py-4">📭 暂无交易记录</td></tr>
-                ) : txs.map(t => (
-                  <tr key={t.id}>
+                ) : txs.map(t => {
+                  const isExcluded = (t.tags || []).some(tag => tag.name === '排除统计');
+                  return (
+                  <tr key={t.id} style={{ opacity: isExcluded ? 0.5 : 1 }}>
                     <td className="text-nowrap"><small>{t.date?.slice(0, 10)}</small></td>
                     <td><span className={`badge ${t.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{t.type}</span></td>
                     <td className={`${t.type === '收入' ? 'amount-income' : 'amount-expense'} text-nowrap`}>¥ {fmt(t.amount)}</td>
@@ -262,6 +299,15 @@ export default function Transactions() {
                     </td>
                     <td><small className="text-muted">{trunc(t.note, 10)}</small></td>
                     <td className="text-nowrap">
+                      {(() => {
+                        const isExcluded = (t.tags || []).some(tag => tag.name === '排除统计');
+                        return (
+                          <button className={`btn btn-sm py-0 px-1 me-1 ${isExcluded ? 'btn-warning' : 'btn-outline-secondary'}`}
+                            onClick={() => handleToggleExclude(t)} title={isExcluded ? '取消排除' : '排除统计'}>
+                            <i className={`bi ${isExcluded ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                          </button>
+                        );
+                      })()}
                       <button className="btn btn-sm btn-outline-primary py-0 px-1 me-1"
                         onClick={() => handleEdit(t.id)} title="编辑">
                         <i className="bi bi-pencil"></i>
@@ -272,7 +318,7 @@ export default function Transactions() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

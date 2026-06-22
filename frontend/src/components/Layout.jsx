@@ -18,6 +18,8 @@ export default function Layout() {
     { path: '/budgets', icon: 'pie-chart', label: '预算' },
     { path: '/categories', icon: 'tags', label: '类别' },
     { path: '/stats', icon: 'graph-up', label: '统计' },
+    { path: '/import', icon: 'cloud-upload', label: '导入' },
+    { path: '/export', icon: 'cloud-download', label: '导出' },
   ];
 
   return (

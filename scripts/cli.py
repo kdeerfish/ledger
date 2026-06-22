@@ -339,7 +339,23 @@ def cmd_export(args):
         print("❌ export 需要 --output")
         return
     _sync_db_path()
-    tx_module.export_transactions(args.output, args.format, args.category, args.start_date, args.end_date)
+    if args.format in ('excel', 'pdf'):
+        from ledger_modules import export_engine
+        export_engine.DB_PATH = tx_module.DB_PATH
+        data = export_engine.get_export_data(
+            start_date=args.start_date, end_date=args.end_date,
+            category=args.category
+        )
+        if data['count'] == 0:
+            print("没有数据可导出")
+            return
+        if args.format == 'excel':
+            export_engine.export_excel(data, args.output)
+        else:
+            export_engine.export_pdf(data, args.output)
+        print(f"✅ 已导出 {data['count']} 条记录到 {args.output}")
+    else:
+        tx_module.export_transactions(args.output, args.format, args.category, args.start_date, args.end_date)
 
 
 def cmd_stats(args):
@@ -409,7 +425,7 @@ def main():
     parser.add_argument("--keyword")
     parser.add_argument("--search_type", choices=["all", "note", "category", "merchant"], default="all")
     parser.add_argument("--output")
-    parser.add_argument("--format", choices=["csv", "json"], default="csv")
+    parser.add_argument("--format", choices=["csv", "json", "excel", "pdf"], default="csv")
     parser.add_argument("--start_date")
     parser.add_argument("--end_date")
     parser.add_argument("--group_by", choices=["category", "account", "month"], default="category")
