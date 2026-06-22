@@ -8,10 +8,38 @@ version: 2.0.0
 
 ## 基本信息
 
-```
-Base URL: http://127.0.0.1:5800
 Content-Type: application/json
+
+### Base URL 解析
+
+执行任何 API 调用前，**必须先确定 `BASE_URL`**，按以下优先级：
+
+1. **系统环境变量** `$LEDGER_API_URL`
+2. **`.env` 文件** `skills/ledger/.env` 中的 `LEDGER_API_URL`
+3. **Docker 容器内** 自动使用 `http://host.docker.internal:5800`
+4. **默认值** `http://127.0.0.1:5800`
+
+确定方法（在执行任何 curl 之前运行一次）：
+
+```bash
+# 1. 优先使用环境变量
+BASE_URL="${LEDGER_API_URL:-}"
+
+# 2. 检查 .env 文件
+if [ -z "$BASE_URL" ] && [ -f "skills/ledger/.env" ]; then
+  BASE_URL=$(grep -E '^LEDGER_API_URL=' skills/ledger/.env | cut -d= -f2-)
+fi
+
+# 3. Docker 容器内自动检测
+if [ -z "$BASE_URL" ] && ([ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null); then
+  BASE_URL="http://host.docker.internal:5800"
+fi
+
+# 4. 默认值
+BASE_URL="${BASE_URL:-http://127.0.0.1:5800}"
 ```
+
+后续所有命令中的 `$BASE_URL` 即由此解析得到。
 
 所有响应格式：
 ```json
@@ -26,7 +54,7 @@ Content-Type: application/json
 ### 记账
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":30,"category":"食品酒水","subcategory":"早餐","account":"微信零钱","note":"包子豆浆"}'
 ```
@@ -40,13 +68,13 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 ```bash
 # 最近 20 条
-curl http://127.0.0.1:5800/api/transactions?limit=20
+curl $BASE_URL/api/transactions?limit=20
 
 # 带筛选
-curl "http://127.0.0.1:5800/api/transactions?category=食品酒水&account=微信零钱&limit=10"
+curl "$BASE_URL/api/transactions?category=食品酒水&account=微信零钱&limit=10"
 
 # 包含已删除
-curl "http://127.0.0.1:5800/api/transactions?include_deleted=true&limit=5"
+curl "$BASE_URL/api/transactions?include_deleted=true&limit=5"
 ```
 
 筛选参数：`type`、`category`、`subcategory`、`account`、`project`、`member`、`merchant`、`keyword`、`tag_ids`、`year`、`month`、`start_date`、`end_date`、`limit`、`offset`
@@ -54,13 +82,13 @@ curl "http://127.0.0.1:5800/api/transactions?include_deleted=true&limit=5"
 ### 查看单条
 
 ```bash
-curl http://127.0.0.1:5800/api/transactions/42
+curl $BASE_URL/api/transactions/42
 ```
 
 ### 搜索
 
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=早餐&search_type=all&limit=20"
+curl "$BASE_URL/api/transactions/search?keyword=早餐&search_type=all&limit=20"
 ```
 
 `search_type`: `all`（默认）/ `note` / `category` / `merchant`
@@ -69,12 +97,12 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=早餐&search_type=a
 
 ```bash
 # 单字段
-curl -X PUT http://127.0.0.1:5800/api/transactions/42 \
+curl -X PUT $BASE_URL/api/transactions/42 \
   -H 'Content-Type: application/json' \
   -d '{"field":"amount","value":50}'
 
 # 多字段
-curl -X PUT http://127.0.0.1:5800/api/transactions/42 \
+curl -X PUT $BASE_URL/api/transactions/42 \
   -H 'Content-Type: application/json' \
   -d '{"amount":50,"note":"修改备注","category":"餐饮"}'
 ```
@@ -85,10 +113,10 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/42 \
 
 ```bash
 # 软删除
-curl -X DELETE http://127.0.0.1:5800/api/transactions/42
+curl -X DELETE $BASE_URL/api/transactions/42
 
 # 恢复
-curl -X POST http://127.0.0.1:5800/api/transactions/42/restore
+curl -X POST $BASE_URL/api/transactions/42/restore
 ```
 
 ---
@@ -98,7 +126,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions/42/restore
 ### 收支汇总
 
 ```bash
-curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
+curl "$BASE_URL/api/summary?year=2026&month=6"
 ```
 
 返回：`income`、`expense`、`balance`、`daily_avg_expense`、`income_count`、`expense_count`
@@ -107,10 +135,10 @@ curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
 
 ```bash
 # 按类别
-curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
+curl "$BASE_URL/api/stats?group_by=category&year=2026&month=6"
 
 # 按账户、月份、商家、成员、项目、标签、类型
-curl "http://127.0.0.1:5800/api/stats?group_by=account&year=2026"
+curl "$BASE_URL/api/stats?group_by=account&year=2026"
 ```
 
 `group_by`: `category` / `subcategory` / `account` / `merchant` / `project` / `member` / `month` / `tag` / `type`
@@ -119,7 +147,7 @@ curl "http://127.0.0.1:5800/api/stats?group_by=account&year=2026"
 ### 趋势
 
 ```bash
-curl "http://127.0.0.1:5800/api/trends?year=2026&granularity=month"
+curl "$BASE_URL/api/trends?year=2026&granularity=month"
 ```
 
 `granularity`: `day` / `week` / `month`
@@ -130,25 +158,25 @@ curl "http://127.0.0.1:5800/api/trends?year=2026&granularity=month"
 
 ```bash
 # 所有类别（含子类别及使用次数）
-curl http://127.0.0.1:5800/api/categories
+curl $BASE_URL/api/categories
 
 # 常用子类别 TOP20
-curl http://127.0.0.1:5800/api/categories/quick
+curl $BASE_URL/api/categories/quick
 
 # 所有账户
-curl http://127.0.0.1:5800/api/accounts
+curl $BASE_URL/api/accounts
 
 # 所有成员
-curl http://127.0.0.1:5800/api/members
+curl $BASE_URL/api/members
 
 # 所有项目
-curl http://127.0.0.1:5800/api/projects
+curl $BASE_URL/api/projects
 
 # 所有商家
-curl http://127.0.0.1:5800/api/merchants
+curl $BASE_URL/api/merchants
 
 # 自动建议（综合）
-curl "http://127.0.0.1:5800/api/suggestions?field=all&keyword=早"
+curl "$BASE_URL/api/suggestions?field=all&keyword=早"
 ```
 
 `suggestions` 的 `field`: `all` / `categories` / `subcategories` / `accounts` / `merchants` / `projects` / `members`
@@ -160,7 +188,7 @@ curl "http://127.0.0.1:5800/api/suggestions?field=all&keyword=早"
 ### 设置预算
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/budgets \
+curl -X POST $BASE_URL/api/budgets \
   -H 'Content-Type: application/json' \
   -d '{"category":"食品酒水","amount":2000,"year":2026,"month":6}'
 ```
@@ -170,7 +198,7 @@ curl -X POST http://127.0.0.1:5800/api/budgets \
 ### 查看预算执行
 
 ```bash
-curl "http://127.0.0.1:5800/api/budgets/check?year=2026&month=6"
+curl "$BASE_URL/api/budgets/check?year=2026&month=6"
 ```
 
 返回每个预算的 `budget`、`spent`、`remaining`、`percentage`
@@ -178,7 +206,7 @@ curl "http://127.0.0.1:5800/api/budgets/check?year=2026&month=6"
 ### 预算列表
 
 ```bash
-curl "http://127.0.0.1:5800/api/budgets?year=2026&month=6"
+curl "$BASE_URL/api/budgets?year=2026&month=6"
 ```
 
 ---
@@ -189,23 +217,23 @@ curl "http://127.0.0.1:5800/api/budgets?year=2026&month=6"
 
 ```bash
 # 列表
-curl http://127.0.0.1:5800/api/templates
+curl $BASE_URL/api/templates
 
 # 创建
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"早餐","template_type":"日常","type":"支出","amount":15,"category":"食品酒水","subcategory":"早餐","account":"微信零钱"}'
 
 # 修改
-curl -X PUT http://127.0.0.1:5800/api/templates/1 \
+curl -X PUT $BASE_URL/api/templates/1 \
   -H 'Content-Type: application/json' \
   -d '{"amount":20}'
 
 # 删除
-curl -X DELETE http://127.0.0.1:5800/api/templates/1
+curl -X DELETE $BASE_URL/api/templates/1
 
 # 使用（增加使用次数）
-curl -X POST http://127.0.0.1:5800/api/templates/1/use
+curl -X POST $BASE_URL/api/templates/1/use
 ```
 
 ---
@@ -214,18 +242,18 @@ curl -X POST http://127.0.0.1:5800/api/templates/1/use
 
 ```bash
 # 列表
-curl http://127.0.0.1:5800/api/tags
+curl $BASE_URL/api/tags
 
 # 创建
-curl -X POST http://127.0.0.1:5800/api/tags \
+curl -X POST $BASE_URL/api/tags \
   -H 'Content-Type: application/json' \
   -d '{"name":"报销","color":"#ef4444"}'
 
 # 删除
-curl -X DELETE http://127.0.0.1:5800/api/tags/1
+curl -X DELETE $BASE_URL/api/tags/1
 
 # 按标签查记录
-curl "http://127.0.0.1:5800/api/tags/1/transactions?limit=20"
+curl "$BASE_URL/api/tags/1/transactions?limit=20"
 ```
 
 ---
@@ -234,10 +262,10 @@ curl "http://127.0.0.1:5800/api/tags/1/transactions?limit=20"
 
 ```bash
 # JSON 格式
-curl "http://127.0.0.1:5800/api/export?format=json&category=食品酒水&start_date=2026-01-01&end_date=2026-06-30"
+curl "$BASE_URL/api/export?format=json&category=食品酒水&start_date=2026-01-01&end_date=2026-06-30"
 
 # CSV 格式
-curl "http://127.0.0.1:5800/api/export?format=csv"
+curl "$BASE_URL/api/export?format=csv"
 ```
 
 ---
@@ -246,13 +274,13 @@ curl "http://127.0.0.1:5800/api/export?format=csv"
 
 ```bash
 # 健康检查
-curl http://127.0.0.1:5800/api/health
+curl $BASE_URL/api/health
 
 # 数据库信息
-curl http://127.0.0.1:5800/api/info
+curl $BASE_URL/api/info
 
 # 消费分析报告
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 ---

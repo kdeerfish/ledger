@@ -4,12 +4,12 @@
 
 ```bash
 # 创建支出模板
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"零食模板","template_type":"支出","type":"支出","amount":30,"category":"食品酒水","subcategory":"零食","account":"微信零钱","merchant":"拼多多"}'
 
 # 创建收入模板
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"工资模板","template_type":"收入","type":"收入","amount":5000,"category":"职业收入","account":"招商银行"}'
 ```
@@ -26,13 +26,13 @@ curl -X POST http://127.0.0.1:5800/api/templates \
 ## 列出模板
 
 ```bash
-curl http://127.0.0.1:5800/api/templates
+curl $BASE_URL/api/templates
 ```
 
 ## 修改模板
 
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/templates/1 \
+curl -X PUT $BASE_URL/api/templates/1 \
   -H 'Content-Type: application/json' \
   -d '{"amount":40}'
 ```
@@ -40,11 +40,11 @@ curl -X PUT http://127.0.0.1:5800/api/templates/1 \
 ## 删除模板
 
 ```bash
-curl -X DELETE http://127.0.0.1:5800/api/templates/1
+curl -X DELETE $BASE_URL/api/templates/1
 ```
 
 ## 使用模板（增加使用次数）
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/templates/1/use
+curl -X POST $BASE_URL/api/templates/1/use
 ```

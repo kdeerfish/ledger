@@ -48,7 +48,7 @@ docker exec -it ledger python scripts/import_ledger.py /data/your-file.csv
 ### 用户说"学习"或"分析我的数据"
 
 ```bash
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 然后用 `remember` 保存关键模式到记忆。
@@ -56,7 +56,7 @@ curl http://127.0.0.1:5800/api/analyze
 ### 用户说"今天花了30块钱买零食"
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":30,"category":"食品酒水","subcategory":"零食","account":"微信零钱","note":"零食"}'
 ```
@@ -64,20 +64,20 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 ### 用户说"帮我看看这个月花了多少"
 
 ```bash
-curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
+curl "$BASE_URL/api/summary?year=2026&month=6"
 ```
 
 ### 用户说"上个月在拼多多买了多少东西"
 
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_type=merchant"
-curl "http://127.0.0.1:5800/api/transactions?merchant=拼多多&start_date=2026-05-01&end_date=2026-05-31"
+curl "$BASE_URL/api/transactions/search?keyword=拼多多&search_type=merchant"
+curl "$BASE_URL/api/transactions?merchant=拼多多&start_date=2026-05-01&end_date=2026-05-31"
 ```
 
 ### 用户说"把刚才那笔记错了，改成50"
 
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+curl -X PUT $BASE_URL/api/transactions/123 \
   -H 'Content-Type: application/json' \
   -d '{"field":"amount","value":50}'
 ```
@@ -85,7 +85,7 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
 ### 用户说"设个预算，食品酒水每月1000块"
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/budgets \
+curl -X POST $BASE_URL/api/budgets \
   -H 'Content-Type: application/json' \
   -d '{"category":"食品酒水","amount":1000}'
 ```
@@ -93,19 +93,19 @@ curl -X POST http://127.0.0.1:5800/api/budgets \
 ### 用户说"给我看看这个月的支出统计"
 
 ```bash
-curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
+curl "$BASE_URL/api/stats?group_by=category&year=2026&month=6"
 ```
 
 ### 用户说"我有哪些银行卡"
 
 ```bash
-curl http://127.0.0.1:5800/api/accounts
+curl $BASE_URL/api/accounts
 ```
 
 ### 用户说"记一笔收入，工资5000"
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"收入","amount":5000,"category":"职业收入","account":"招商银行","note":"工资"}'
 ```
@@ -114,13 +114,13 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 ```bash
 # 先查看模板列表
-curl http://127.0.0.1:5800/api/templates
+curl $BASE_URL/api/templates
 # 然后使用模板
-curl -X POST http://127.0.0.1:5800/api/templates/1/use
+curl -X POST $BASE_URL/api/templates/1/use
 ```
 
 ### 用户说"帮我看看有哪些模板"
 
 ```bash
-curl http://127.0.0.1:5800/api/templates
+curl $BASE_URL/api/templates
 ```

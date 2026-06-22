@@ -35,7 +35,7 @@ docker exec -it ledger python scripts/import_ledger.py /data/wechat_bill_202606.
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/export?format=csv&category=食品酒水&start_date=2026-06-01&end_date=2026-06-30"
+curl "$BASE_URL/api/export?format=csv&category=食品酒水&start_date=2026-06-01&end_date=2026-06-30"
 ```
 
 ---
@@ -47,7 +47,7 @@ curl "http://127.0.0.1:5800/api/export?format=csv&category=食品酒水&start_da
 
 **Agent 执行**：
 ```bash
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 **Agent 用 remember 保存关键模式**
@@ -61,5 +61,5 @@ curl http://127.0.0.1:5800/api/analyze
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/export?format=json&start_date=2026-01-01&end_date=2026-12-31"
+curl "$BASE_URL/api/export?format=json&start_date=2026-01-01&end_date=2026-12-31"
 ```

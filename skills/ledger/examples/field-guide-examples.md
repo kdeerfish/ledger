@@ -22,7 +22,7 @@
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":6.8,"category":"食品酒水","subcategory":"零食","account":"储蓄卡","merchant":"拼多多","project":"日常支出","member":"本人"}'
 ```
@@ -47,7 +47,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":20,"category":"行车交通","subcategory":"打车租车","account":"微信零钱","merchant":"滴滴","project":"日常支出","member":"本人"}'
 ```
@@ -72,7 +72,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":11.5,"category":"居家物业","subcategory":"日常用品","account":"信用卡","merchant":"拼多多","project":"家庭支出","member":"家庭公用"}'
 ```
@@ -86,7 +86,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":4,"category":"食品酒水","subcategory":"甜品","account":"微信零钱","merchant":"抖音","project":"日常支出","member":"本人"}'
 ```
@@ -100,7 +100,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":538.6,"category":"金融保险","subcategory":"保险","account":"储蓄卡","member":"本人","note":"社保缴费"}'
 ```
@@ -114,7 +114,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":10,"category":"自由职业","subcategory":"大模型费用","account":"储蓄卡","merchant":"AI平台","project":"AI项目","member":"本人","note":"AI服务充值"}'
 ```
@@ -128,7 +128,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"收入","amount":5000,"category":"职业收入","account":"招商银行","member":"本人","note":"月薪"}'
 ```
@@ -142,7 +142,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":200,"category":"居家物业","subcategory":"房租水电","account":"储蓄卡","project":"固定支出","member":"家庭公用","note":"水电费"}'
 ```
@@ -156,7 +156,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":1000,"category":"其他杂项","subcategory":"礼尚往来","account":"微信零钱","member":"本人","note":"给家里"}'
 ```

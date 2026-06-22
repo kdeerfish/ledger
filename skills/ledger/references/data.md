@@ -31,10 +31,10 @@ docker exec -it ledger python scripts/import_ledger.py /data/mymoney.csv
 
 ```bash
 # JSON 格式
-curl "http://127.0.0.1:5800/api/export?format=json&start_date=2026-06-01&end_date=2026-06-30"
+curl "$BASE_URL/api/export?format=json&start_date=2026-06-01&end_date=2026-06-30"
 
 # CSV 格式
-curl "http://127.0.0.1:5800/api/export?format=csv&category=食品酒水"
+curl "$BASE_URL/api/export?format=csv&category=食品酒水"
 ```
 
 参数：`format`（json/csv）、`category`、`start_date`、`end_date`
@@ -42,7 +42,7 @@ curl "http://127.0.0.1:5800/api/export?format=csv&category=食品酒水"
 ## 数据分析
 
 ```bash
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 输出结构化摘要：账户列表、商家列表、类别层级、成员列表、项目列表、字段使用率等。
@@ -50,7 +50,7 @@ curl http://127.0.0.1:5800/api/analyze
 ## 健康检查
 
 ```bash
-curl http://127.0.0.1:5800/api/health
+curl $BASE_URL/api/health
 ```
 
 返回数据库状态、记录数、版本号。
@@ -58,5 +58,5 @@ curl http://127.0.0.1:5800/api/health
 ## 数据库信息
 
 ```bash
-curl http://127.0.0.1:5800/api/info
+curl $BASE_URL/api/info
 ```

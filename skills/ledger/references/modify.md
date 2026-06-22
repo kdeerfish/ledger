@@ -4,12 +4,12 @@
 
 ```bash
 # 单字段修改
-curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+curl -X PUT $BASE_URL/api/transactions/123 \
   -H 'Content-Type: application/json' \
   -d '{"field":"amount","value":50.0}'
 
 # 多字段修改
-curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
+curl -X PUT $BASE_URL/api/transactions/123 \
   -H 'Content-Type: application/json' \
   -d '{"amount":50,"category":"餐饮","note":"修改备注"}'
 ```
@@ -19,7 +19,7 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/123 \
 ## 删除记录
 
 ```bash
-curl -X DELETE http://127.0.0.1:5800/api/transactions/123
+curl -X DELETE $BASE_URL/api/transactions/123
 ```
 
 软删除，可恢复。
@@ -27,5 +27,5 @@ curl -X DELETE http://127.0.0.1:5800/api/transactions/123
 ## 恢复记录
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions/123/restore
+curl -X POST $BASE_URL/api/transactions/123/restore
 ```

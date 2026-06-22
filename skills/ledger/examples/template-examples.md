@@ -11,7 +11,7 @@
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"零食","template_type":"支出","type":"支出","amount":6,"category":"食品酒水","subcategory":"零食","account":"储蓄卡","merchant":"拼多多"}'
 ```
@@ -28,7 +28,7 @@ curl -X POST http://127.0.0.1:5800/api/templates \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"午餐","template_type":"支出","type":"支出","amount":25,"category":"食品酒水","subcategory":"早午晚餐","account":"微信零钱","merchant":"食堂"}'
 ```
@@ -42,7 +42,7 @@ curl -X POST http://127.0.0.1:5800/api/templates \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/templates \
+curl -X POST $BASE_URL/api/templates \
   -H 'Content-Type: application/json' \
   -d '{"name":"工资","template_type":"收入","type":"收入","amount":5000,"category":"职业收入","account":"招商银行","note":"月薪"}'
 ```
@@ -56,7 +56,7 @@ curl -X POST http://127.0.0.1:5800/api/templates \
 
 **Agent 执行**：
 ```bash
-curl http://127.0.0.1:5800/api/templates
+curl $BASE_URL/api/templates
 ```
 
 ---
@@ -68,7 +68,7 @@ curl http://127.0.0.1:5800/api/templates
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/templates/1/use
+curl -X POST $BASE_URL/api/templates/1/use
 ```
 
 ---
@@ -80,7 +80,7 @@ curl -X POST http://127.0.0.1:5800/api/templates/1/use
 
 **Agent 执行**：
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/templates/1 \
+curl -X PUT $BASE_URL/api/templates/1 \
   -H 'Content-Type: application/json' \
   -d '{"amount":8}'
 ```
@@ -94,5 +94,5 @@ curl -X PUT http://127.0.0.1:5800/api/templates/1 \
 
 **Agent 执行**：
 ```bash
-curl -X DELETE http://127.0.0.1:5800/api/templates/1
+curl -X DELETE $BASE_URL/api/templates/1
 ```

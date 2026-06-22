@@ -11,7 +11,7 @@
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":6.8,"category":"食品酒水","subcategory":"零食","account":"储蓄卡","merchant":"拼多多"}'
 ```
@@ -30,7 +30,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":20,"category":"行车交通","subcategory":"打车租车","account":"微信零钱","merchant":"滴滴"}'
 ```
@@ -47,7 +47,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"收入","amount":5000,"category":"职业收入","account":"招商银行","note":"6月工资"}'
 ```
@@ -64,7 +64,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
+curl "$BASE_URL/api/summary?year=2026&month=6"
 ```
 
 ---
@@ -76,7 +76,7 @@ curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_type=merchant&limit=30"
+curl "$BASE_URL/api/transactions/search?keyword=拼多多&search_type=merchant&limit=30"
 ```
 
 ---
@@ -88,8 +88,8 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_typ
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions?category=食品酒水&start_date=2026-06-01&end_date=2026-06-30"
-curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
+curl "$BASE_URL/api/transactions?category=食品酒水&start_date=2026-06-01&end_date=2026-06-30"
+curl "$BASE_URL/api/stats?group_by=category&year=2026&month=6"
 ```
 
 ### 场景七：查看最近的记录
@@ -99,5 +99,5 @@ curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions?limit=10"
+curl "$BASE_URL/api/transactions?limit=10"
 ```

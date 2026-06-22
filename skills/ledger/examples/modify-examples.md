@@ -11,7 +11,7 @@
 
 **Agent 执行**（先搜索找到记录）：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=零食&search_type=category&limit=10"
+curl "$BASE_URL/api/transactions/search?keyword=零食&search_type=category&limit=10"
 ```
 
 **Agent 询问**：
@@ -22,7 +22,7 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=零食&search_type=c
 
 **Agent 执行**：
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/transactions/456 \
+curl -X PUT $BASE_URL/api/transactions/456 \
   -H 'Content-Type: application/json' \
   -d '{"field":"amount","value":8.6}'
 ```
@@ -36,7 +36,7 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/456 \
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_type=merchant&limit=10"
+curl "$BASE_URL/api/transactions/search?keyword=拼多多&search_type=merchant&limit=10"
 ```
 
 **Agent 询问**：
@@ -47,7 +47,7 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_typ
 
 **Agent 执行**：
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/transactions/789 \
+curl -X PUT $BASE_URL/api/transactions/789 \
   -H 'Content-Type: application/json' \
   -d '{"category":"居家物业","subcategory":"日常用品"}'
 ```
@@ -61,7 +61,7 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/789 \
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=打车&search_type=note&limit=20"
+curl "$BASE_URL/api/transactions/search?keyword=打车&search_type=note&limit=20"
 ```
 
 **Agent 询问**：
@@ -72,7 +72,7 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=打车&search_type=n
 
 **Agent 执行**（假设ID是321）：
 ```bash
-curl -X PUT http://127.0.0.1:5800/api/transactions/321 \
+curl -X PUT $BASE_URL/api/transactions/321 \
   -H 'Content-Type: application/json' \
   -d '{"merchant":"滴滴"}'
 ```
@@ -86,7 +86,7 @@ curl -X PUT http://127.0.0.1:5800/api/transactions/321 \
 
 **Agent 执行**：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions?limit=20"
+curl "$BASE_URL/api/transactions?limit=20"
 ```
 
 **Agent 询问**：
@@ -97,7 +97,7 @@ curl "http://127.0.0.1:5800/api/transactions?limit=20"
 
 **Agent 执行**：
 ```bash
-curl -X DELETE http://127.0.0.1:5800/api/transactions/654
+curl -X DELETE $BASE_URL/api/transactions/654
 ```
 
 ---
@@ -109,7 +109,7 @@ curl -X DELETE http://127.0.0.1:5800/api/transactions/654
 
 **Agent 执行**（查看已删除记录）：
 ```bash
-curl "http://127.0.0.1:5800/api/transactions?limit=20&include_deleted=true"
+curl "$BASE_URL/api/transactions?limit=20&include_deleted=true"
 ```
 
 **Agent 询问**：
@@ -120,5 +120,5 @@ curl "http://127.0.0.1:5800/api/transactions?limit=20&include_deleted=true"
 
 **Agent 执行**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions/654/restore
+curl -X POST $BASE_URL/api/transactions/654/restore
 ```

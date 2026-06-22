@@ -1,11 +1,11 @@
 # 基础命令
 
-所有命令通过 HTTP API 调用，Base URL: `http://127.0.0.1:5800`
+所有命令通过 HTTP API 调用，Base URL 通过环境变量 `$BASE_URL` 解析（详见主文档 [SKILL.md](../SKILL.md) 的「Base URL 解析」章节）
 
 ## 记账
 
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":25.5,"category":"食品酒水","subcategory":"零食","account":"微信零钱","note":"零食"}'
 ```
@@ -27,7 +27,7 @@ curl -X POST http://127.0.0.1:5800/api/transactions \
 ## 查账
 
 ```bash
-curl "http://127.0.0.1:5800/api/transactions?limit=20"
+curl "$BASE_URL/api/transactions?limit=20"
 ```
 
 参数：`limit`、`offset`、`include_deleted`、`type`、`category`、`account`、`member`、`merchant`、`keyword`、`tag_ids`、`year`、`month`、`start_date`、`end_date`
@@ -35,7 +35,7 @@ curl "http://127.0.0.1:5800/api/transactions?limit=20"
 ## 搜索
 
 ```bash
-curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_type=all&limit=50"
+curl "$BASE_URL/api/transactions/search?keyword=拼多多&search_type=all&limit=50"
 ```
 
 `search_type`: `all`（默认）/ `note` / `category` / `merchant`
@@ -43,7 +43,7 @@ curl "http://127.0.0.1:5800/api/transactions/search?keyword=拼多多&search_typ
 ## 汇总
 
 ```bash
-curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
+curl "$BASE_URL/api/summary?year=2026&month=6"
 ```
 
 参数：`year`、`month`（均可选）
@@ -51,7 +51,7 @@ curl "http://127.0.0.1:5800/api/summary?year=2026&month=6"
 ## 统计
 
 ```bash
-curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
+curl "$BASE_URL/api/stats?group_by=category&year=2026&month=6"
 ```
 
 `group_by`: `category` / `subcategory` / `account` / `merchant` / `project` / `member` / `month` / `tag` / `type`
@@ -59,9 +59,9 @@ curl "http://127.0.0.1:5800/api/stats?group_by=category&year=2026&month=6"
 ## 枚举查询
 
 ```bash
-curl http://127.0.0.1:5800/api/accounts
-curl http://127.0.0.1:5800/api/categories
-curl http://127.0.0.1:5800/api/members
-curl http://127.0.0.1:5800/api/projects
-curl http://127.0.0.1:5800/api/merchants
+curl $BASE_URL/api/accounts
+curl $BASE_URL/api/categories
+curl $BASE_URL/api/members
+curl $BASE_URL/api/projects
+curl $BASE_URL/api/merchants
 ```

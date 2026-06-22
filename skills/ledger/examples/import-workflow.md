@@ -43,7 +43,7 @@ docker exec -it ledger python scripts/import_ledger.py /data/mymoney_export.csv
 
 **Agent 执行**：
 ```bash
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 **Agent 用 remember 保存关键模式**

@@ -2,12 +2,12 @@
 
 环境没有 curl 时（如 Docker 容器），可用 wget 调用本 API。
 
-Base URL: `http://127.0.0.1:5800`
+Base URL 通过环境变量 `$BASE_URL` 解析（详见主文档「Base URL 解析」章节）
 
 ## GET 请求
 
 ```bash
-wget -qO- http://127.0.0.1:5800/api/transactions?limit=5
+wget -qO- $BASE_URL/api/transactions?limit=5
 ```
 
 ## POST 请求
@@ -15,7 +15,7 @@ wget -qO- http://127.0.0.1:5800/api/transactions?limit=5
 ```bash
 wget --post-data '{"amount":30,"category":"食品酒水"}' \
      --header='Content-Type: application/json' \
-     -qO- http://127.0.0.1:5800/api/transactions
+     -qO- $BASE_URL/api/transactions
 ```
 
 ## PUT 请求（通过 _method）
@@ -26,12 +26,12 @@ wget 不支持 PUT，通过 `?_method=PUT` 模拟：
 # 修改交易
 wget --post-data '{"amount":50}' \
      --header='Content-Type: application/json' \
-     -qO- "http://127.0.0.1:5800/api/transactions/42?_method=PUT"
+     -qO- "$BASE_URL/api/transactions/42?_method=PUT"
 
 # 修改模板
 wget --post-data '{"amount":20}' \
      --header='Content-Type: application/json' \
-     -qO- "http://127.0.0.1:5800/api/templates/1?_method=PUT"
+     -qO- "$BASE_URL/api/templates/1?_method=PUT"
 ```
 
 ## DELETE 请求（通过 _method）
@@ -39,15 +39,15 @@ wget --post-data '{"amount":20}' \
 ```bash
 # 删除交易
 wget --post-data='' \
-     -qO- "http://127.0.0.1:5800/api/transactions/42?_method=DELETE"
+     -qO- "$BASE_URL/api/transactions/42?_method=DELETE"
 
 # 删除模板
 wget --post-data='' \
-     -qO- "http://127.0.0.1:5800/api/templates/1?_method=DELETE"
+     -qO- "$BASE_URL/api/templates/1?_method=DELETE"
 
 # 删除标签
 wget --post-data='' \
-     -qO- "http://127.0.0.1:5800/api/tags/1?_method=DELETE"
+     -qO- "$BASE_URL/api/tags/1?_method=DELETE"
 ```
 
 ## 恢复删除
@@ -55,7 +55,7 @@ wget --post-data='' \
 ```bash
 wget --post-data='' \
      --header='Content-Type: application/json' \
-     -qO- http://127.0.0.1:5800/api/transactions/42/restore
+     -qO- $BASE_URL/api/transactions/42/restore
 ```
 
 ## 注意事项

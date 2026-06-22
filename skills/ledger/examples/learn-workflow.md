@@ -21,7 +21,7 @@
 
 **Agent 执行**：
 ```bash
-curl http://127.0.0.1:5800/api/analyze
+curl $BASE_URL/api/analyze
 ```
 
 **输出示例**：
@@ -69,7 +69,7 @@ curl http://127.0.0.1:5800/api/analyze
 
 **Agent 根据学习结果填写**：
 ```bash
-curl -X POST http://127.0.0.1:5800/api/transactions \
+curl -X POST $BASE_URL/api/transactions \
   -H 'Content-Type: application/json' \
   -d '{"type":"支出","amount":200,"category":"食品酒水","subcategory":"零食","merchant":"京东","account":"信用卡"}'
 ```
