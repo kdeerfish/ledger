@@ -8,13 +8,17 @@ export default function Transactions() {
   const [txs, setTxs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [suggestions, setSuggestions] = useState({});
   const [tags, setTags] = useState([]);
-  const pageSize = 20;
 
-  // 筛选状态
+  // 排序
+  const [sortBy, setSortBy] = useState('trans_date');
+  const [sortOrder, setSortOrder] = useState('DESC');
+
+  // 筛选
   const [filters, setFilters] = useState({
     keyword: searchParams.get('keyword') || searchParams.get('search') || '',
     type: searchParams.get('type') || '',
@@ -29,18 +33,19 @@ export default function Transactions() {
     end_date: searchParams.get('end_date') || '',
   });
 
-  const searchTimer = useRef(null);
+  // 中文输入法状态
+  const isComposing = useRef(false);
 
   const loadData = useCallback(async () => {
     const params = {
       limit: pageSize,
       offset: (page - 1) * pageSize,
+      sort_by: sortBy,
+      sort_order: sortOrder,
     };
-    // 只添加有值的参数
     Object.entries(filters).forEach(([k, v]) => {
       if (v) params[k] = v;
     });
-
     try {
       const res = await api.getTransactions(params);
       if (res.data) {
@@ -48,7 +53,7 @@ export default function Transactions() {
         setTotal(res.data.total || 0);
       }
     } catch (e) {}
-  }, [filters, page]);
+  }, [filters, page, pageSize, sortBy, sortOrder]);
 
   const loadSuggestions = useCallback(async () => {
     try {
@@ -73,7 +78,6 @@ export default function Transactions() {
 
   const handleSearch = (val) => {
     setFilter('keyword', val);
-    // 更新 URL
     const p = new URLSearchParams(searchParams);
     if (val) p.set('keyword', val);
     else p.delete('keyword');
@@ -104,7 +108,6 @@ export default function Transactions() {
     if (!confirm(`确认删除交易 #${id}？可恢复。`)) return;
     try {
       await api.deleteTransaction(id);
-      toast('已删除');
       loadData();
     } catch (e) {}
   };
@@ -114,7 +117,6 @@ export default function Transactions() {
     const currentTags = tx.tags || [];
     const isExcluded = currentTags.some(t => t.name === excludeTagName);
 
-    // 获取"排除统计"标签（如果不存在则创建）
     let excludeTag = tags.find(t => t.name === excludeTagName);
     if (!excludeTag) {
       try {
@@ -153,15 +155,27 @@ export default function Transactions() {
     }
   };
 
-  // 图表点击后的筛选
+  const handleSort = (col) => {
+    if (sortBy === col) {
+      setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setSortBy(col);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+
   useEffect(() => {
     const category = searchParams.get('category');
-    if (category) {
-      setFilter('category', category);
-    }
+    if (category) setFilter('category', category);
   }, [searchParams]);
 
   const totalPages = Math.ceil(total / pageSize);
+
+  const SortIcon = ({ col }) => {
+    if (sortBy !== col) return <i className="bi bi-arrow-down-up text-muted ms-1" style={{ fontSize: 10 }}></i>;
+    return <i className={`bi ${sortOrder === 'DESC' ? 'bi-sort-down' : 'bi-sort-up'} ms-1`}></i>;
+  };
 
   return (
     <div className="page-content">
@@ -172,16 +186,25 @@ export default function Transactions() {
         </button>
       </div>
 
-      {/* ── 筛选栏 ── */}
+      {/* 筛选栏 */}
       <div className="filter-bar">
         <div className="row g-2">
           <div className="col-md-3">
             <input type="text" className="form-control form-control-sm"
               placeholder="🔍 搜索备注、类别、商家..." value={filters.keyword}
+              onCompositionStart={() => { isComposing.current = true; }}
+              onCompositionEnd={e => {
+                isComposing.current = false;
+                handleSearch(e.target.value);
+              }}
               onChange={e => {
-                const v = e.target.value;
-                clearTimeout(searchTimer.current);
-                searchTimer.current = setTimeout(() => handleSearch(v), 300);
+                // 组合输入期间不触发搜索，避免中文输入法被打断
+                if (!isComposing.current) {
+                  handleSearch(e.target.value);
+                } else {
+                  // 更新显示值但不触发搜索
+                  setFilters(prev => ({ ...prev, keyword: e.target.value }));
+                }
               }} />
           </div>
           <div className="col-md-1-5 col-4">
@@ -236,8 +259,8 @@ export default function Transactions() {
               const active = filters.tag_ids.includes(String(tag.id));
               return (
                 <span key={tag.id}
-                  className={`tag-badge tag-badge-sm ${active ? '' : ''}`}
                   style={{
+                    display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: 12,
                     background: active ? tag.color + '33' : '#f1f5f9',
                     color: active ? tag.color : '#64748b',
                     border: `1px solid ${active ? tag.color + '66' : '#e2e8f0'}`,
@@ -252,22 +275,20 @@ export default function Transactions() {
         )}
       </div>
 
-      {/* ── 表格 ── */}
+      {/* 表格 */}
       <div className="card shadow-sm">
         <div className="card-body p-0">
-          <div className="table-responsive" style={{ maxHeight: '60vh' }}>
+          <div className="table-responsive" style={{ maxHeight: '65vh' }}>
             <table className="table table-ledger table-hover mb-0">
               <thead>
                 <tr>
-                  <th>日期</th>
-                  <th>类型</th>
-                  <th>金额</th>
-                  <th>类别</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('trans_date')}>日期 <SortIcon col="trans_date" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('type')}>类型 <SortIcon col="type" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('amount')}>金额 <SortIcon col="amount" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('category')}>类别 <SortIcon col="category" /></th>
                   <th>子类别</th>
-                  <th>账户</th>
-                  <th>商家</th>
-                  <th>项目</th>
-                  <th>成员</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('account')}>账户 <SortIcon col="account" /></th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => handleSort('merchant')}>商家 <SortIcon col="merchant" /></th>
                   <th>标签</th>
                   <th>备注</th>
                   <th style={{ width: 70 }}>操作</th>
@@ -275,7 +296,7 @@ export default function Transactions() {
               </thead>
               <tbody>
                 {txs.length === 0 ? (
-                  <tr><td colSpan="12" className="text-center text-muted py-4">📭 暂无交易记录</td></tr>
+                  <tr><td colSpan="10" className="text-center text-muted py-4">📭 暂无交易记录</td></tr>
                 ) : txs.map(t => {
                   const isExcluded = (t.tags || []).some(tag => tag.name === '排除统计');
                   return (
@@ -287,24 +308,23 @@ export default function Transactions() {
                     <td><small>{trunc(t.subcategory, 10)}</small></td>
                     <td><small>{trunc(t.account, 8)}</small></td>
                     <td><small>{trunc(t.merchant, 10)}</small></td>
-                    <td><small>{trunc(t.project, 8)}</small></td>
-                    <td><small>{trunc(t.member, 6)}</small></td>
                     <td>
                       {(t.tags || []).map(tag => (
-                        <span key={tag.id} className="tag-badge tag-badge-sm"
-                          style={{ background: tag.color + '22', color: tag.color, border: '1px solid ' + tag.color + '44' }}>
-                          {tag.name}
-                        </span>
+                        <span key={tag.id} style={{
+                          display: 'inline-block', padding: '0 6px', borderRadius: 8, fontSize: 10,
+                          background: tag.color + '22', color: tag.color, border: '1px solid ' + tag.color + '44',
+                          marginRight: 2,
+                        }}>{tag.name}</span>
                       ))}
                     </td>
                     <td><small className="text-muted">{trunc(t.note, 10)}</small></td>
                     <td className="text-nowrap">
                       {(() => {
-                        const isExcluded = (t.tags || []).some(tag => tag.name === '排除统计');
+                        const isEx = (t.tags || []).some(tag => tag.name === '排除统计');
                         return (
-                          <button className={`btn btn-sm py-0 px-1 me-1 ${isExcluded ? 'btn-warning' : 'btn-outline-secondary'}`}
-                            onClick={() => handleToggleExclude(t)} title={isExcluded ? '取消排除' : '排除统计'}>
-                            <i className={`bi ${isExcluded ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                          <button className={`btn btn-sm py-0 px-1 me-1 ${isEx ? 'btn-warning' : 'btn-outline-secondary'}`}
+                            onClick={() => handleToggleExclude(t)} title={isEx ? '取消排除' : '排除统计'}>
+                            <i className={`bi ${isEx ? 'bi-eye-slash' : 'bi-eye'}`}></i>
                           </button>
                         );
                       })()}
@@ -325,23 +345,43 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* ── 分页 ── */}
-      <div className="d-flex justify-content-between align-items-center mt-2">
-        <small className="text-muted">共 {total} 条记录</small>
+      {/* 分页 */}
+      <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+        <div className="d-flex align-items-center gap-2">
+          <small className="text-muted">共 {total} 条</small>
+          <select className="form-select form-select-sm" style={{ width: 'auto' }}
+            value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}>
+            <option value="20">20条/页</option>
+            <option value="50">50条/页</option>
+            <option value="100">100条/页</option>
+            <option value="200">200条/页</option>
+          </select>
+        </div>
         {totalPages > 1 && (
           <nav>
             <ul className="pagination pagination-sm mb-0">
-              {Array.from({ length: Math.min(totalPages, 20) }, (_, i) => i + 1).map(p => (
-                <li key={p} className={`page-item ${p === page ? 'active' : ''}`}>
-                  <button className="page-link" onClick={() => setPage(p)}>{p}</button>
-                </li>
-              ))}
+              {page > 1 && <li className="page-item"><button className="page-link" onClick={() => setPage(1)}>«</button></li>}
+              {page > 1 && <li className="page-item"><button className="page-link" onClick={() => setPage(page - 1)}>‹</button></li>}
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                let p;
+                if (totalPages <= 7) p = i + 1;
+                else if (page <= 4) p = i + 1;
+                else if (page >= totalPages - 3) p = totalPages - 6 + i;
+                else p = page - 3 + i;
+                return (
+                  <li key={p} className={`page-item ${p === page ? 'active' : ''}`}>
+                    <button className="page-link" onClick={() => setPage(p)}>{p}</button>
+                  </li>
+                );
+              })}
+              {page < totalPages && <li className="page-item"><button className="page-link" onClick={() => setPage(page + 1)}>›</button></li>}
+              {page < totalPages && <li className="page-item"><button className="page-link" onClick={() => setPage(totalPages)}>»</button></li>}
             </ul>
           </nav>
         )}
       </div>
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       {showForm && (
         <TransactionForm
           show={showForm}
@@ -361,24 +401,4 @@ function fmt(v) {
 function trunc(s, n = 15) {
   if (!s) return '-';
   return s.length > n ? s.slice(0, n) + '...' : s;
-}
-
-function toast(msg, type = 'success') {
-  const container = document.querySelector('.toast-container') || (() => {
-    const c = document.createElement('div');
-    c.className = 'toast-container';
-    document.body.appendChild(c);
-    return c;
-  })();
-  const el = document.createElement('div');
-  el.className = 'toast align-items-center border-0 bg-white shadow-sm';
-  el.style.borderRadius = '12px';
-  el.innerHTML = `<div class="d-flex">
-    <div class="toast-body"><i class="bi bi-${type === 'danger' ? 'exclamation-circle' : 'check-circle'}" style="color:${type === 'danger' ? '#ef4444' : '#10b981'}"></i> ${msg}</div>
-    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
-  </div>`;
-  container.appendChild(el);
-  const bs = new bootstrap.Toast(el, { delay: 3000 });
-  bs.show();
-  el.addEventListener('hidden.bs.toast', () => el.remove());
 }

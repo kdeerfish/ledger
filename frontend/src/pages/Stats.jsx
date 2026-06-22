@@ -303,11 +303,11 @@ export default function Stats() {
         {largeAmount && <span className="badge bg-warning text-dark">筛选: {filteredItems.length} 项</span>}
       </div>
 
-      {/* Data Table — 点击行展开明细 */}
+      {/* Data Table — 点击行展开明细（嵌入行内） */}
       <div className="card shadow-sm mb-3">
         <div className="card-body">
           <h6 className="card-title mb-3"><i className="bi bi-table"></i> 数据明细（点击行查看详情）</h6>
-          <div className="table-responsive" style={{ maxHeight: 400, overflowY: 'auto' }}>
+          <div className="table-responsive" style={{ maxHeight: 500, overflowY: 'auto' }}>
             <table className="table stats-table table-hover">
               <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
                 <tr>
@@ -321,15 +321,15 @@ export default function Stats() {
               <tbody>
                 {(largeAmount ? filteredItems : items).length === 0 ? (
                   <tr><td colSpan="5" className="text-center text-muted py-3">暂无数据</td></tr>
-                ) : (largeAmount ? filteredItems : items).map((i, idx) => {
+                ) : (largeAmount ? filteredItems : items).flatMap((i, idx) => {
                   const totalByType = items.filter(x => x.type === i.type).reduce((s, x) => s + x.total, 0);
                   const pct = totalByType > 0 ? ((i.total / totalByType) * 100).toFixed(1) : '0.0';
                   const isSelected = selectedGroup === i.group;
-                  return (
+                  const rows = [
                     <tr key={idx}
                       onClick={() => handleGroupClick(i.group)}
                       style={{ cursor: 'pointer', backgroundColor: isSelected ? 'rgba(99,102,241,.08)' : undefined }}>
-                      <td><strong>{i.group}</strong> {isSelected && <i className="bi bi-chevron-down ms-1 text-primary"></i>}</td>
+                      <td><strong>{i.group}</strong> {isSelected && <i className="bi bi-chevron-up ms-1 text-primary"></i>}</td>
                       <td><span className={`badge ${i.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{i.type}</span></td>
                       <td className={i.type === '收入' ? 'amount-income' : 'amount-expense'}>¥ {fmt(i.total)}</td>
                       <td>{i.count}笔</td>
@@ -342,57 +342,62 @@ export default function Stats() {
                           <small className="text-muted" style={{ minWidth: 40 }}>{pct}%</small>
                         </div>
                       </td>
-                    </tr>
-                  );
+                    </tr>,
+                  ];
+                  // 选中行下方插入明细
+                  if (isSelected) {
+                    rows.push(
+                      <tr key={`${idx}-detail`} style={{ backgroundColor: '#f8f9ff' }}>
+                        <td colSpan="5" style={{ padding: 0 }}>
+                          <div style={{ padding: '8px 12px' }}>
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <small className="fw-bold text-primary">
+                                <i className="bi bi-list-ul me-1"></i>{i.group} · {i.count}笔 · ¥{fmt(i.total)}
+                              </small>
+                              <button className="btn btn-sm btn-outline-secondary py-0 px-2"
+                                style={{ fontSize: 11 }}
+                                onClick={e => { e.stopPropagation(); setSelectedGroup(null); setDetailTx([]); }}>
+                                收起
+                              </button>
+                            </div>
+                            {detailLoading ? (
+                              <div className="text-center py-2"><span className="spinner-border spinner-border-sm"></span></div>
+                            ) : detailTx.length === 0 ? (
+                              <div className="text-center text-muted py-2"><small>暂无记录</small></div>
+                            ) : (
+                              <div style={{ maxHeight: 250, overflowY: 'auto' }}>
+                                <table className="table table-sm mb-0" style={{ fontSize: 12 }}>
+                                  <thead className="table-light">
+                                    <tr><th>日期</th><th>类型</th><th>金额</th><th>类别</th><th>账户</th><th>商家</th><th>备注</th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {detailTx.map(tx => (
+                                      <tr key={tx.id}>
+                                        <td>{tx.date?.slice(0, 10)}</td>
+                                        <td><span className={`badge ${tx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`} style={{ fontSize: 10 }}>{tx.type}</span></td>
+                                        <td className={tx.type === '收入' ? 'amount-income' : 'amount-expense'}>¥{fmt(tx.amount)}</td>
+                                        <td>{tx.category}</td>
+                                        <td>{tx.account}</td>
+                                        <td>{tx.merchant}</td>
+                                        <td className="text-muted">{trunc(tx.note, 12)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return rows;
                 })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
-
-      {/* 展开的明细区域 */}
-      {selectedGroup && (
-        <div className="card shadow-sm border-primary mb-3">
-          <div className="card-header d-flex justify-content-between align-items-center bg-primary bg-opacity-10">
-            <h6 className="mb-0">
-              <i className="bi bi-list-ul me-2"></i>{selectedGroup}
-              {selectedGroupInfo && <span className="text-muted ms-2">· {selectedGroupInfo.count}笔 · ¥{fmt(selectedGroupInfo.total)}</span>}
-            </h6>
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => { setSelectedGroup(null); setDetailTx([]); }}>
-              <i className="bi bi-x"></i> 收起
-            </button>
-          </div>
-          <div className="card-body p-0">
-            {detailLoading ? (
-              <div className="text-center py-4"><span className="spinner-border spinner-border-sm"></span> 加载中...</div>
-            ) : detailTx.length === 0 ? (
-              <div className="text-center text-muted py-4">暂无交易记录</div>
-            ) : (
-              <div className="table-responsive" style={{ maxHeight: 300, overflowY: 'auto' }}>
-                <table className="table table-sm table-hover mb-0">
-                  <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
-                    <tr><th>日期</th><th>类型</th><th>金额</th><th>类别</th><th>账户</th><th>商家</th><th>备注</th></tr>
-                  </thead>
-                  <tbody>
-                    {detailTx.map(tx => (
-                      <tr key={tx.id}>
-                        <td><small>{tx.date?.slice(0, 16)}</small></td>
-                        <td><span className={`badge ${tx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{tx.type}</span></td>
-                        <td className={tx.type === '收入' ? 'amount-income' : 'amount-expense'}>¥ {fmt(tx.amount)}</td>
-                        <td><small>{tx.category}</small></td>
-                        <td><small>{tx.account}</small></td>
-                        <td><small>{tx.merchant}</small></td>
-                        <td><small className="text-muted">{trunc(tx.note, 15)}</small></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

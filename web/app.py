@@ -421,6 +421,16 @@ def list_transactions():
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
+    # 排序
+    sort_by = request.args.get('sort_by', 'trans_date')
+    sort_order = request.args.get('sort_order', 'DESC').upper()
+    allowed_sorts = {'trans_date', 'amount', 'type', 'category', 'account', 'merchant'}
+    if sort_by not in allowed_sorts:
+        sort_by = 'trans_date'
+    if sort_order not in ('ASC', 'DESC'):
+        sort_order = 'DESC'
+    sort_col = f"t.{sort_by}"
+
     # 总数
     c.execute(f"SELECT COUNT(*) FROM transactions t WHERE {where_sql}", params)
     total = c.fetchone()[0]
@@ -429,7 +439,7 @@ def list_transactions():
                         t.account, t.project, t.member, t.merchant, t.note
                  FROM transactions t
                  WHERE {where_sql}
-                 ORDER BY t.trans_date DESC LIMIT ? OFFSET ?''', params + [limit, offset])
+                 ORDER BY {sort_col} {sort_order} LIMIT ? OFFSET ?''', params + [limit, offset])
     rows = c.fetchall()
 
     transactions = []
