@@ -24,7 +24,7 @@ docker exec -it ledger python scripts/import_ledger.py /data/wechat_bill_202606.
 ```
 
 **Agent 回复**：
-> ✅ 导入完成，共 152 条记录。建议说"学习"让我分析你的记账习惯。
+> ✅ 导入完成，共 152 条记录。建议说"学习记账"让我分析你的记账习惯。
 
 ---
 
