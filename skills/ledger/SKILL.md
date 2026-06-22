@@ -257,6 +257,12 @@ curl http://127.0.0.1:5800/api/analyze
 
 ---
 
+## 其他客户端
+
+如果环境中没有 curl（如 Docker 容器），可使用 wget，详见 [references/wget.md](references/wget.md)。
+
+---
+
 ## 注意事项
 
 - 金额必须为正数

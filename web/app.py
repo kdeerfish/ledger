@@ -49,6 +49,29 @@ db_module.init_db()
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 
+
+# ─── _method 覆盖中间件（WSGI 层，在路由匹配之前执行）───
+class MethodOverrideMiddleware:
+    """支持 ?_method=PUT/DELETE，兼容 wget 等不支持 PUT/DELETE 的客户端"""
+    def __init__(self, wsgi_app):
+        self.app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        if environ.get('REQUEST_METHOD') == 'POST':
+            from urllib.parse import parse_qs
+            qs = parse_qs(environ.get('QUERY_STRING', ''))
+            method = qs.get('_method', [''])[0].upper()
+            if method in ('PUT', 'DELETE', 'PATCH'):
+                environ['REQUEST_METHOD'] = method
+                del qs['_method']
+                environ['QUERY_STRING'] = '&'.join(
+                    f'{k}={v[0]}' for k, v in qs.items()
+                ) if qs else ''
+        return self.app(environ, start_response)
+
+
+app.wsgi_app = MethodOverrideMiddleware(app.wsgi_app)
+
 # CORS
 cors_origins = os.environ.get('WEB_CORS_ORIGINS', '').strip()
 if cors_origins:
