@@ -24,7 +24,7 @@ export default function More() {
   const loadData = async () => {
     try {
       const [s, b] = await Promise.all([
-        api.getSuggestions({ field: 'all' }),
+        api.getSuggestions({ field: 'all', limit: 500 }),
         api.getImportBatches(),
       ]);
       if (s.data) setSuggestions(s.data);
@@ -48,7 +48,6 @@ export default function More() {
     try {
       await api.hideItem(field, value);
       loadHidden();
-      loadData();
     } catch (e) {}
   };
 

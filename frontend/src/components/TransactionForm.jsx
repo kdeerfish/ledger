@@ -96,7 +96,7 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
     if (!value) return;
     try {
       await api.hideItem(field, value);
-      // 直接从当前建议中移除，不重新请求（避免表单状态丢失）
+      // 直接从当前建议中移除
       const suggestionKey = field === 'category' ? 'categories'
         : field === 'subcategory' ? 'subcategories'
         : field + 's';
@@ -106,7 +106,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
           item => (item.name || item) !== value
         ),
       }));
-    } catch (e) {}
+    } catch (e) {
+      console.error('隐藏失败:', e);
+    }
   };
 
   // 双向同步：toggle ↔ tag_ids

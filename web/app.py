@@ -791,6 +791,9 @@ def get_suggestions():
     sync_db_path()
     field = request.args.get('field', 'all')
     keyword = request.args.get('keyword', '').strip()
+    limit = request.args.get('limit', 20, type=int)
+    if limit > 500:
+        limit = 500
 
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -824,7 +827,7 @@ def get_suggestions():
                      FROM transactions {where}
                      GROUP BY {db_col}
                      ORDER BY COUNT(*) DESC
-                     LIMIT 20''', params)
+                     LIMIT ?''', params + [limit])
         rows = c.fetchall()
         result[key] = [{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows]
 
@@ -832,12 +835,19 @@ def get_suggestions():
     if field == 'all':
         result['frequent'] = {}
         for key, (db_col, _) in fields_map.items():
+            freq_hidden = _get_hidden(db_col)
+            freq_where = f"WHERE is_deleted = 0 AND {db_col} != '' AND {db_col} IS NOT NULL"
+            freq_params = []
+            if freq_hidden:
+                ph = ','.join(['?'] * len(freq_hidden))
+                freq_where += f" AND {db_col} NOT IN ({ph})"
+                freq_params.extend(freq_hidden)
             c.execute(f'''SELECT {db_col}, COUNT(*)
                          FROM transactions
-                         WHERE is_deleted = 0 AND {db_col} != '' AND {db_col} IS NOT NULL
+                         {freq_where}
                          GROUP BY {db_col}
                          ORDER BY COUNT(*) DESC
-                         LIMIT 5''')
+                         LIMIT 5''', freq_params)
             result['frequent'][key] = [{'name': r[0], 'count': r[1]} for r in c.fetchall()]
 
     conn.close()
@@ -1106,11 +1116,23 @@ def get_quick_categories():
     sync_db_path()
     conn = db_module.sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''SELECT category, subcategory, COUNT(*) as cnt
-                 FROM transactions WHERE is_deleted = 0 AND subcategory != '' AND subcategory IS NOT NULL
+    hidden_cat = _get_hidden('category')
+    hidden_sub = _get_hidden('subcategory')
+    where = "WHERE is_deleted = 0 AND subcategory != '' AND subcategory IS NOT NULL"
+    params = []
+    if hidden_cat:
+        ph = ','.join(['?'] * len(hidden_cat))
+        where += f" AND category NOT IN ({ph})"
+        params.extend(hidden_cat)
+    if hidden_sub:
+        ph = ','.join(['?'] * len(hidden_sub))
+        where += f" AND subcategory NOT IN ({ph})"
+        params.extend(hidden_sub)
+    c.execute(f'''SELECT category, subcategory, COUNT(*) as cnt
+                 FROM transactions {where}
                  GROUP BY category, subcategory
                  ORDER BY cnt DESC
-                 LIMIT 20''')
+                 LIMIT 20''', params)
     rows = c.fetchall()
     conn.close()
     return api_success([{'category': r[0], 'subcategory': r[1], 'count': r[2]} for r in rows])

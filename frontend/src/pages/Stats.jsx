@@ -176,7 +176,7 @@ export default function Stats() {
   });
 
   const years = ['all'];
-  for (let i = now.getFullYear(); i >= now.getFullYear() - 2; i--) years.push(i);
+  for (let i = now.getFullYear(); i >= now.getFullYear() - 5; i--) years.push(i);
 
   // 明细排序
   const [detailSortBy, setDetailSortBy] = useState('date');
