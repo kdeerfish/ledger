@@ -94,12 +94,10 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
 
   const handleHide = async (field, value) => {
     if (!value) return;
-    if (!confirm(`确定隐藏"${value}"？之后不会出现在下拉建议中。`)) return;
     try {
       await api.hideItem(field, value);
       loadSuggestions();
-      // 清空当前字段值
-      set(field, '');
+      // 不清空当前值，只刷新建议列表
     } catch (e) {}
   };
 
