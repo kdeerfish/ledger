@@ -96,8 +96,16 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
     if (!value) return;
     try {
       await api.hideItem(field, value);
-      loadSuggestions();
-      // 不清空当前值，只刷新建议列表
+      // 直接从当前建议中移除，不重新请求（避免表单状态丢失）
+      const suggestionKey = field === 'category' ? 'categories'
+        : field === 'subcategory' ? 'subcategories'
+        : field + 's';
+      setSuggestions(prev => ({
+        ...prev,
+        [suggestionKey]: (prev[suggestionKey] || []).filter(
+          item => (item.name || item) !== value
+        ),
+      }));
     } catch (e) {}
   };
 
