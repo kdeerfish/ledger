@@ -1126,10 +1126,13 @@
           <div class="mb-3">
             <label class="form-label">AI 提供商</label>
             <select id="agentProvider" class="form-select" onchange="updateModelOptions()">
-              <option value="openai">OpenAI</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="claude">Claude</option>
-              <option value="ollama">Ollama (本地)</option>
+              <option value="">加载中...</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">模型</label>
+            <select id="agentModel" class="form-select">
+              <option value="">请先选择提供商</option>
             </select>
           </div>
           <div class="mb-3">
@@ -1137,16 +1140,11 @@
             <input type="password" id="agentApiKey" class="form-control" placeholder="sk-...">
           </div>
           <div class="mb-3">
-            <label class="form-label">模型</label>
-            <select id="agentModel" class="form-select">
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-              <option value="gpt-4">GPT-4</option>
-              <option value="gpt-4o">GPT-4o</option>
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Base URL (可选)</label>
+            <label class="form-label">Base URL <small class="text-muted">(可选，自定义时必填)</small></label>
             <input type="text" id="agentBaseUrl" class="form-control" placeholder="https://api.openai.com/v1">
+          </div>
+          <div class="alert alert-info py-2 small" id="agentProviderHint" style="display:none">
+            <i class="bi bi-info-circle"></i> <span id="agentProviderHintText"></span>
           </div>
         </div>
         <div class="modal-footer">
@@ -1156,6 +1154,8 @@
       </div>
     </div>
   </div>
+
+  <style>  </div>
 
   <style>
     .agent-chat-widget {
@@ -1262,105 +1262,146 @@
   </style>
 
   <script>
-    // Agent Chat 功能
+    ﻿// Agent Chat feature
     let agentChatOpen = false;
     let agentConfig = null;
+    let agentProviders = [];
     
     function toggleAgentChat() {
       agentChatOpen = !agentChatOpen;
-      document.getElementById('agentChatWindow').style.display = agentChatOpen ? 'flex' : 'none';
-      document.getElementById('agentChatToggle').innerHTML = agentChatOpen ? '<i class="bi bi-x-lg"></i>' : '<i class="bi bi-robot"></i>';
+      const win = document.getElementById('agentChatWindow');
+      const toggle = document.getElementById('agentChatToggle');
+      if (win) win.style.display = agentChatOpen ? 'flex' : 'none';
+      if (toggle) toggle.innerHTML = agentChatOpen ? '<i class="bi bi-x-lg"></i>' : '<i class="bi bi-robot"></i>';
     }
     
-    function showAgentSettings() {
-      const modal = new bootstrap.Modal(document.getElementById('agentSettingsModal'));
-      modal.show();
+    async function showAgentSettings() {
+      if (typeof bootstrap !== 'undefined') new bootstrap.Modal(document.getElementById('agentSettingsModal')).show();
+      if (agentProviders.length === 0) {
+        try {
+          const res = await fetch('/api/agent/providers');
+          const data = await res.json();
+          if (data.success) {
+            agentProviders = data.data;
+            renderProviders();
+          }
+        } catch (e) {}
+      }
+    }
+    
+    function renderProviders() {
+      const select = document.getElementById('agentProvider');
+      if (!select) return;
+      select.innerHTML = '';
+      const intlGroup = document.createElement('optgroup');
+      intlGroup.label = 'International';
+      ['openai', 'claude', 'ollama'].forEach(id => {
+        const p = agentProviders.find(x => x.id === id);
+        if (p) {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          intlGroup.appendChild(opt);
+        }
+      });
+      select.appendChild(intlGroup);
+      const cnGroup = document.createElement('optgroup');
+      cnGroup.label = 'China';
+      ['qwen', 'wenxin', 'glm', 'moonshot', 'hunyuan', 'spark', 'doubao', 'minimax', 'deepseek'].forEach(id => {
+        const p = agentProviders.find(x => x.id === id);
+        if (p) {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          cnGroup.appendChild(opt);
+        }
+      });
+      select.appendChild(cnGroup);
+      const custom = agentProviders.find(x => x.id === 'custom');
+      if (custom) {
+        const cg = document.createElement('optgroup');
+        cg.label = 'Custom';
+        const opt = document.createElement('option');
+        opt.value = custom.id;
+        opt.textContent = custom.name;
+        cg.appendChild(opt);
+        select.appendChild(cg);
+      }
+      if (agentConfig && agentConfig.provider) {
+        select.value = agentConfig.provider;
+        updateModelOptions();
+        if (agentConfig.model) document.getElementById('agentModel').value = agentConfig.model;
+        if (agentConfig.api_key) document.getElementById('agentApiKey').value = agentConfig.api_key;
+        if (agentConfig.base_url) document.getElementById('agentBaseUrl').value = agentConfig.base_url;
+      }
     }
     
     function updateModelOptions() {
       const provider = document.getElementById('agentProvider').value;
       const modelSelect = document.getElementById('agentModel');
       modelSelect.innerHTML = '';
-      
-      const models = {
-        'openai': ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o'],
-        'deepseek': ['deepseek-chat', 'deepseek-coder'],
-        'claude': ['claude-3-sonnet', 'claude-3-opus'],
-        'ollama': ['llama3', 'qwen2', 'mistral']
-      };
-      
-      (models[provider] || []).forEach(m => {
-        modelSelect.innerHTML += `<option value="${m}">${m}</option>`;
+      if (!provider) { modelSelect.innerHTML = '<option value="">Select provider first</option>'; return; }
+      const p = agentProviders.find(x => x.id === provider);
+      if (!p || !p.models || p.models.length === 0) {
+        modelSelect.innerHTML = '<option value="">Enter custom model</option>';
+        return;
+      }
+      p.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modelSelect.appendChild(opt);
       });
     }
     
     function saveAgentSettings() {
-      agentConfig = {
-        provider: document.getElementById('agentProvider').value,
-        api_key: document.getElementById('agentApiKey').value,
-        model: document.getElementById('agentModel').value,
-        base_url: document.getElementById('agentBaseUrl').value
-      };
+      const provider = document.getElementById('agentProvider').value;
+      const model = document.getElementById('agentModel').value;
+      const apiKey = document.getElementById('agentApiKey').value;
+      const baseUrl = document.getElementById('agentBaseUrl').value;
+      if (!provider) { alert('Please select provider'); return; }
+      if (!model) { alert('Please enter model name'); return; }
+      if (!apiKey && provider !== 'ollama') { alert('Please enter API Key'); return; }
+      agentConfig = { provider, api_key: apiKey, model, base_url: baseUrl };
       localStorage.setItem('agentConfig', JSON.stringify(agentConfig));
-      bootstrap.Modal.getInstance(document.getElementById('agentSettingsModal')).hide();
-      addAgentMessage('system', '设置已保存！现在可以开始对话了。');
+      if (typeof bootstrap !== 'undefined') bootstrap.Modal.getInstance(document.getElementById('agentSettingsModal')).hide();
+      addAgentMessage('system', 'Settings saved! You can start chatting now.');
     }
     
     function loadAgentSettings() {
       const saved = localStorage.getItem('agentConfig');
-      if (saved) {
-        agentConfig = JSON.parse(saved);
-      }
+      if (saved) agentConfig = JSON.parse(saved);
     }
     
     function addAgentMessage(role, content) {
-      const messagesDiv = document.getElementById('agentChatMessages');
-      const messageClass = role === 'user' ? 'agent-message-user' : role === 'assistant' ? 'agent-message-assistant' : 'agent-message-system';
-      const icon = role === 'user' ? '' : role === 'assistant' ? '<i class="bi bi-robot me-1"></i>' : '';
-      
-      messagesDiv.innerHTML += `
-        <div class="agent-message ${messageClass}">
-          <div class="agent-message-content">${icon}${content}</div>
-        </div>
-      `;
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      const div = document.getElementById('agentChatMessages');
+      const cls = role === 'user' ? 'agent-message-user' : role === 'assistant' ? 'agent-message-assistant' : 'agent-message-system';
+      const icon = role === 'assistant' ? '<i class="bi bi-robot me-1"></i>' : '';
+      div.innerHTML += '<div class="agent-message ' + cls + '"><div class="agent-message-content">' + icon + content + '</div></div>';
+      div.scrollTop = div.scrollHeight;
     }
     
     async function sendAgentMessage() {
       const input = document.getElementById('agentInput');
       const message = input.value.trim();
       if (!message) return;
-      
       input.value = '';
       addAgentMessage('user', message);
-      
-      if (!agentConfig) {
-        addAgentMessage('system', '请先点击右上角齿轮图标配置 AI 设置。');
-        return;
-      }
-      
+      if (!agentConfig) { addAgentMessage('system', 'Please configure AI settings first'); return; }
       try {
         const response = await fetch('/api/agent/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: message,
-            config: agentConfig
-          })
+          body: JSON.stringify({ message, config: agentConfig })
         });
-        
         const data = await response.json();
-        if (data.response) {
-          addAgentMessage('assistant', data.response);
-        } else if (data.error) {
-          addAgentMessage('system', '错误: ' + data.error);
-        }
+        if (data.response) addAgentMessage('assistant', data.response);
+        else if (data.error) addAgentMessage('system', 'Error: ' + data.error);
       } catch (e) {
-        addAgentMessage('system', '请求失败: ' + e.message);
+        addAgentMessage('system', 'Request failed: ' + e.message);
       }
     }
     
-    // 初始化
     loadAgentSettings();
   </script>
 </body>
