@@ -47,7 +47,7 @@ const config: Config = {
       title: 'Ledger',
       logo: {
         alt: 'Ledger',
-        src: 'img/logo.svg',
+        src: 'img/logo.png',
       },
       items: [
         {
