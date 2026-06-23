@@ -61,9 +61,15 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
 
   useEffect(() => {
     if (editId && show) {
-      api.getTransaction(editId).then(res => {
+      Promise.all([
+        api.getTransaction(editId),
+        api.getTags(),
+      ]).then(([res, tagsRes]) => {
         if (res.data) {
           const t = res.data;
+          const allTags = tagsRes.data || [];
+          const excludeTag = allTags.find(tg => tg.name === '排除统计');
+          const isExcluded = (t.tags || []).some(tg => tg.name === '排除统计');
           setForm({
             type: t.type || '支出',
             amount: t.amount || '',
@@ -76,6 +82,8 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
             note: t.note || '',
             date: t.date ? t.date.replace(' ', 'T').slice(0, 16) : new Date().toISOString().slice(0, 16),
             tag_ids: (t.tags || []).map(tag => tag.id),
+            _excludeFromStats: isExcluded,
+            _excludeTagId: excludeTag?.id,
           });
         }
       }).catch(() => {});
@@ -116,12 +124,40 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
     }
     setSaving(true);
     try {
+      // 处理"排除统计"标签
+      let tagIds = [...form.tag_ids];
+      const excludeTagName = '排除统计';
+      let excludeTagId = form._excludeTagId;
+
+      // 确保"排除统计"标签存在
+      if (form._excludeFromStats && !excludeTagId) {
+        try {
+          await api.createTag({ name: excludeTagName, color: '#6b7280' });
+          const tagsRes = await api.getTags();
+          if (tagsRes.data) {
+            const t = tagsRes.data.find(tg => tg.name === excludeTagName);
+            if (t) excludeTagId = t.id;
+          }
+        } catch (e) {}
+      }
+
+      if (form._excludeFromStats && excludeTagId && !tagIds.includes(excludeTagId)) {
+        tagIds.push(excludeTagId);
+      } else if (!form._excludeFromStats && excludeTagId) {
+        tagIds = tagIds.filter(id => id !== excludeTagId);
+      }
+
       const data = {
         ...form,
         amount,
         date: form.date ? form.date.replace('T', ' ') : undefined,
+        tag_ids: tagIds,
         force: true,
       };
+      // 清理内部字段
+      delete data._excludeFromStats;
+      delete data._excludeTagId;
+
       if (editId) {
         await api.updateTransaction(editId, data);
       } else {
@@ -360,6 +396,14 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
                 value={form.tag_ids}
                 onChange={ids => set('tag_ids', ids)}
               />
+              <div className="form-check form-switch mt-2">
+                <input className="form-check-input" type="checkbox" id="excludeFromStats"
+                  checked={form._excludeFromStats || false}
+                  onChange={e => set('_excludeFromStats', e.target.checked)} />
+                <label className="form-check-label small text-muted" htmlFor="excludeFromStats">
+                  排除统计（不影响图表）
+                </label>
+              </div>
             </div>
 
             {/* 备注 */}

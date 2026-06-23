@@ -455,16 +455,6 @@ export default function Transactions() {
                 </div>
               </div>
               <div className="modal-footer border-0 pt-0">
-                {(() => {
-                  const isEx = (detailTx.tags || []).some(t => t.name === '排除统计');
-                  return (
-                    <button className={`btn btn-sm ${isEx ? 'btn-warning' : 'btn-outline-secondary'}`}
-                      onClick={() => { handleToggleExclude(detailTx); setDetailTx(null); }}>
-                      <i className={`bi ${isEx ? 'bi-eye-slash' : 'bi-eye'} me-1`}></i>
-                      {isEx ? '取消排除' : '排除统计'}
-                    </button>
-                  );
-                })()}
                 <button className="btn btn-sm btn-primary"
                   onClick={() => { setDetailTx(null); handleEdit(detailTx.id); }}>
                   <i className="bi bi-pencil me-1"></i>编辑
