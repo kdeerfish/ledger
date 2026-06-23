@@ -92,26 +92,6 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
 
   const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
 
-  const handleHide = async (field, value) => {
-    if (!value) return;
-    try {
-      const res = await api.hideItem(field, value);
-      // 直接从当前建议中移除
-      const suggestionKey = field === 'category' ? 'categories'
-        : field === 'subcategory' ? 'subcategories'
-        : field + 's';
-      setSuggestions(prev => ({
-        ...prev,
-        [suggestionKey]: (prev[suggestionKey] || []).filter(
-          item => (item.name || item) !== value
-        ),
-      }));
-      toast(`已隐藏 "${value}"`);
-    } catch (e) {
-      toast('隐藏失败: ' + e.message, 'danger');
-    }
-  };
-
   // 双向同步：toggle ↔ tag_ids
   useEffect(() => {
     if (form._excludeTagId && form.tag_ids) {
@@ -371,30 +351,6 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               </div>
             </div>
 
-            {/* 隐藏选项按钮 */}
-            <div className="mt-2 d-flex flex-wrap gap-1">
-              <small className="text-muted me-1">隐藏选项：</small>
-              {[
-                { field: 'category', value: form.category, label: '类别' },
-                { field: 'subcategory', value: form.subcategory, label: '子类别' },
-                { field: 'account', value: form.account, label: '账户' },
-                { field: 'merchant', value: form.merchant, label: '商家' },
-                { field: 'project', value: form.project, label: '项目' },
-                { field: 'member', value: form.member, label: '成员' },
-              ].filter(x => x.value).map(x => (
-                <button key={x.field} type="button"
-                  className="btn btn-sm btn-outline-secondary py-0"
-                  style={{ fontSize: 11 }}
-                  onClick={() => handleHide(x.field, x.value)}>
-                  <i className="bi bi-eye-slash me-1"></i>{x.label}: {x.value}
-                </button>
-              ))}
-              {![form.category, form.subcategory, form.account, form.merchant, form.project, form.member].some(Boolean) && (
-                <small className="text-muted">填写字段后可隐藏对应选项</small>
-              )}
-            </div>
-
-            {/* 子类别快速选择 */}
             {quickSubs.length > 0 && (
               <div className="mt-3">
                 <small className="text-muted d-block mb-1">常用子类别：</small>
