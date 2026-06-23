@@ -11,6 +11,7 @@ export default function Transactions() {
   const [pageSize, setPageSize] = useState(50);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [detailTx, setDetailTx] = useState(null);
   const [suggestions, setSuggestions] = useState({});
   const [tags, setTags] = useState([]);
 
@@ -315,7 +316,12 @@ export default function Transactions() {
                 ) : txs.map(t => {
                   const isExcluded = (t.tags || []).some(tag => tag.name === '排除统计');
                   return (
-                  <tr key={t.id} style={{ opacity: isExcluded ? 0.5 : 1 }}>
+                  <tr key={t.id} style={{ opacity: isExcluded ? 0.5 : 1, cursor: 'pointer' }}
+                    onClick={e => {
+                      // 如果点击的是操作按钮，不打开详情
+                      if (e.target.closest('button')) return;
+                      setDetailTx(t);
+                    }}>
                     <td className="text-nowrap"><small>{t.date?.slice(0, 10)}</small></td>
                     <td><span className={`badge ${t.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{t.type}</span></td>
                     <td className={`${t.type === '收入' ? 'amount-income' : 'amount-expense'} text-nowrap`}>¥ {fmt(t.amount)}</td>
@@ -404,6 +410,69 @@ export default function Transactions() {
           onSaved={handleSaved}
           editId={editId}
         />
+      )}
+
+      {/* 交易详情弹窗 */}
+      {detailTx && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,.4)' }}
+          onClick={() => setDetailTx(null)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ borderRadius: 16 }}>
+              <div className="modal-header border-0 pb-0">
+                <h6 className="modal-title">
+                  <span className={`badge me-2 ${detailTx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{detailTx.type}</span>
+                  交易详情
+                </h6>
+                <button type="button" className="btn-close" onClick={() => setDetailTx(null)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="text-center mb-3">
+                  <div className={detailTx.type === '收入' ? 'amount-income' : 'amount-expense'}
+                    style={{ fontSize: 28, fontWeight: 700 }}>
+                    ¥ {fmt(detailTx.amount)}
+                  </div>
+                </div>
+                <div className="row g-2 small">
+                  <div className="col-6"><span className="text-muted">日期：</span>{detailTx.date?.slice(0, 16)}</div>
+                  <div className="col-6"><span className="text-muted">类别：</span>{detailTx.category || '-'}</div>
+                  <div className="col-6"><span className="text-muted">子类别：</span>{detailTx.subcategory || '-'}</div>
+                  <div className="col-6"><span className="text-muted">账户：</span>{detailTx.account || '-'}</div>
+                  <div className="col-6"><span className="text-muted">商家：</span>{detailTx.merchant || '-'}</div>
+                  <div className="col-6"><span className="text-muted">成员：</span>{detailTx.member || '-'}</div>
+                  <div className="col-6"><span className="text-muted">项目：</span>{detailTx.project || '-'}</div>
+                  <div className="col-12"><span className="text-muted">备注：</span>{detailTx.note || '-'}</div>
+                  <div className="col-12">
+                    <span className="text-muted">标签：</span>
+                    {(detailTx.tags || []).length > 0
+                      ? detailTx.tags.map(tag => (
+                        <span key={tag.id} className="ms-1" style={{
+                          display: 'inline-block', padding: '0 8px', borderRadius: 10, fontSize: 11,
+                          background: tag.color + '22', color: tag.color, border: '1px solid ' + tag.color + '44',
+                        }}>{tag.name}</span>
+                      ))
+                      : '-'}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-0 pt-0">
+                {(() => {
+                  const isEx = (detailTx.tags || []).some(t => t.name === '排除统计');
+                  return (
+                    <button className={`btn btn-sm ${isEx ? 'btn-warning' : 'btn-outline-secondary'}`}
+                      onClick={() => { handleToggleExclude(detailTx); setDetailTx(null); }}>
+                      <i className={`bi ${isEx ? 'bi-eye-slash' : 'bi-eye'} me-1`}></i>
+                      {isEx ? '取消排除' : '排除统计'}
+                    </button>
+                  );
+                })()}
+                <button className="btn btn-sm btn-primary"
+                  onClick={() => { setDetailTx(null); handleEdit(detailTx.id); }}>
+                  <i className="bi bi-pencil me-1"></i>编辑
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

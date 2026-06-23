@@ -144,6 +144,7 @@ export default function Stats() {
   const chartOptions = (isBar) => ({
     responsive: true,
     maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
     onClick: chartType !== 'line' ? (e, elements) => {
       if (elements.length > 0) {
         const idx = elements[0].index;
@@ -224,13 +225,13 @@ export default function Stats() {
     }
     switch (chartType) {
       case 'hbar':
-        return <Bar data={data} options={{ ...chartOptions(true), indexAxis: 'y' }} />;
+        return <Bar key="hbar" data={data} options={{ ...chartOptions(true), indexAxis: 'y' }} />;
       case 'bar':
-        return <Bar data={data} options={chartOptions(true)} />;
+        return <Bar key="bar" data={data} options={chartOptions(true)} />;
       case 'pie':
-        return <Pie data={data} options={chartOptions(false)} />;
+        return <Pie key="pie" data={data} options={chartOptions(false)} />;
       default:
-        return <Doughnut data={data} options={{ ...chartOptions(false), cutout: '55%' }} />;
+        return <Doughnut key="doughnut" data={data} options={{ ...chartOptions(false), cutout: '55%' }} />;
     }
   };
 
