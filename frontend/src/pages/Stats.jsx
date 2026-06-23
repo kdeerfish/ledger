@@ -341,7 +341,7 @@ export default function Stats() {
       {/* Data Table — 点击行展开明细（嵌入行内） */}
       <div className="card shadow-sm mb-3">
         <div className="card-body">
-          <h6 className="card-title mb-3"><i className="bi bi-table"></i> 数据明细（点击行查看详情）</h6>
+          <h6 className="card-title mb-3"><i className="bi bi-table"></i> 数据明细</h6>
           <div className="table-responsive" style={{ maxHeight: 500, overflowY: 'auto' }}>
             <table className="table stats-table table-hover">
               <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>

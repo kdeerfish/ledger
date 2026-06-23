@@ -92,7 +92,18 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
 
   const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
 
-  // 同步：如果用户从标签列表里移除了"排除统计"标签，toggle 也要跟着关
+  const handleHide = async (field, value) => {
+    if (!value) return;
+    if (!confirm(`确定隐藏"${value}"？之后不会出现在下拉建议中。`)) return;
+    try {
+      await api.hideItem(field, value);
+      loadSuggestions();
+      // 清空当前字段值
+      set(field, '');
+    } catch (e) {}
+  };
+
+  // 双向同步：toggle ↔ tag_ids
   useEffect(() => {
     if (form._excludeTagId && form.tag_ids) {
       const hasExcludeTag = form.tag_ids.includes(form._excludeTagId);
@@ -275,9 +286,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 类别 */}
               <div className="col-md-4">
                 <label className="form-label">类别</label>
-                <input type="text" className="form-control" list="catList"
-                  value={form.category} onChange={e => set('category', e.target.value)}
-                  placeholder="如：食品酒水" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="catList"
+                    value={form.category} onChange={e => set('category', e.target.value)}
+                    placeholder="如：食品酒水" />
+                  {form.category && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('category', form.category)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="catList">
                   {(suggestions.categories || []).map(c => (
                     <option key={c.name} value={c.name} />
@@ -301,9 +320,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 账户 */}
               <div className="col-md-4">
                 <label className="form-label">账户</label>
-                <input type="text" className="form-control" list="accList"
-                  value={form.account} onChange={e => set('account', e.target.value)}
-                  placeholder="如：微信" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="accList"
+                    value={form.account} onChange={e => set('account', e.target.value)}
+                    placeholder="如：微信" />
+                  {form.account && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('account', form.account)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="accList">
                   {(suggestions.accounts || []).map(a => (
                     <option key={a.name} value={a.name} />
@@ -314,9 +341,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 商家 */}
               <div className="col-md-4">
                 <label className="form-label">商家</label>
-                <input type="text" className="form-control" list="merchantList"
-                  value={form.merchant} onChange={e => set('merchant', e.target.value)}
-                  placeholder="如：美团" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="merchantList"
+                    value={form.merchant} onChange={e => set('merchant', e.target.value)}
+                    placeholder="如：美团" />
+                  {form.merchant && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('merchant', form.merchant)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="merchantList">
                   {(suggestions.merchants || []).map(m => (
                     <option key={m.name} value={m.name} />
@@ -411,7 +446,21 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               <div className="form-check form-switch mt-2">
                 <input className="form-check-input" type="checkbox" id="excludeFromStats"
                   checked={form._excludeFromStats || false}
-                  onChange={e => set('_excludeFromStats', e.target.checked)} />
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setForm(prev => {
+                      const newState = { ...prev, _excludeFromStats: checked };
+                      // 同步更新 tag_ids
+                      if (prev._excludeTagId) {
+                        if (checked && !prev.tag_ids.includes(prev._excludeTagId)) {
+                          newState.tag_ids = [...prev.tag_ids, prev._excludeTagId];
+                        } else if (!checked) {
+                          newState.tag_ids = prev.tag_ids.filter(id => id !== prev._excludeTagId);
+                        }
+                      }
+                      return newState;
+                    });
+                  }} />
                 <label className="form-check-label small text-muted" htmlFor="excludeFromStats">
                   排除统计
                 </label>

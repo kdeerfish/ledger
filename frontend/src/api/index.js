@@ -111,6 +111,17 @@ export const api = {
     return request('/info');
   },
 
+  // 隐藏项管理
+  getHidden(field) {
+    return request('/hidden/' + field);
+  },
+  hideItem(field, value) {
+    return request('/hidden/' + field, { method: 'POST', body: JSON.stringify({ value }) });
+  },
+  unhideItem(field, value) {
+    return request('/hidden/' + field, { method: 'DELETE', body: JSON.stringify({ value }) });
+  },
+
   // 导入
   importPreview(formData) {
     return fetch(BASE + '/import/preview', { method: 'POST', body: formData })

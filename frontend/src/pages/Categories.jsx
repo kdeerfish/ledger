@@ -5,11 +5,35 @@ export default function Tags() {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState({ name: '', color: '#6366f1' });
   const [batches, setBatches] = useState([]);
+  const [hiddenItems, setHiddenItems] = useState({});
+
+  const HIDDEN_FIELDS = [
+    { field: 'category', label: '类别' },
+    { field: 'subcategory', label: '子类别' },
+    { field: 'account', label: '账户' },
+    { field: 'merchant', label: '商家' },
+    { field: 'member', label: '成员' },
+    { field: 'project', label: '项目' },
+  ];
 
   useEffect(() => {
     loadTags();
     loadBatches();
+    loadHidden();
   }, []);
+
+  const loadHidden = async () => {
+    const result = {};
+    for (const { field } of HIDDEN_FIELDS) {
+      try {
+        const res = await api.getHidden(field);
+        if (res.data && res.data.length > 0) {
+          result[field] = res.data;
+        }
+      } catch (e) {}
+    }
+    setHiddenItems(result);
+  };
 
   const loadTags = async () => {
     try {
@@ -40,6 +64,13 @@ export default function Tags() {
     try {
       await api.deleteTag(id);
       loadTags();
+    } catch (e) {}
+  };
+
+  const handleUnhide = async (field, value) => {
+    try {
+      await api.unhideItem(field, value);
+      loadHidden();
     } catch (e) {}
   };
 
@@ -121,7 +152,7 @@ export default function Tags() {
 
       {/* 导入批次历史 */}
       {batches.length > 0 && (
-        <div className="card">
+        <div className="card mb-4">
           <div className="card-header"><strong>导入批次历史</strong></div>
           <div className="card-body p-0">
             <table className="table table-sm mb-0">
@@ -156,6 +187,32 @@ export default function Tags() {
           </div>
         </div>
       )}
+
+      {/* 隐藏项管理 */}
+      <div className="card">
+        <div className="card-header"><strong>已隐藏的选项</strong></div>
+        <div className="card-body">
+          {HIDDEN_FIELDS.map(({ field, label }) => {
+            const items = hiddenItems[field];
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={field} className="mb-2">
+                <small className="text-muted">{label}：</small>
+                {items.map(v => (
+                  <span key={v} className="badge bg-secondary me-1" style={{ cursor: 'pointer' }}
+                    onClick={() => handleUnhide(field, v)}
+                    title="点击取消隐藏">
+                    {v} <i className="bi bi-x ms-1"></i>
+                  </span>
+                ))}
+              </div>
+            );
+          })}
+          {Object.values(hiddenItems).every(v => !v || v.length === 0) && (
+            <div className="text-muted text-center py-2">暂无隐藏项</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

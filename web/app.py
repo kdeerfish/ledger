@@ -553,10 +553,12 @@ def update_transaction(data, tid):
             update_fields['trans_date'] = data['date']
 
         # Tag 更新
+        tag_updated = False
         if 'tag_ids' in data:
             db_module.set_transaction_tags(tid, data['tag_ids'])
+            tag_updated = True
 
-        if not update_fields:
+        if not update_fields and not tag_updated:
             return api_error('没有需要更新的字段')
 
         try:
@@ -807,11 +809,17 @@ def get_suggestions():
     for key, (db_col, _) in fields_map.items():
         if field != 'all' and field != key:
             continue
+        # 获取隐藏列表
+        hidden = _get_hidden(db_col)
         where = "WHERE is_deleted = 0 AND {} != '' AND {} IS NOT NULL".format(db_col, db_col)
         params = []
         if keyword:
             where += f" AND {db_col} LIKE ?"
             params.append(f'%{keyword}%')
+        if hidden:
+            placeholders = ','.join(['?'] * len(hidden))
+            where += f" AND {db_col} NOT IN ({placeholders})"
+            params.extend(hidden)
         c.execute(f'''SELECT {db_col}, COUNT(*), SUM(amount)
                      FROM transactions {where}
                      GROUP BY {db_col}
@@ -1292,6 +1300,74 @@ def analyze():
     tx_module.DB_PATH = DB_PATH
     result = tx_module.analyze_data()
     return api_success({'report': result})
+
+
+# ════════════════════════════════════════════════════════
+# 隐藏项管理 API
+# ════════════════════════════════════════════════════════
+
+def _get_hidden(field):
+    """获取某个字段的隐藏值列表"""
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT value FROM meta WHERE key = ?", (f'hidden_{field}',))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        try:
+            return json.loads(row[0])
+        except Exception:
+            pass
+    return []
+
+
+def _set_hidden(field, items):
+    """设置某个字段的隐藏值列表"""
+    conn = db_module.sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+              (f'hidden_{field}', json.dumps(items, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+
+
+@app.route('/api/hidden/<field>', methods=['GET'])
+def get_hidden_items(field):
+    """获取隐藏项列表"""
+    if field not in ('category', 'account', 'merchant', 'member', 'project', 'subcategory'):
+        return api_error('不支持的字段')
+    items = _get_hidden(field)
+    return api_success(items)
+
+
+@app.route('/api/hidden/<field>', methods=['POST'])
+def set_hidden_item(field):
+    """隐藏一个值"""
+    if field not in ('category', 'account', 'merchant', 'member', 'project', 'subcategory'):
+        return api_error('不支持的字段')
+    data = request.get_json(silent=True) or {}
+    value = data.get('value', '').strip()
+    if not value:
+        return api_error('值不能为空')
+    items = _get_hidden(field)
+    if value not in items:
+        items.append(value)
+        _set_hidden(field, items)
+    return api_success(items)
+
+
+@app.route('/api/hidden/<field>', methods=['DELETE'])
+def unhide_item(field):
+    """取消隐藏"""
+    if field not in ('category', 'account', 'merchant', 'member', 'project', 'subcategory'):
+        return api_error('不支持的字段')
+    data = request.get_json(silent=True) or {}
+    value = data.get('value', '').strip()
+    items = _get_hidden(field)
+    if value in items:
+        items.remove(value)
+        _set_hidden(field, items)
+    return api_success(items)
 
 
 # ════════════════════════════════════════════════════════
