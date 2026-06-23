@@ -295,17 +295,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 类别 */}
               <div className="col-md-4">
                 <label className="form-label">类别</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="catList"
-                    value={form.category} onChange={e => set('category', e.target.value)}
-                    placeholder="如：食品酒水" />
-                  {form.category && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('category', form.category)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="catList"
+                  value={form.category} onChange={e => set('category', e.target.value)}
+                  placeholder="如：食品酒水" />
                 <datalist id="catList">
                   {(suggestions.categories || []).map(c => (
                     <option key={c.name} value={c.name} />
@@ -316,17 +308,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 子类别 */}
               <div className="col-md-4">
                 <label className="form-label">子类别</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="subcatList"
-                    value={form.subcategory} onChange={e => set('subcategory', e.target.value)}
-                    placeholder="如：水果" />
-                  {form.subcategory && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('subcategory', form.subcategory)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="subcatList"
+                  value={form.subcategory} onChange={e => set('subcategory', e.target.value)}
+                  placeholder="如：水果" />
                 <datalist id="subcatList">
                   {(suggestions.subcategories || []).map(c => (
                     <option key={c.name} value={c.name} />
@@ -337,17 +321,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 账户 */}
               <div className="col-md-4">
                 <label className="form-label">账户</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="accList"
-                    value={form.account} onChange={e => set('account', e.target.value)}
-                    placeholder="如：微信" />
-                  {form.account && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('account', form.account)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="accList"
+                  value={form.account} onChange={e => set('account', e.target.value)}
+                  placeholder="如：微信" />
                 <datalist id="accList">
                   {(suggestions.accounts || []).map(a => (
                     <option key={a.name} value={a.name} />
@@ -358,17 +334,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 商家 */}
               <div className="col-md-4">
                 <label className="form-label">商家</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="merchantList"
-                    value={form.merchant} onChange={e => set('merchant', e.target.value)}
-                    placeholder="如：美团" />
-                  {form.merchant && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('merchant', form.merchant)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="merchantList"
+                  value={form.merchant} onChange={e => set('merchant', e.target.value)}
+                  placeholder="如：美团" />
                 <datalist id="merchantList">
                   {(suggestions.merchants || []).map(m => (
                     <option key={m.name} value={m.name} />
@@ -379,17 +347,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 项目 */}
               <div className="col-md-4">
                 <label className="form-label">项目</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="projectList"
-                    value={form.project} onChange={e => set('project', e.target.value)}
-                    placeholder="项目名称" />
-                  {form.project && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('project', form.project)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="projectList"
+                  value={form.project} onChange={e => set('project', e.target.value)}
+                  placeholder="项目名称" />
                 <datalist id="projectList">
                   {(suggestions.projects || []).map(p => (
                     <option key={p.name} value={p.name} />
@@ -400,23 +360,38 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 成员 */}
               <div className="col-md-4">
                 <label className="form-label">成员</label>
-                <div className="input-group input-group-sm">
-                  <input type="text" className="form-control" list="memberList"
-                    value={form.member} onChange={e => set('member', e.target.value)}
-                    placeholder="如：本人" />
-                  {form.member && (
-                    <button className="btn btn-outline-secondary" type="button"
-                      onClick={() => handleHide('member', form.member)} title="隐藏此选项">
-                      <i className="bi bi-eye-slash"></i>
-                    </button>
-                  )}
-                </div>
+                <input type="text" className="form-control form-control-sm" list="memberList"
+                  value={form.member} onChange={e => set('member', e.target.value)}
+                  placeholder="如：本人" />
                 <datalist id="memberList">
                   {(suggestions.members || []).map(m => (
                     <option key={m.name} value={m.name} />
                   ))}
                 </datalist>
               </div>
+            </div>
+
+            {/* 隐藏选项按钮 */}
+            <div className="mt-2 d-flex flex-wrap gap-1">
+              <small className="text-muted me-1">隐藏选项：</small>
+              {[
+                { field: 'category', value: form.category, label: '类别' },
+                { field: 'subcategory', value: form.subcategory, label: '子类别' },
+                { field: 'account', value: form.account, label: '账户' },
+                { field: 'merchant', value: form.merchant, label: '商家' },
+                { field: 'project', value: form.project, label: '项目' },
+                { field: 'member', value: form.member, label: '成员' },
+              ].filter(x => x.value).map(x => (
+                <button key={x.field} type="button"
+                  className="btn btn-sm btn-outline-secondary py-0"
+                  style={{ fontSize: 11 }}
+                  onClick={() => handleHide(x.field, x.value)}>
+                  <i className="bi bi-eye-slash me-1"></i>{x.label}: {x.value}
+                </button>
+              ))}
+              {![form.category, form.subcategory, form.account, form.merchant, form.project, form.member].some(Boolean) && (
+                <small className="text-muted">填写字段后可隐藏对应选项</small>
+              )}
             </div>
 
             {/* 子类别快速选择 */}
