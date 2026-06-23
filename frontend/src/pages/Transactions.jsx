@@ -78,9 +78,13 @@ export default function Transactions() {
   }, []);
 
   useEffect(() => {
-    loadData();
     loadSuggestions();
-  }, [loadData, loadSuggestions]);
+  }, [loadSuggestions]);
+
+  // 筛选/分页/排序变化时重新加载
+  useEffect(() => {
+    loadData();
+  }, [filters, page, pageSize, sortBy, sortOrder]);
 
   const setFilter = (key, val) => {
     setFilters(prev => ({ ...prev, [key]: val }));
@@ -162,8 +166,13 @@ export default function Transactions() {
 
     try {
       await api.updateTransaction(tx.id, { tag_ids: newTagIds });
-      // 成功后刷新获取真实数据
-      loadData();
+      // 成功后用真实标签数据更新本地状态（不重新加载整页）
+      const updatedTags = isExcluded
+        ? currentTags.filter(t => t.name !== excludeTagName)
+        : [...currentTags, { id: excludeTag?.id || -1, name: excludeTagName, color: '#6b7280' }];
+      setTxs(prev => prev.map(item =>
+        item.id === tx.id ? { ...item, tags: updatedTags } : item
+      ));
     } catch (e) {
       // 失败则回滚
       setTxs(prev => prev.map(item =>

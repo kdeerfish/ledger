@@ -180,6 +180,7 @@ export default function Stats() {
   // 明细排序
   const [detailSortBy, setDetailSortBy] = useState('date');
   const [detailSortOrder, setDetailSortOrder] = useState('DESC');
+  const [detailModalTx, setDetailModalTx] = useState(null);
 
   const sortedDetailTx = [...detailTx].sort((a, b) => {
     let va = a[detailSortBy] ?? '', vb = b[detailSortBy] ?? '';
@@ -384,13 +385,6 @@ export default function Stats() {
                       <tr key={`${idx}-detail`} style={{ backgroundColor: '#f8f9ff' }}>
                         <td colSpan="5" style={{ padding: 0 }}>
                           <div style={{ padding: '8px 12px' }}>
-                            <div className="d-flex justify-content-end mb-1">
-                              <button className="btn btn-sm btn-outline-secondary py-0 px-2"
-                                style={{ fontSize: 11 }}
-                                onClick={e => { e.stopPropagation(); setSelectedGroup(null); setDetailTx([]); }}>
-                                收起
-                              </button>
-                            </div>
                             {detailLoading ? (
                               <div className="text-center py-2"><span className="spinner-border spinner-border-sm"></span></div>
                             ) : detailTx.length === 0 ? (
@@ -411,7 +405,8 @@ export default function Stats() {
                                   </thead>
                                   <tbody>
                                     {sortedDetailTx.map(tx => (
-                                      <tr key={tx.id}>
+                                      <tr key={tx.id} style={{ cursor: 'pointer' }}
+                                        onClick={() => setDetailModalTx(tx)}>
                                         <td>{tx.date?.slice(0, 10)}</td>
                                         <td><span className={`badge ${tx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`} style={{ fontSize: 10 }}>{tx.type}</span></td>
                                         <td className={tx.type === '收入' ? 'amount-income' : 'amount-expense'}>¥{fmt(tx.amount)}</td>
@@ -437,6 +432,39 @@ export default function Stats() {
           </div>
         </div>
       </div>
+
+      {/* 交易详情弹窗 */}
+      {detailModalTx && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,.4)' }}
+          onClick={() => setDetailModalTx(null)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ borderRadius: 16 }}>
+              <div className="modal-header border-0 pb-0">
+                <h6 className="modal-title">
+                  <span className={`badge me-2 ${detailModalTx.type === '收入' ? 'badge-type-income' : 'badge-type-expense'}`}>{detailModalTx.type}</span>
+                  交易详情
+                </h6>
+                <button type="button" className="btn-close" onClick={() => setDetailModalTx(null)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="text-center mb-3">
+                  <div className={detailModalTx.type === '收入' ? 'amount-income' : 'amount-expense'}
+                    style={{ fontSize: 28, fontWeight: 700 }}>
+                    ¥ {fmt(detailModalTx.amount)}
+                  </div>
+                </div>
+                <div className="row g-2 small">
+                  <div className="col-6"><span className="text-muted">日期：</span>{detailModalTx.date?.slice(0, 16)}</div>
+                  <div className="col-6"><span className="text-muted">类别：</span>{detailModalTx.category || '-'}</div>
+                  <div className="col-6"><span className="text-muted">账户：</span>{detailModalTx.account || '-'}</div>
+                  <div className="col-6"><span className="text-muted">商家：</span>{detailModalTx.merchant || '-'}</div>
+                  <div className="col-12"><span className="text-muted">备注：</span>{detailModalTx.note || '-'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
