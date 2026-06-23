@@ -1,112 +1,261 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Agent API Routes
-"""
+"""Agent API Routes"""
 
 import asyncio
+import json
+import os
 from flask import request, jsonify
+import httpx
+
+
+# Provider configuration - latest models
+PROVIDERS_CONFIG = {
+    'openai': {
+        'name': 'OpenAI',
+        'api_style': 'openai',
+        'default_base_url': 'https://api.openai.com/v1',
+        'models_url': '/models',
+        'auth_header': 'Authorization',
+        'auth_prefix': 'Bearer ',
+        'models': [
+            'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+            'o1', 'o1-mini', 'o1-pro', 'o3', 'o3-mini', 'o3-pro', 'o4-mini',
+            'gpt-4-turbo', 'gpt-3.5-turbo'
+        ]
+    },
+    'claude': {
+        'name': 'Claude',
+        'api_style': 'claude',
+        'default_base_url': 'https://api.anthropic.com',
+        'models_url': '/v1/models',
+        'auth_header': 'x-api-key',
+        'auth_prefix': '',
+        'models': [
+            'claude-sonnet-4-5', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219',
+            'claude-opus-4-1-20250805', 'claude-opus-4-20250514',
+            'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'
+        ]
+    },
+    'deepseek': {
+        'name': 'DeepSeek', 'api_style': 'openai',
+        'default_base_url': 'https://api.deepseek.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder', 'deepseek-v3']
+    },
+    'qwen': {
+        'name': 'Qwen (Alibaba)', 'api_style': 'openai',
+        'default_base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long',
+            'qwen3-max', 'qwen3-plus', 'qwen3-235b-a22b',
+            'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct', 'qwen2.5-14b-instruct', 'qwen2.5-7b-instruct',
+            'qwen-coder-plus', 'qwen-vl-max', 'qwen-vl-plus'
+        ]
+    },
+    'wenxin': {
+        'name': 'Wenxin (Baidu)', 'api_style': 'openai',
+        'default_base_url': 'https://qianfan.baidubce.com/v2', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'ernie-4.5-8k', 'ernie-4.5-turbo-128k', 'ernie-4.0-turbo-8k', 'ernie-4.0-8k',
+            'ernie-3.5-8k', 'ernie-3.5-128k', 'ernie-speed-pro-128k',
+            'ernie-lite-8k', 'ernie-tiny-8k'
+        ]
+    },
+    'glm': {
+        'name': 'GLM (Zhipu)', 'api_style': 'openai',
+        'default_base_url': 'https://open.bigmodel.cn/api/paas/v4', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'glm-4-plus', 'glm-4-0520', 'glm-4-air', 'glm-4-airx', 'glm-4-long',
+            'glm-4-flash', 'glm-4-flashx', 'glm-zero-preview', 'glm-3-turbo'
+        ]
+    },
+    'moonshot': {
+        'name': 'Kimi (Moonshot)', 'api_style': 'openai',
+        'default_base_url': 'https://api.moonshot.cn/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto',
+            'kimi-k2-0905-preview', 'kimi-latest'
+        ]
+    },
+    'hunyuan': {
+        'name': 'Hunyuan (Tencent)', 'api_style': 'openai',
+        'default_base_url': 'https://api.hunyuan.cloud.tencent.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'hunyuan-turbo', 'hunyuan-turbos', 'hunyuan-pro', 'hunyuan-standard',
+            'hunyuan-standard-256k', 'hunyuan-lite', 'hunyuan-code', 'hunyuan-role', 'hunyuan-vision'
+        ]
+    },
+    'spark': {
+        'name': 'Spark (iFlytek)', 'api_style': 'openai',
+        'default_base_url': 'https://spark-api-open.xf-yun.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'generalv3.5', 'generalv3', 'pro-128k', 'max-32k', 'lite',
+            'spark-3.0-ultra', 'spark-v3.5'
+        ]
+    },
+    'doubao': {
+        'name': 'Doubao (ByteDance)', 'api_style': 'openai',
+        'default_base_url': 'https://ark.cn-beijing.volces.com/api/v3', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'doubao-pro-32k', 'doubao-pro-256k', 'doubao-lite-4k', 'doubao-lite-32k', 'doubao-lite-128k',
+            'doubao-1-5-pro-32k', 'doubao-1-5-pro-256k'
+        ]
+    },
+    'minimax': {
+        'name': 'MiniMax', 'api_style': 'openai',
+        'default_base_url': 'https://api.MiniMax.chat/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': ['MiniMax-Text-01', 'MiniMax-VL-01', 'MiniMax-Text-02', 'MiniMax-Reasoning-01']
+    },
+    'ollama': {
+        'name': 'Ollama (Local)', 'api_style': 'openai',
+        'default_base_url': 'http://localhost:11434/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'llama3.3', 'llama3.2', 'qwen2.5', 'qwen2.5-coder', 'mistral', 'mixtral',
+            'gemma2', 'phi3', 'codellama', 'deepseek-coder-v2'
+        ]
+    },
+    'custom': {
+        'name': 'Custom (OpenAI compatible)', 'api_style': 'openai',
+        'default_base_url': '', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': []
+    }
+}
 
 
 def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
-    """注册 Agent API 路由"""
+    """Register Agent API routes"""
     import ledger_modules.agent as agent_module
     
-    @app.route('/api/agent/providers', methods=['GET'])
+    @app.route("/api/agent/providers", methods=["GET"])
     def agent_providers():
-        """获取支持的 AI 厂商列表"""
-        providers = [
-            {'id': 'openai', 'name': 'OpenAI', 'models': ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']},
-            {'id': 'claude', 'name': 'Claude', 'models': ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307']},
-            {'id': 'deepseek', 'name': 'DeepSeek', 'models': ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner']},
-            {'id': 'qwen', 'name': '通义千问 (阿里)', 'models': ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-long', 'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct', 'qwen2.5-14b-instruct', 'qwen2.5-7b-instruct']},
-            {'id': 'wenxin', 'name': '文心一言 (百度)', 'models': ['ernie-4.0-8k', 'ernie-3.5-8k', 'ernie-3.5-128k', 'ernie-speed-8k', 'ernie-lite-8k', 'ernie-tiny-8k']},
-            {'id': 'glm', 'name': '智谱AI (GLM)', 'models': ['glm-4', 'glm-4-plus', 'glm-4-0520', 'glm-4-air', 'glm-4-airx', 'glm-4-long', 'glm-4-flash', 'glm-3-turbo']},
-            {'id': 'moonshot', 'name': 'Kimi (月之暗面)', 'models': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto']},
-            {'id': 'hunyuan', 'name': '腾讯混元', 'models': ['hunyuan-pro', 'hunyuan-standard', 'hunyuan-lite', 'hunyuan-turbo', 'hunyuan-code', 'hunyuan-role']},
-            {'id': 'spark', 'name': '讯飞星火', 'models': ['general', 'generalv3', 'generalv3.5', 'pro-128k', 'max-32k', 'lite']},
-            {'id': 'doubao', 'name': '豆包 (字节跳动)', 'models': ['doubao-pro-32k', 'doubao-pro-128k', 'doubao-lite-4k', 'doubao-lite-32k', 'doubao-lite-128k']},
-            {'id': 'minimax', 'name': 'MiniMax', 'models': ['MiniMax-text-01', 'MiniMax-VL-01']},
-            {'id': 'ollama', 'name': 'Ollama (本地)', 'models': ['llama3', 'qwen2', 'mistral', 'gemma2', 'phi3', 'codellama']},
-            {'id': 'custom', 'name': '自定义 (OpenAI兼容)', 'models': []},
-        ]
+        providers = []
+        for pid, cfg in PROVIDERS_CONFIG.items():
+            providers.append({
+                "id": pid,
+                "name": cfg["name"],
+                "models": cfg["models"]
+            })
         return api_success(providers)
     
-    @app.route('/api/agent/chat', methods=['POST'])
+    @app.route("/api/agent/fetch_models", methods=["POST"])
+    def agent_fetch_models():
+        data = request.get_json(silent=True) or {}
+        provider = data.get("provider", "")
+        api_key = (data.get("api_key") or "").strip()
+        base_url = (data.get("base_url") or "").strip()
+        
+        cfg = PROVIDERS_CONFIG.get(provider)
+        if not cfg:
+            return api_error("Unknown provider")
+        
+        url = base_url or cfg["default_base_url"]
+        if not url:
+            return api_error("Provider requires Base URL")
+        
+        models_url = url.rstrip("/") + cfg["models_url"]
+        
+        headers = {}
+        if cfg["api_style"] == "claude":
+            headers["x-api-key"] = api_key
+            headers["anthropic-version"] = "2023-06-01"
+        else:
+            auth_val = (cfg["auth_prefix"] + api_key) if api_key else cfg["auth_prefix"].rstrip() or "ollama"
+            headers[cfg["auth_header"]] = auth_val
+        
+        try:
+            with httpx.Client(timeout=15.0) as client:
+                resp = client.get(models_url, headers=headers)
+                if resp.status_code == 200:
+                    result = resp.json()
+                    models = []
+                    if cfg["api_style"] == "claude":
+                        for m in result.get("data", []):
+                            models.append(m.get("id", ""))
+                    else:
+                        for m in result.get("data", []):
+                            mid = m.get("id", "")
+                            if mid:
+                                models.append(mid)
+                    return api_success({"models": models, "source": "live"})
+                else:
+                    return api_error(f"API returned {resp.status_code}")
+        except Exception as e:
+            return api_error(f"Failed: {str(e)}")
+    
+    @app.route("/api/agent/chat", methods=["POST"])
     def agent_chat():
-        """Agent 聊天接口"""
         sync_db_path()
         data = request.get_json(silent=True)
         if not data:
-            return api_error('请求数据不能为空')
+            return api_error("Empty request")
         
-        message = data.get('message', '').strip()
+        message = (data.get("message") or "").strip()
         if not message:
-            return api_error('消息不能为空')
+            return api_error("Empty message")
         
-        config = data.get('config', {})
+        config = data.get("config") or {}
+        history = data.get("history") or []
+        
         if not config:
-            return api_error('请先配置 AI 设置')
+            return api_error("Please configure AI first")
         
         if not agent_module.agent_service.load_config(config):
-            return api_error('配置加载失败')
+            return api_error("Failed to load config")
         
-        provider = config.get('provider', 'openai')
+        provider = config.get("provider", "openai")
         provider_names = {
-            'openai': 'OpenAI', 'claude': 'Claude', 'deepseek': 'DeepSeek',
-            'qwen': '通义千问', 'wenxin': '文心一言', 'glm': '智谱GLM',
-            'moonshot': 'Kimi', 'hunyuan': '腾讯混元', 'spark': '讯飞星火',
-            'doubao': '豆包', 'minimax': 'MiniMax', 'ollama': 'Ollama', 'custom': '自定义'
+            "openai": "OpenAI", "claude": "Claude", "deepseek": "DeepSeek",
+            "qwen": "Qwen", "wenxin": "Wenxin", "glm": "GLM",
+            "moonshot": "Kimi", "hunyuan": "Hunyuan", "spark": "Spark",
+            "doubao": "Doubao", "minimax": "MiniMax", "ollama": "Ollama", "custom": "Custom"
         }
         
-        system_prompt = f"""你是 Ledger 记账系统的 AI 助手（由 {provider_names.get(provider, provider)} 提供能力）。你可以帮助用户：
-1. 记账：用户说"记一笔午餐30元"，你调用 add_transaction 工具
-2. 查询：用户说"查本月支出"，你调用 query_transactions 工具
-3. 统计：用户说"本月统计"，你调用 get_statistics 工具
-4. 预算：用户说"查预算"，你调用 query_budgets 工具
-
-请用中文回复，简洁明了。如果用户没有明确说日期，默认使用今天。
-"""
+        system_prompt = "You are Ledger AI assistant powered by " + provider_names.get(provider, provider) + ". Help with: 1) Add transaction (e.g. add lunch 30 yuan -> use add_transaction tool), 2) Query (check this month expenses -> query_transactions), 3) Statistics (this month stats -> get_statistics), 4) Budget (check budget -> query_budgets). Reply in Chinese concisely. Today: " + __import__("datetime").datetime.now().strftime("%Y-%m-%d")
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        for h in history[-6:]:
+            if h.get("role") in ("user", "assistant") and h.get("content"):
+                if h["content"] != "Thinking...":
+                    messages.append({"role": h["role"], "content": h["content"]})
+        messages.append({"role": "user", "content": message})
         
         try:
             response = asyncio.run(agent_module.agent_service.chat(messages))
             
-            # 处理 Claude 响应
-            if provider == 'claude':
-                content = ''
-                tool_calls = None
-                if response.get('content'):
-                    for block in response['content']:
-                        if block.get('type') == 'text':
-                            content += block.get('text', '')
+            if provider == "claude":
+                content = ""
+                if response.get("content"):
+                    for block in response["content"]:
+                        if block.get("type") == "text":
+                            content += block.get("text", "")
+                return api_success({"response": content or "OK"})
+            
+            if response.get("choices") and response["choices"][0].get("message", {}).get("tool_calls"):
+                tool_calls = response["choices"][0]["message"]["tool_calls"]
                 return api_success({
-                    'response': content or '收到回复',
-                    'tool_calls': tool_calls
+                    "response": response["choices"][0]["message"].get("content") or "Processing...",
+                    "tool_calls": tool_calls
                 })
             
-            # OpenAI 兼容响应
-            if response.get('choices', [{}])[0].get('message', {}).get('tool_calls'):
-                tool_calls = response['choices'][0]['message']['tool_calls']
-                return api_success({
-                    'response': response['choices'][0]['message']['content'] or '正在处理...',
-                    'tool_calls': tool_calls
-                })
-            
-            return api_success({
-                'response': response['choices'][0]['message']['content']
-            })
+            msg = response.get("choices", [{}])[0].get("message", {})
+            return api_success({"response": msg.get("content", "")})
         except Exception as e:
-            return api_error(f'请求失败: {str(e)}')
+            return api_error(f"Failed: {str(e)}")
     
-    @app.route('/api/agent/config', methods=['POST'])
+    @app.route("/api/agent/config", methods=["POST"])
     def save_agent_config():
-        """保存 Agent 配置"""
         data = request.get_json(silent=True)
         if not data:
-            return api_error('请求数据不能为空')
-        return api_success({'message': '配置已保存'})
+            return api_error("Empty request")
+        return api_success({"message": "Config saved"})
