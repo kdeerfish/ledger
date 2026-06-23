@@ -95,7 +95,7 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
   const handleHide = async (field, value) => {
     if (!value) return;
     try {
-      await api.hideItem(field, value);
+      const res = await api.hideItem(field, value);
       // 直接从当前建议中移除
       const suggestionKey = field === 'category' ? 'categories'
         : field === 'subcategory' ? 'subcategories'
@@ -106,8 +106,9 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
           item => (item.name || item) !== value
         ),
       }));
+      toast(`已隐藏 "${value}"`);
     } catch (e) {
-      console.error('隐藏失败:', e);
+      toast('隐藏失败: ' + e.message, 'danger');
     }
   };
 
