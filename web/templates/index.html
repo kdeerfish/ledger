@@ -1540,15 +1540,29 @@
         body: JSON.stringify({ message: message, config: agentConfig, history: chatHistory.slice(-10) })
       });
       const data = await response.json();
+      console.log('[AgentChat] API response:', data);
+      
+      // Remove "思考中..." message
       const msgs = document.getElementById('agentChatMessages').children;
-      if (msgs.length > 0 && msgs[msgs.length-1].textContent === 'Thinking...') {
+      if (msgs.length > 0 && msgs[msgs.length-1].textContent === '思考中...') {
         document.getElementById('agentChatMessages').removeChild(msgs[msgs.length-1]);
         chatHistory.pop();
       }
-      if (data.response) {
-        addAgentMessage('assistant', data.response);
-      } else if (data.error) {
-        addAgentMessage('system', 'Error: ' + data.error);
+      
+      // Backend returns {success: true, data: {response: "..."}} or {success: false, error: "..."}
+      if (data.success === false) {
+        // Explicit error from backend
+        addAgentMessage('system', '错误: ' + (data.error || '未知错误'));
+      } else if (data.data && data.data.response) {
+        // Normal response
+        addAgentMessage('assistant', data.data.response);
+      } else if (data.data && data.data.tool_calls) {
+        // Tool calls returned
+        addAgentMessage('assistant', data.data.response || '(模型请求调用工具，但前端暂不支持自动执行)');
+      } else {
+        // Empty response - show something
+        console.warn('[AgentChat] Unexpected response format:', data);
+        addAgentMessage('system', '(未收到回复，请检查模型配置或查看控制台日志)');
       }
     } catch (e) {
       addAgentMessage('system', 'Failed: ' + e.message);

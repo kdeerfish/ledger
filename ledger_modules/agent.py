@@ -289,6 +289,10 @@ class AgentService:
         headers = self.build_headers()
         provider_config = self.get_provider_config()
         
+        print(f"[Agent] Calling API: provider={self.config.provider}, model={self.config.model}")
+        print(f"[Agent] Base URL: {base_url}")
+        print(f"[Agent] Messages count: {len(messages)}")
+        
         payload = {
             "model": self.config.model,
             "messages": messages,
@@ -327,18 +331,24 @@ class AgentService:
         else:
             url = f"{base_url.rstrip('/')}/chat/completions"
         
+        print(f"[Agent] Request URL: {url}")
+        
         async with httpx.AsyncClient() as client:
             if stream:
                 return self._stream_response(client, url, headers, payload)
             else:
+                print(f"[Agent] Sending POST request...")
                 response = await client.post(
                     url,
                     headers=headers,
                     json=payload,
                     timeout=60.0
                 )
+                print(f"[Agent] Response status: {response.status_code}")
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+                print(f"[Agent] Response keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
+                return result
     
     async def _stream_response(self, client, url, headers, payload):
         """流式响应"""

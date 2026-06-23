@@ -124,6 +124,68 @@ PROVIDERS_CONFIG = {
             'gemma2', 'phi3', 'codellama', 'deepseek-coder-v2'
         ]
     },
+    'groq': {
+        'name': 'Groq (Fast Inference)', 'api_style': 'openai',
+        'default_base_url': 'https://api.groq.com/openai/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768',
+            'gemma2-9b-it', 'llama3-groq-8b-8192-tool-use-preview'
+        ]
+    },
+    'together': {
+        'name': 'Together AI', 'api_style': 'openai',
+        'default_base_url': 'https://api.together.xyz/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'meta-llama/Llama-3.3-70B-Instruct-Turbo', 'meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo',
+            'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-72B-Instruct-Turbo'
+        ]
+    },
+    'mistral': {
+        'name': 'Mistral AI', 'api_style': 'openai',
+        'default_base_url': 'https://api.mistral.ai/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'mistral-large-latest', 'mistral-small-latest', 'open-mixtral-8x22b',
+            'open-mixtral-8x7b', 'codestral-latest', 'pixtral-large-latest'
+        ]
+    },
+    'cohere': {
+        'name': 'Cohere', 'api_style': 'openai',
+        'default_base_url': 'https://api.cohere.com/v2', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'command-r-plus', 'command-r', 'command-light', 'command'
+        ]
+    },
+    'yi': {
+        'name': 'Yi (零一万物)', 'api_style': 'openai',
+        'default_base_url': 'https://api.lingyiwanwu.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'yi-large', 'yi-medium', 'yi-spark', 'yi-large-turbo',
+            'yi-medium-200k', 'yi-lightning'
+        ]
+    },
+    'baichuan': {
+        'name': 'Baichuan (百川)', 'api_style': 'openai',
+        'default_base_url': 'https://api.baichuan-ai.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'Baichuan4', 'Baichuan3-Turbo', 'Baichuan3-Turbo-128k',
+            'Baichuan2-Turbo', 'Baichuan2-Turbo-192k'
+        ]
+    },
+    'stepfun': {
+        'name': 'StepFun (阶跃星辰)', 'api_style': 'openai',
+        'default_base_url': 'https://api.stepfun.com/v1', 'models_url': '/models',
+        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
+        'models': [
+            'step-1-200k', 'step-1-32k', 'step-1-8k', 'step-2-16k',
+            'step-2-16k-chat', 'step-1-flash'
+        ]
+    },
     'custom': {
         'name': 'Custom (OpenAI compatible)', 'api_style': 'openai',
         'default_base_url': '', 'models_url': '/models',
@@ -231,7 +293,18 @@ def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
         messages.append({"role": "user", "content": message})
         
         try:
+            print(f"[AgentChat] Provider: {provider}, Model: {config.get('model')}, Base URL: {config.get('base_url')}")
+            print(f"[AgentChat] Sending {len(messages)} messages to API")
+            
             response = asyncio.run(agent_module.agent_service.chat(messages))
+            
+            print(f"[AgentChat] API response keys: {list(response.keys()) if isinstance(response, dict) else type(response)}")
+            if isinstance(response, dict) and 'choices' in response:
+                print(f"[AgentChat] Choices count: {len(response.get('choices', []))}")
+                if response.get('choices'):
+                    msg = response['choices'][0].get('message', {})
+                    print(f"[AgentChat] Message content length: {len(msg.get('content', '') or '')}")
+                    print(f"[AgentChat] Has tool_calls: {bool(msg.get('tool_calls'))}")
             
             if provider == "claude":
                 content = ""
@@ -239,6 +312,7 @@ def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
                     for block in response["content"]:
                         if block.get("type") == "text":
                             content += block.get("text", "")
+                print(f"[AgentChat] Claude response content length: {len(content)}")
                 return api_success({"response": content or "OK"})
             
             if response.get("choices") and response["choices"][0].get("message", {}).get("tool_calls"):
@@ -249,8 +323,13 @@ def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
                 })
             
             msg = response.get("choices", [{}])[0].get("message", {})
-            return api_success({"response": msg.get("content", "")})
+            result_content = msg.get("content", "")
+            print(f"[AgentChat] Final response content: '{result_content[:100]}...' " if len(result_content) > 100 else f"[AgentChat] Final response content: '{result_content}'")
+            return api_success({"response": result_content})
         except Exception as e:
+            import traceback
+            print(f"[AgentChat] Error: {str(e)}")
+            print(f"[AgentChat] Traceback: {traceback.format_exc()}")
             return api_error(f"Failed: {str(e)}")
     
     @app.route("/api/agent/config", methods=["POST"])

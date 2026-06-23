@@ -49,7 +49,7 @@ def sync_db_path():
 sync_db_path()
 db_module.init_db()
 
-app = Flask(__name__, static_folder=None)
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'))
 
 
 # ─── _method 覆盖中间件（WSGI 层，在路由匹配之前执行）───

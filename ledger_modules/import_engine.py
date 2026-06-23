@@ -356,7 +356,7 @@ def detect_source(headers, filename=''):
 
 
 def suggest_tags(source, rows):
-    """根据来源和数据生成标签建议"""
+    """根据来源生成标签建议"""
     tags = []
 
     # 来源标签
@@ -368,22 +368,6 @@ def suggest_tags(source, rows):
     }
     if source in source_tag_map:
         tags.append(source_tag_map[source])
-
-    # 时间标签（从数据中提取日期范围）
-    dates = []
-    for row in rows[:100]:  # 只看前100条
-        date_val = row.get('_normalized', {}).get('date') or row.get('日期', '') or row.get('交易时间', '')
-        if date_val and len(str(date_val)) >= 7:
-            dates.append(str(date_val)[:7])  # 取 YYYY-MM
-
-    if dates:
-        unique_months = sorted(set(dates))
-        if len(unique_months) == 1:
-            tags.append(unique_months[0])
-        elif len(unique_months) <= 3:
-            tags.extend(unique_months)
-        else:
-            tags.append(f'{unique_months[0]}~{unique_months[-1]}')
 
     return tags
 
