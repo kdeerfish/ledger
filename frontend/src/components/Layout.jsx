@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { api } from '../api';
+import AgentChat from './AgentChat';
 
 export default function Layout() {
   const [recordCount, setRecordCount] = useState('-');
@@ -65,6 +66,8 @@ export default function Layout() {
           Ledger · 个人记账系统 · {recordCount} 条记录
         </small>
       </div>
+
+      <AgentChat />
     </>
   );
 }

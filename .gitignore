@@ -56,3 +56,11 @@ deploy/
 website/build/
 website/.docusaurus/
 website/node_modules/
+
+# 临时工具脚本
+new_js.txt
+replace_js.py
+script1.py
+agent_models.json
+agent_models_full.json
+.omo/

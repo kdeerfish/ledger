@@ -1,0 +1,52 @@
+<!-- ========== Agent Chat Widget ========== -->
+<div id="agentChatWidget">
+  <button id="agentChatToggle" onclick="window.toggleAgentChat&&toggleAgentChat()">
+    <i class="bi bi-robot"></i>
+  </button>
+  <div id="agentChatWindow" style="display:none">
+    <div id="agentChatHeader">
+      <span><i class="bi bi-robot"></i> AI Assistant</span>
+      <div>
+        <button onclick="window.showAgentSettings&&showAgentSettings()" title="Settings"><i class="bi bi-gear"></i></button>
+        <button onclick="window.toggleAgentChat&&toggleAgentChat()" title="Close"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+    <div id="agentChatMessages"></div>
+    <div id="agentChatInput">
+      <input type="text" id="agentInput" placeholder="Type a message..." />
+      <button id="agentSendBtn" onclick="window.sendAgentMessage&&sendAgentMessage()"><i class="bi bi-send"></i></button>
+    </div>
+  </div>
+</div>
+<div id="agentSettingsModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h5>AI Settings</h5>
+      <button onclick="window.closeAgentSettings&&closeAgentSettings()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Provider</label>
+        <select id="agentProvider" onchange="window.onProviderChange&&onProviderChange()"></select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="agentApiKey" placeholder="sk-..." />
+      </div>
+      <div class="form-group">
+        <label>Model <button type="button" id="fetchModelsBtn" onclick="window.fetchModels&&fetchModels()"><i class="bi bi-arrow-clockwise"></i> Fetch</button></label>
+        <select id="agentModel"></select>
+        <input type="text" id="agentModelCustom" placeholder="Or type custom model name" style="display:none;margin-top:8px" />
+      </div>
+      <div class="form-group">
+        <label>Base URL (optional for custom)</label>
+        <input type="text" id="agentBaseUrl" placeholder="https://api.openai.com/v1" />
+      </div>
+      <div id="agentProviderHint" class="hint" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="window.closeAgentSettings&&closeAgentSettings()">Cancel</button>
+      <button class="primary" onclick="window.saveAgentSettings&&saveAgentSettings()">Save</button>
+    </div>
+  </div>
+</div>

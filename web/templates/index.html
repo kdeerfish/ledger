@@ -7,6 +7,209 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/static/style.css">
+<style id="agent-chat-styles">
+#agentChatWidget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+#agentChatToggle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(79,70,229,0.4);
+  transition: all 0.2s;
+}
+#agentChatToggle:hover { transform: scale(1.1); }
+#agentChatWindow {
+  position: absolute;
+  bottom: 70px;
+  right: 0;
+  width: 380px;
+  height: 520px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+#agentChatHeader {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+#agentChatHeader button {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 4px;
+  border-radius: 4px;
+}
+#agentChatHeader button:hover { background: rgba(255,255,255,0.15); }
+#agentChatMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agent-msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+.agent-msg.user {
+  align-self: flex-end;
+  background: #4f46e5;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+.agent-msg.assistant {
+  align-self: flex-start;
+  background: white;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 4px;
+}
+.agent-msg.system {
+  align-self: center;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  max-width: 95%;
+  text-align: center;
+  border-radius: 8px;
+}
+#agentChatInput {
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+  display: flex;
+  gap: 8px;
+}
+#agentInput {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+#agentInput:focus { border-color: #4f46e5; }
+#agentSendBtn {
+  width: 40px;
+  height: 40px;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#agentSendBtn:hover { background: #4338ca; }
+#agentSettingsModal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#agentSettingsModal .modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+#agentSettingsModal .modal-header,
+#agentSettingsModal .modal-footer {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#agentSettingsModal .modal-header { border-bottom: 1px solid #e5e7eb; }
+#agentSettingsModal .modal-footer { border-top: 1px solid #e5e7eb; justify-content: flex-end; gap: 8px; }
+#agentSettingsModal .modal-body { padding: 20px; }
+#agentSettingsModal button {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+#agentSettingsModal button.primary {
+  background: #4f46e5;
+  color: white;
+  border-color: #4f46e5;
+}
+#agentSettingsModal button.primary:hover { background: #4338ca; }
+#agentSettingsModal .form-group { margin-bottom: 14px; }
+#agentSettingsModal label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+#agentSettingsModal input,
+#agentSettingsModal select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+#agentSettingsModal input:focus,
+#agentSettingsModal select:focus { border-color: #4f46e5; }
+#fetchModelsBtn {
+  margin-left: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+}
+#fetchModelsBtn:hover { background: #e5e7eb; }
+#agentProviderHint.hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 480px) {
+  #agentChatWindow { width: calc(100vw - 48px); height: calc(100vh - 120px); }
+}
+</style>
 </head>
 <body>
 
@@ -1068,5 +1271,321 @@
   // ── Boot ──
   document.addEventListener('DOMContentLoaded', init);
   </script>
-</body>
+<!-- ========== Agent Chat Widget ========== -->
+<div id="agentChatWidget">
+  <button id="agentChatToggle" onclick="window.toggleAgentChat&&toggleAgentChat()">
+    <i class="bi bi-robot"></i>
+  </button>
+  <div id="agentChatWindow" style="display:none">
+    <div id="agentChatHeader">
+      <span><i class="bi bi-robot"></i> AI Assistant</span>
+      <div>
+        <button onclick="window.showAgentSettings&&showAgentSettings()" title="Settings"><i class="bi bi-gear"></i></button>
+        <button onclick="window.toggleAgentChat&&toggleAgentChat()" title="Close"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+    <div id="agentChatMessages"></div>
+    <div id="agentChatInput">
+      <input type="text" id="agentInput" placeholder="Type a message..." />
+      <button id="agentSendBtn" onclick="window.sendAgentMessage&&sendAgentMessage()"><i class="bi bi-send"></i></button>
+    </div>
+  </div>
+</div>
+<div id="agentSettingsModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h5>AI Settings</h5>
+      <button onclick="window.closeAgentSettings&&closeAgentSettings()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Provider</label>
+        <select id="agentProvider" onchange="window.onProviderChange&&onProviderChange()"></select>
+      </div>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="agentApiKey" placeholder="sk-..." />
+      </div>
+      <div class="form-group">
+        <label>Model <button type="button" id="fetchModelsBtn" onclick="window.fetchModels&&fetchModels()"><i class="bi bi-arrow-clockwise"></i> Fetch</button></label>
+        <select id="agentModel"></select>
+        <input type="text" id="agentModelCustom" placeholder="Or type custom model name" style="display:none;margin-top:8px" />
+      </div>
+      <div class="form-group">
+        <label>Base URL (optional for custom)</label>
+        <input type="text" id="agentBaseUrl" placeholder="https://api.openai.com/v1" />
+      </div>
+      <div id="agentProviderHint" class="hint" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="window.closeAgentSettings&&closeAgentSettings()">Cancel</button>
+      <button class="primary" onclick="window.saveAgentSettings&&saveAgentSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>\n(function() {
+  let agentChatOpen = false;
+  let agentConfig = null;
+  let agentProviders = {};
+  let chatHistory = [];
+
+  async function initAgent() {
+    try {
+      const res = await fetch('/api/agent/providers');
+      const data = await res.json();
+      if (data.success) {
+        agentProviders = data.data;
+      }
+    } catch (e) {}
+    const saved = localStorage.getItem('agentConfig');
+    if (saved) {
+      try { agentConfig = JSON.parse(saved); } catch (e) {}
+    }
+  }
+
+  function toggleAgentChat() {
+    agentChatOpen = !agentChatOpen;
+    const win = document.getElementById('agentChatWindow');
+    const toggle = document.getElementById('agentChatToggle');
+    if (win) win.style.display = agentChatOpen ? 'flex' : 'none';
+    if (toggle) toggle.innerHTML = agentChatOpen ? '<i class="bi bi-x-lg"></i>' : '<i class="bi bi-robot"></i>';
+    if (agentChatOpen && chatHistory.length === 0) {
+      addAgentMessage('system', 'Hello! Try: add a lunch 30 yuan, check this month expenses.');
+    }
+  }
+
+  function showAgentSettings() {
+    renderProviders();
+    document.getElementById('agentSettingsModal').style.display = 'flex';
+  }
+
+  function closeAgentSettings() {
+    document.getElementById('agentSettingsModal').style.display = 'none';
+  }
+
+  function renderProviders() {
+    const sel = document.getElementById('agentProvider');
+    sel.innerHTML = '';
+    const groups = {
+      'International': ['openai', 'claude', 'ollama'],
+      'China': ['qwen', 'wenxin', 'glm', 'moonshot', 'hunyuan', 'spark', 'doubao', 'minimax', 'deepseek'],
+      'Custom': ['custom']
+    };
+    for (const g in groups) {
+      const og = document.createElement('optgroup');
+      og.label = g;
+      for (const id of groups[g]) {
+        if (agentProviders[id]) {
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = agentProviders[id].name;
+          og.appendChild(opt);
+        }
+      }
+      sel.appendChild(og);
+    }
+    if (agentConfig && agentConfig.provider) {
+      sel.value = agentConfig.provider;
+      onProviderChange();
+      if (agentConfig.model) {
+        const modelSel = document.getElementById('agentModel');
+        const opt = Array.from(modelSel.options).find(function(o) { return o.value === agentConfig.model; });
+        if (opt) modelSel.value = agentConfig.model;
+        else document.getElementById('agentModelCustom').value = agentConfig.model;
+      }
+      if (agentConfig.api_key) document.getElementById('agentApiKey').value = agentConfig.api_key;
+      if (agentConfig.base_url) document.getElementById('agentBaseUrl').value = agentConfig.base_url;
+    }
+  }
+
+  function onProviderChange() {
+    const provider = document.getElementById('agentProvider').value;
+    const modelSel = document.getElementById('agentModel');
+    const customInput = document.getElementById('agentModelCustom');
+    const hint = document.getElementById('agentProviderHint');
+    modelSel.innerHTML = '';
+    
+    const p = agentProviders[provider];
+    if (!p) return;
+
+    if (p.models && p.models.length > 0) {
+      modelSel.style.display = 'block';
+      customInput.style.display = 'none';
+      p.models.forEach(function(m) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modelSel.appendChild(opt);
+      });
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = '-- Custom --';
+      modelSel.appendChild(customOpt);
+    } else {
+      modelSel.style.display = 'none';
+      customInput.style.display = 'block';
+    }
+
+    const hints = {
+      'custom': 'Custom: fill Base URL, model name and API Key. OpenAI compatible.',
+      'ollama': 'Ollama local. Default: http://localhost:11434. API Key optional.',
+      'wenxin': 'Wenxin uses Qianfan API. Get API Key from Baidu Cloud.'
+    };
+    if (hints[provider]) {
+      hint.textContent = hints[provider];
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+
+  async function fetchModels() {
+    const provider = document.getElementById('agentProvider').value;
+    const apiKey = document.getElementById('agentApiKey').value.trim();
+    const baseUrl = document.getElementById('agentBaseUrl').value.trim();
+    
+    if (!apiKey && provider !== 'ollama') {
+      alert('Please enter API Key first');
+      return;
+    }
+
+    const btn = document.getElementById('fetchModelsBtn');
+    btn.disabled = true;
+    btn.innerHTML = 'Loading...';
+    
+    try {
+      const res = await fetch('/api/agent/fetch_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider, api_key: apiKey, base_url: baseUrl })
+      });
+      const data = await res.json();
+      if (data.success && data.data.models) {
+        const modelSel = document.getElementById('agentModel');
+        const currentModels = Array.from(modelSel.options).map(function(o) { return o.value; }).filter(function(v) { return v !== '__custom__'; });
+        const newModels = data.data.models.filter(function(m) { return currentModels.indexOf(m) === -1; });
+        
+        if (newModels.length > 0) {
+          const customOpt = modelSel.querySelector('option[value="__custom__"]');
+          newModels.forEach(function(m) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m + ' (live)';
+            if (customOpt) modelSel.insertBefore(opt, customOpt);
+            else modelSel.appendChild(opt);
+          });
+          addAgentMessage('system', 'Fetched ' + newModels.length + ' live models');
+        } else {
+          addAgentMessage('system', 'No new models found');
+        }
+      } else {
+        alert('Failed: ' + (data.error || 'Unknown'));
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Fetch';
+    }
+  }
+
+  function saveAgentSettings() {
+    const provider = document.getElementById('agentProvider').value;
+    let model = document.getElementById('agentModel').value;
+    if (model === '__custom__') {
+      model = document.getElementById('agentModelCustom').value.trim();
+    }
+    const apiKey = document.getElementById('agentApiKey').value;
+    const baseUrl = document.getElementById('agentBaseUrl').value;
+    
+    if (!provider) { alert('Select provider'); return; }
+    if (!model) { alert('Enter model name'); return; }
+    if (!apiKey && provider !== 'ollama') { alert('Enter API Key'); return; }
+    
+    agentConfig = { provider: provider, api_key: apiKey, model: model, base_url: baseUrl };
+    localStorage.setItem('agentConfig', JSON.stringify(agentConfig));
+    closeAgentSettings();
+    addAgentMessage('system', 'Settings saved!');
+  }
+
+  function addAgentMessage(role, content) {
+    const div = document.getElementById('agentChatMessages');
+    const msg = document.createElement('div');
+    msg.className = 'agent-msg ' + role;
+    msg.textContent = content;
+    div.appendChild(msg);
+    div.scrollTop = div.scrollHeight;
+    chatHistory.push({ role: role, content: content });
+  }
+
+  async function sendAgentMessage() {
+    const input = document.getElementById('agentInput');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    addAgentMessage('user', message);
+    
+    if (!agentConfig) {
+      addAgentMessage('system', 'Configure AI first (gear icon)');
+      return;
+    }
+
+    addAgentMessage('system', 'Thinking...');
+    
+    try {
+      const response = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, config: agentConfig, history: chatHistory.slice(-10) })
+      });
+      const data = await response.json();
+      console.log('[AgentChat] API response:', data);
+      
+      // Remove "思考中..." message
+      const msgs = document.getElementById('agentChatMessages').children;
+      if (msgs.length > 0 && msgs[msgs.length-1].textContent === '思考中...') {
+        document.getElementById('agentChatMessages').removeChild(msgs[msgs.length-1]);
+        chatHistory.pop();
+      }
+      
+      // Backend returns {success: true, data: {response: "..."}} or {success: false, error: "..."}
+      if (data.success === false) {
+        // Explicit error from backend
+        addAgentMessage('system', '错误: ' + (data.error || '未知错误'));
+      } else if (data.data && data.data.response) {
+        // Normal response
+        addAgentMessage('assistant', data.data.response);
+      } else if (data.data && data.data.tool_calls) {
+        // Tool calls returned
+        addAgentMessage('assistant', data.data.response || '(模型请求调用工具，但前端暂不支持自动执行)');
+      } else {
+        // Empty response - show something
+        console.warn('[AgentChat] Unexpected response format:', data);
+        addAgentMessage('system', '(未收到回复，请检查模型配置或查看控制台日志)');
+      }
+    } catch (e) {
+      addAgentMessage('system', 'Failed: ' + e.message);
+    }
+  }
+
+  window.toggleAgentChat = toggleAgentChat;
+  window.showAgentSettings = showAgentSettings;
+  window.closeAgentSettings = closeAgentSettings;
+  window.onProviderChange = onProviderChange;
+  window.fetchModels = fetchModels;
+  window.saveAgentSettings = saveAgentSettings;
+  window.sendAgentMessage = sendAgentMessage;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    initAgent();
+    const input = document.getElementById('agentInput');
+    if (input) {
+      input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') sendAgentMessage();
+      });
+    }
+  });
+})();
+\n</script>\n</body>
 </html>

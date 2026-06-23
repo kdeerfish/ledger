@@ -49,7 +49,7 @@ def sync_db_path():
 sync_db_path()
 db_module.init_db()
 
-app = Flask(__name__, static_folder=None)
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'))
 
 
 # ─── _method 覆盖中间件（WSGI 层，在路由匹配之前执行）───
@@ -1656,6 +1656,11 @@ def export_v2():
 
 # ─── 启动 ──────────────────────────────────────────
 
+# ─── Agent API 路由注册 ──────────────────────────────────────────
+from web.agent_routes import register_agent_routes
+register_agent_routes(app, api_error, api_success, sync_db_path, db_module)
+
+
 if __name__ == '__main__':
     in_docker = os.path.exists('/.dockerenv')
     msg = (
@@ -1670,3 +1675,6 @@ if __name__ == '__main__':
     )
     print(msg, flush=True)
     app.run(host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG)
+
+
+
