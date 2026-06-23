@@ -36,15 +36,25 @@ export default function Transactions() {
 
   // 中文输入法状态
   const isComposing = useRef(false);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
+  const sortByRef = useRef(sortBy);
+  sortByRef.current = sortBy;
+  const sortOrderRef = useRef(sortOrder);
+  sortOrderRef.current = sortOrder;
 
   const loadData = useCallback(async () => {
     const params = {
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-      sort_by: sortBy,
-      sort_order: sortOrder,
+      limit: pageSizeRef.current,
+      offset: (pageRef.current - 1) * pageSizeRef.current,
+      sort_by: sortByRef.current,
+      sort_order: sortOrderRef.current,
     };
-    Object.entries(filters).forEach(([k, v]) => {
+    Object.entries(filtersRef.current).forEach(([k, v]) => {
       if (v) params[k] = v;
     });
     try {
@@ -54,7 +64,7 @@ export default function Transactions() {
         setTotal(res.data.total || 0);
       }
     } catch (e) {}
-  }, [filters, page, pageSize, sortBy, sortOrder]);
+  }, []);
 
   const loadSuggestions = useCallback(async () => {
     try {

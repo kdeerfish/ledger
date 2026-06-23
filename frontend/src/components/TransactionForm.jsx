@@ -92,6 +92,18 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
 
   const set = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
 
+  // 同步：如果用户从标签列表里移除了"排除统计"标签，toggle 也要跟着关
+  useEffect(() => {
+    if (form._excludeTagId && form.tag_ids) {
+      const hasExcludeTag = form.tag_ids.includes(form._excludeTagId);
+      if (form._excludeFromStats && !hasExcludeTag) {
+        setForm(prev => ({ ...prev, _excludeFromStats: false }));
+      } else if (!form._excludeFromStats && hasExcludeTag) {
+        setForm(prev => ({ ...prev, _excludeFromStats: true }));
+      }
+    }
+  }, [form.tag_ids, form._excludeTagId]);
+
   const handleQuickSub = (cat, sub) => {
     set('category', cat);
     set('subcategory', sub);
@@ -401,7 +413,7 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
                   checked={form._excludeFromStats || false}
                   onChange={e => set('_excludeFromStats', e.target.checked)} />
                 <label className="form-check-label small text-muted" htmlFor="excludeFromStats">
-                  排除统计（不影响图表）
+                  排除统计
                 </label>
               </div>
             </div>
