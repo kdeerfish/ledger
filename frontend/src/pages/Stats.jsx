@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
 import { api } from '../api';
+import TransactionForm from '../components/TransactionForm';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -181,6 +182,7 @@ export default function Stats() {
   const [detailSortBy, setDetailSortBy] = useState('date');
   const [detailSortOrder, setDetailSortOrder] = useState('DESC');
   const [detailModalTx, setDetailModalTx] = useState(null);
+  const [editId, setEditId] = useState(null);
 
   const sortedDetailTx = [...detailTx].sort((a, b) => {
     let va = a[detailSortBy] ?? '', vb = b[detailSortBy] ?? '';
@@ -462,14 +464,23 @@ export default function Stats() {
                 </div>
               </div>
               <div className="modal-footer border-0 pt-0">
-                <a href="/transactions" className="btn btn-sm btn-primary"
-                  onClick={() => setDetailModalTx(null)}>
-                  <i className="bi bi-pencil me-1"></i>去编辑
-                </a>
+                <button className="btn btn-sm btn-primary"
+                  onClick={() => { setEditId(detailModalTx.id); setDetailModalTx(null); }}>
+                  <i className="bi bi-pencil me-1"></i>编辑
+                </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+      {/* 编辑表单 */}
+      {editId && (
+        <TransactionForm
+          show={true}
+          onClose={() => setEditId(null)}
+          onSaved={() => { setEditId(null); loadData(); }}
+          editId={editId}
+        />
       )}
     </div>
   );
