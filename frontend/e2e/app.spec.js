@@ -10,7 +10,7 @@ test.describe('导航栏', () => {
 
   test('导航链接全部可点击', async ({ page }) => {
     await page.goto('/');
-    const navLinks = ['概览', '交易', '预算', '标签', '统计', '导入', '导出'];
+    const navLinks = ['概览', '交易', '统计', '其他'];
     for (const label of navLinks) {
       const link = page.locator('.nav-link', { hasText: label });
       await expect(link).toBeVisible();

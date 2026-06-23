@@ -15,11 +15,8 @@ export default function Layout() {
   const navItems = [
     { path: '/', icon: 'speedometer2', label: '概览' },
     { path: '/transactions', icon: 'list-ul', label: '交易' },
-    { path: '/budgets', icon: 'pie-chart', label: '预算' },
-    { path: '/categories', icon: 'tags', label: '标签' },
     { path: '/stats', icon: 'graph-up', label: '统计' },
-    { path: '/import', icon: 'cloud-upload', label: '导入' },
-    { path: '/export', icon: 'cloud-download', label: '导出' },
+    { path: '/more', icon: 'three-dots', label: '其他' },
   ];
 
   return (

@@ -307,9 +307,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 子类别 */}
               <div className="col-md-4">
                 <label className="form-label">子类别</label>
-                <input type="text" className="form-control" list="subcatList"
-                  value={form.subcategory} onChange={e => set('subcategory', e.target.value)}
-                  placeholder="如：水果" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="subcatList"
+                    value={form.subcategory} onChange={e => set('subcategory', e.target.value)}
+                    placeholder="如：水果" />
+                  {form.subcategory && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('subcategory', form.subcategory)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="subcatList">
                   {(suggestions.subcategories || []).map(c => (
                     <option key={c.name} value={c.name} />
@@ -362,9 +370,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 项目 */}
               <div className="col-md-4">
                 <label className="form-label">项目</label>
-                <input type="text" className="form-control" list="projectList"
-                  value={form.project} onChange={e => set('project', e.target.value)}
-                  placeholder="项目名称" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="projectList"
+                    value={form.project} onChange={e => set('project', e.target.value)}
+                    placeholder="项目名称" />
+                  {form.project && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('project', form.project)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="projectList">
                   {(suggestions.projects || []).map(p => (
                     <option key={p.name} value={p.name} />
@@ -375,9 +391,17 @@ export default function TransactionForm({ show, onClose, onSaved, editId }) {
               {/* 成员 */}
               <div className="col-md-4">
                 <label className="form-label">成员</label>
-                <input type="text" className="form-control" list="memberList"
-                  value={form.member} onChange={e => set('member', e.target.value)}
-                  placeholder="如：本人" />
+                <div className="input-group input-group-sm">
+                  <input type="text" className="form-control" list="memberList"
+                    value={form.member} onChange={e => set('member', e.target.value)}
+                    placeholder="如：本人" />
+                  {form.member && (
+                    <button className="btn btn-outline-secondary" type="button"
+                      onClick={() => handleHide('member', form.member)} title="隐藏此选项">
+                      <i className="bi bi-eye-slash"></i>
+                    </button>
+                  )}
+                </div>
                 <datalist id="memberList">
                   {(suggestions.members || []).map(m => (
                     <option key={m.name} value={m.name} />
