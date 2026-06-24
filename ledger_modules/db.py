@@ -167,6 +167,24 @@ def init_db():
         except Exception:
             pass
 
+    # ── AI Agent 多套配置 ──
+    c.execute('''CREATE TABLE IF NOT EXISTS agent_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        name TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        base_url TEXT,
+        api_key TEXT,
+        system_prompt TEXT,
+        is_default INTEGER DEFAULT 0,
+        is_enabled INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )''')
+    c.execute("CREATE INDEX IF NOT EXISTS idx_agent_configs_user ON agent_configs(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_agent_configs_default ON agent_configs(user_id, is_default)")
+
     # ── 数据库迁移 ──
     current_version = _get_db_version(c)
     if current_version < 2:

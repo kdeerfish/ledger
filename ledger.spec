@@ -25,6 +25,8 @@ a = Analysis(
         ('ledger_modules', 'ledger_modules'),
         # 项目配置
         ('pyproject.toml', '.'),
+        # Skills 文档（AI Agent 使用）
+        ('skills', 'skills'),
     ],
     hiddenimports=[
         # Flask

@@ -352,6 +352,7 @@ def export_transactions(output_file, format_type='csv', category=None, start_dat
 
 
 def get_statistics(year=None, month=None, group_by='category'):
+    """获取统计数据，返回格式化的字符串"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     where_clauses = ["is_deleted = 0"]
@@ -363,21 +364,46 @@ def get_statistics(year=None, month=None, group_by='category'):
         where_clauses.append("strftime('%m', trans_date) = ?")
         params.append(f"{month:02d}")
     where_sql = " AND ".join(where_clauses)
+    
     if group_by == 'category':
         c.execute(f'''SELECT category, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY category, type ORDER BY SUM(amount) DESC''', params)
     elif group_by == 'account':
         c.execute(f'''SELECT account, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY account, type ORDER BY SUM(amount) DESC''', params)
     elif group_by == 'month':
         c.execute(f'''SELECT strftime('%Y-%m', trans_date) as month, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY month, type ORDER BY month DESC''', params)
+    else:
+        c.execute(f'''SELECT category, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY category, type ORDER BY SUM(amount) DESC''', params)
+    
     rows = c.fetchall()
     conn.close()
+    
     if not rows:
-        _safe_print("没有统计数据")
-        return
-    _safe_print(f"按{group_by}统计：")
+        return None
+    
+    # 构建结果
+    result_lines = []
+    if year and month:
+        result_lines.append(f"{year}年{month}月 统计（按{group_by}）：")
+    elif year:
+        result_lines.append(f"{year}年 统计（按{group_by}）：")
+    else:
+        result_lines.append(f"统计（按{group_by}）：")
+    
+    # 汇总
+    total_income = 0
+    total_expense = 0
+    
     for row in rows:
         group, typ, total, count = row
-        _safe_print(f"  {group} ({typ}): {total:.2f} 元, {count} 笔")
+        if typ == '收入':
+            total_income += total
+        else:
+            total_expense += total
+        result_lines.append(f"  {group} ({typ}): {total:.2f} 元, {count} 笔")
+    
+    result_lines.append(f"\n汇总：收入 {total_income:.2f} 元，支出 {total_expense:.2f} 元，结余 {total_income - total_expense:.2f} 元")
+    
+    return "\n".join(result_lines)
 
 
 def list_accounts():
