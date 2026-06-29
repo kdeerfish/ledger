@@ -248,6 +248,11 @@ export default function Transactions() {
               <option value="">全部类型</option>
               <option value="支出">支出</option>
               <option value="收入">收入</option>
+              <option value="转账">转账</option>
+              <option value="余额变更">余额变更</option>
+              <option value="负债变更">负债变更</option>
+              <option value="债权变更">债权变更</option>
+              <option value="调整">调整</option>
             </select>
           </div>
           <div className="col-md-1-5 col-4">

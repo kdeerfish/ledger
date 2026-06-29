@@ -14,6 +14,7 @@ import csv
 import io
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime
 
@@ -23,6 +24,14 @@ except ImportError:
     chardet = None
 
 from .db import DB_PATH
+from .transaction_types import (
+    TYPE_ALIASES,
+    EXPENSE,
+    INCOME,
+    RECONCILIATION,
+    TRANSFER,
+    normalize_raw_type,
+)
 
 # ─── 列名推断模式 ──────────────────────────────────────────
 
@@ -285,14 +294,7 @@ def normalize_value(field, raw_value, existing_values=None, synonyms=None):
 
 def normalize_type(raw_value):
     """标准化交易类型"""
-    if not raw_value:
-        return None
-    raw = raw_value.strip()
-    if raw in ('支出', 'expense', '消费', '付款'):
-        return '支出'
-    if raw in ('收入', 'income', '收款', '转入'):
-        return '收入'
-    return None  # 无法识别的类型
+    return normalize_raw_type(raw_value)
 
 
 def normalize_amount(raw_value):
@@ -304,7 +306,7 @@ def normalize_amount(raw_value):
     raw = raw.replace('¥', '').replace('￥', '').replace(',', '').replace(' ', '')
     try:
         amount = float(raw)
-        return amount if amount > 0 else None
+        return amount
     except (ValueError, TypeError):
         return None
 
@@ -516,14 +518,24 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
         except Exception as e:
             errors.append(f'第 {i+1} 行: {str(e)}')
 
+    # 从备注/extra_data 中提取 #xxx# 形式的自动标签
+    for row in converted_rows:
+        auto_tags = set()
+        note = row.get('note', '') or ''
+        extra = row.get('_extra_data', {}) or {}
+        extra_text = ' '.join(str(v) for v in extra.values()) if isinstance(extra, dict) else ''
+        for text in [note, extra_text]:
+            for m in re.finditer(r'#([^#]+)#', text):
+                tag = m.group(1).strip()
+                if tag:
+                    auto_tags.add(tag)
+        row['_auto_tags'] = list(auto_tags)
+
     # 过滤无效行（缺少必填字段）
     valid_rows = []
     skipped = 0
     for row in converted_rows:
-        if not row.get('type') or not row.get('amount') or not row.get('date'):
-            skipped += 1
-            continue
-        if row['amount'] <= 0:
+        if not row.get('type') or row.get('amount') is None or not row.get('date'):
             skipped += 1
             continue
         valid_rows.append(row)

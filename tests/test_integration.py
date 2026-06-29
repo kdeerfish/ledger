@@ -114,7 +114,7 @@ class TestImportCSV:
         conn.close()
 
     def test_import_skips_non_expense_income(self, temp_db):
-        """导入应跳过转账和不计收支类型"""
+        """导入应跳过未识别类型，但保留转账类型"""
         csv_path = os.path.join(tempfile.mkdtemp(), "skip.csv")
         with open(csv_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
@@ -127,7 +127,7 @@ class TestImportCSV:
         conn = sqlite3.connect(temp_db)
         c = conn.cursor()
         c.execute("SELECT COUNT(*) FROM transactions")
-        assert c.fetchone()[0] == 1
+        assert c.fetchone()[0] == 2
         conn.close()
 
     def test_import_missing_file(self, temp_db):

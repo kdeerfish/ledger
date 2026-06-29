@@ -16,6 +16,17 @@ import sqlite3
 from datetime import datetime
 
 from .db import DB_PATH
+from .transaction_types import (
+    TYPE_ALIASES,
+    EXPENSE,
+    INCOME,
+    RECONCILIATION,
+    TRANSFER,
+    is_stat_expense,
+    is_stat_income,
+    is_transfer,
+    normalize_raw_type,
+)
 
 
 # ─── 数据查询 ──────────────────────────────────────────────
@@ -117,9 +128,9 @@ def get_export_data(start_date=None, end_date=None, category=None,
         month = row[0]
         if month not in by_month:
             by_month[month] = {'month': month, 'income': 0, 'expense': 0, 'count': 0}
-        if row[1] == '收入':
+        if is_stat_income(row[1]):
             by_month[month]['income'] = row[2]
-        else:
+        elif is_stat_expense(row[1]):
             by_month[month]['expense'] = row[2]
         by_month[month]['count'] += row[3]
 
@@ -136,9 +147,9 @@ def get_export_data(start_date=None, end_date=None, category=None,
         cat = row[0]
         if cat not in by_category:
             by_category[cat] = {'category': cat, 'income': 0, 'expense': 0, 'count': 0}
-        if row[1] == '收入':
+        if is_stat_income(row[1]):
             by_category[cat]['income'] = row[2]
-        else:
+        elif is_stat_expense(row[1]):
             by_category[cat]['expense'] = row[2]
         by_category[cat]['count'] += row[3]
 
@@ -155,9 +166,9 @@ def get_export_data(start_date=None, end_date=None, category=None,
         acc = row[0]
         if acc not in by_account:
             by_account[acc] = {'account': acc, 'income': 0, 'expense': 0, 'count': 0}
-        if row[1] == '收入':
+        if is_stat_income(row[1]):
             by_account[acc]['income'] = row[2]
-        else:
+        elif is_stat_expense(row[1]):
             by_account[acc]['expense'] = row[2]
         by_account[acc]['count'] += row[3]
 
@@ -176,23 +187,25 @@ def get_export_data(start_date=None, end_date=None, category=None,
         tag = row[0]
         if tag not in by_tag:
             by_tag[tag] = {'tag': tag, 'income': 0, 'expense': 0, 'count': 0}
-        if row[1] == '收入':
+        if is_stat_income(row[1]):
             by_tag[tag]['income'] = row[2]
-        else:
+        elif is_stat_expense(row[1]):
             by_tag[tag]['expense'] = row[2]
         by_tag[tag]['count'] += row[3]
 
     conn.close()
 
     # 总计
-    total_income = sum(t['amount'] for t in transactions if t['type'] == '收入')
-    total_expense = sum(t['amount'] for t in transactions if t['type'] == '支出')
+    total_income = sum(t['amount'] for t in transactions if is_stat_income(t['type']))
+    total_expense = sum(t['amount'] for t in transactions if is_stat_expense(t['type']))
+    total_transfer = sum(t['amount'] for t in transactions if is_transfer(t['type']))
 
     return {
         'transactions': transactions,
         'summary': {
             'income': total_income,
             'expense': total_expense,
+            'transfer': total_transfer,
             'balance': total_income - total_expense,
         },
         'by_month': sorted(by_month.values(), key=lambda x: x['month']),

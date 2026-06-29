@@ -890,10 +890,16 @@ def get_summary():
 
     c.execute(f"SELECT type, SUM(amount), COUNT(*) FROM transactions {where} GROUP BY type", params)
     rows = c.fetchall()
-    total_income = sum(amt for typ, amt, cnt in rows if typ == '收入' and amt)
-    total_expense = sum(amt for typ, amt, cnt in rows if typ == '支出' and amt)
-    income_count = sum(cnt for typ, amt, cnt in rows if typ == '收入' and amt)
-    expense_count = sum(cnt for typ, amt, cnt in rows if typ == '支出' and amt)
+    from ledger_modules.transaction_types import (
+        is_stat_expense,
+        is_stat_income,
+        is_transfer,
+    )
+    total_income = sum(amt for typ, amt, cnt in rows if is_stat_income(typ) and amt)
+    total_expense = sum(amt for typ, amt, cnt in rows if is_stat_expense(typ) and amt)
+    total_transfer = sum(amt for typ, amt, cnt in rows if is_transfer(typ) and amt)
+    income_count = sum(cnt for typ, amt, cnt in rows if is_stat_income(typ) and amt)
+    expense_count = sum(cnt for typ, amt, cnt in rows if is_stat_expense(typ) and amt)
 
     # 日均支出
     if year and month:

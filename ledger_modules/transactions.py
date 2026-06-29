@@ -128,13 +128,21 @@ def summary(year=None, month=None):
     c.execute(f"SELECT type, SUM(amount) FROM transactions {where} GROUP BY type", params)
     rows = c.fetchall()
     conn.close()
-    total_income = sum(amt for typ, amt in rows if typ == '收入' and amt)
-    total_expense = sum(amt for typ, amt in rows if typ == '支出' and amt)
+
+    from .transaction_types import (
+        is_stat_expense,
+        is_stat_income,
+        is_transfer,
+    )
+    total_income = sum(amt for typ, amt in rows if is_stat_income(typ) and amt)
+    total_expense = sum(amt for typ, amt in rows if is_stat_expense(typ) and amt)
+    total_transfer = sum(amt for typ, amt in rows if is_transfer(typ) and amt)
     balance = total_income - total_expense
     period = f"{year or '所有'}-{month or '全年'}"
     _safe_print(f"📊 收支统计 ({period}):")
     _safe_print(f"  收入: {total_income:.2f}")
     _safe_print(f"  支出: {total_expense:.2f}")
+    _safe_print(f"  转账: {total_transfer:.2f}")
     _safe_print(f"  结余: {balance:.2f}")
 
 

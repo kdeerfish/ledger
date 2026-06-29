@@ -92,7 +92,7 @@ class TestNormalizeType:
         assert import_engine.normalize_type('收款') == '收入'
 
     def test_unknown(self):
-        assert import_engine.normalize_type('转账') is None
+        assert import_engine.normalize_type('转账') == '转账'
         assert import_engine.normalize_type('') is None
 
 
@@ -105,10 +105,10 @@ class TestNormalizeAmount:
         assert import_engine.normalize_amount('￥100') == 100.0
 
     def test_zero(self):
-        assert import_engine.normalize_amount('0') is None
+        assert import_engine.normalize_amount('0') == 0.0
 
     def test_negative(self):
-        assert import_engine.normalize_amount('-50') is None
+        assert import_engine.normalize_amount('-50') == -50.0
 
     def test_invalid(self):
         assert import_engine.normalize_amount('abc') is None
@@ -272,9 +272,9 @@ class TestExecuteImport:
         mapping = {'交易类型': 'type', '日期': 'date', '金额': 'amount'}
         result = import_engine.execute_import(file_bytes, mapping, skip_duplicates=False)
 
-        # 只有最后一条是有效的
-        assert result['imported'] == 1
-        assert result['skipped'] >= 3
+        # 前两条无效：缺类型、缺日期；金额 0 现在允许导入
+        assert result['imported'] == 2
+        assert result['skipped'] >= 2
 
     def test_execute_batch_recorded(self, engine_db):
         csv_content = '交易类型,日期,金额\n支出,2024/06/15,100\n'
