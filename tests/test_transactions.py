@@ -17,9 +17,10 @@ import ledger_modules.transactions as tx_module
 class TestAddTransaction:
     """添加交易测试"""
 
-    # SELECT * 的列顺序：
+    # SELECT * 的列顺序（v4 schema）：
     # 0:id 1:type 2:amount 3:category 4:subcategory
-    # 5:account 6:project 7:member 8:merchant 9:note 10:trans_date 11:is_deleted
+    # 5:account 6:from_account 7:to_account 8:project 9:member
+    # 10:merchant 11:note 12:trans_date 13:is_deleted 14:extra_data 15:batch_id
 
     def test_add_expense(self, temp_db):
         tx_module.add_transaction("expense", 100.0, "食品", "零食", "微信", "项目", "本人", "商家", "备注", "2026-06-15 10:00:00")
@@ -29,9 +30,9 @@ class TestAddTransaction:
         assert rows[0][2] == 100.0       # amount
         assert rows[0][3] == "食品"       # category
         assert rows[0][5] == "微信"       # account
-        assert rows[0][7] == "本人"       # member
-        assert rows[0][8] == "商家"       # merchant
-        assert rows[0][9] == "备注"       # note
+        assert rows[0][9] == "本人"       # member
+        assert rows[0][10] == "商家"      # merchant
+        assert rows[0][11] == "备注"      # note
 
     def test_add_income(self, temp_db):
         tx_module.add_transaction("income", 5000.0, "工资", "", "银行", "", "本人", "", "6月工资", "2026-06-10")
@@ -43,14 +44,14 @@ class TestAddTransaction:
         """不传日期应自动使用当前时间"""
         tx_module.add_transaction("expense", 50.0, "测试", "", "", "", "", "", "", None)
         rows = self._fetch(temp_db)
-        assert datetime.now().strftime("%Y-%m-%d") in rows[0][10]  # trans_date
+        assert datetime.now().strftime("%Y-%m-%d") in rows[0][12]  # trans_date
 
     def test_auto_fields(self, temp_db):
         """账户和成员字段应正确保留"""
         tx_module.add_transaction("expense", 10.0, "测试", "", "账户A", "", "张三", "", "", None)
         rows = self._fetch(temp_db)
         assert rows[0][5] == "账户A"     # account
-        assert rows[0][7] == "张三"       # member
+        assert rows[0][9] == "张三"       # member
 
     @staticmethod
     def _fetch(db_path):

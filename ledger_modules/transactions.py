@@ -4,7 +4,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-from .db import DB_PATH, init_db
+from .db import DB_PATH, init_db, ensure_account, recalc_account_balances, get_account_balance, get_account_balances_with_type, get_net_worth
 
 
 def _safe_print(*args, **kwargs):
@@ -19,11 +19,27 @@ def _safe_print(*args, **kwargs):
             pass
 
 
-def check_duplicate(type_, amount, category, account, trans_date=None):
+def _infer_account_type(name):
+    """根据账户名简单推断账户类型"""
+    if not name:
+        return 'self'
+    name_lower = name.lower()
+    liability_keywords = ['信用卡', '信用ka', '银行ka', '借记卡', '欠款', '负债']
+    claims_keywords = ['借出', '应收', '债权', '借款']
+    for kw in liability_keywords:
+        if kw in name:
+            return 'liability'
+    for kw in claims_keywords:
+        if kw in name:
+            return 'claims'
+    return 'self'
+
+
+def check_duplicate(type_, amount, category, account, trans_date=None, from_account=None, to_account=None):
     """
     检查是否存在相似的重复记录
     
-    检查条件：同一天 + 同类型 + 同金额 + 同类别 + 同账户
+    检查条件：同一天 + 同类型 + 同金额 + 同类别 + 同账户/双账户
     
     返回：相似记录列表，如果无重复返回空列表
     """
@@ -36,15 +52,31 @@ def check_duplicate(type_, amount, category, account, trans_date=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # 查询同一天、同类型、同金额、同类别的记录
-    c.execute('''SELECT id, trans_date, type, amount, category, account, note 
-                 FROM transactions 
-                 WHERE is_deleted = 0 
-                   AND type = ? 
-                   AND amount = ? 
-                   AND category = ?
-                   AND strftime('%Y-%m-%d', trans_date) = ?''',
-              (type_, amount, category, date_part))
+    # 构建查询条件
+    conditions = ["is_deleted = 0", "type = ?", "amount = ?", "category = ?", "strftime('%Y-%m-%d', trans_date) = ?"]
+    params = [type_, amount, category, date_part]
+    
+    # 账户匹配：优先用 from_account/to_account，回退到 account
+    account_conditions = []
+    if from_account:
+        account_conditions.append("from_account = ?")
+        account_conditions.append("to_account = ?")
+        params.extend([from_account, from_account])
+    if to_account:
+        account_conditions.append("from_account = ?")
+        account_conditions.append("to_account = ?")
+        params.extend([to_account, to_account])
+    if account:
+        account_conditions.append("account = ?")
+        params.append(account)
+    
+    if account_conditions:
+        conditions.append(f"({' OR '.join(account_conditions)})")
+    
+    sql = f'''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note 
+              FROM transactions 
+              WHERE {' AND '.join(conditions)}'''
+    c.execute(sql, params)
     
     rows = c.fetchall()
     conn.close()
@@ -56,62 +88,109 @@ def check_duplicate(type_, amount, category, account, trans_date=None):
         'amount': row[3],
         'category': row[4],
         'account': row[5],
-        'note': row[6]
+        'from_account': row[6],
+        'to_account': row[7],
+        'note': row[8]
     } for row in rows]
 
 
-def add_transaction(type_, amount, category, subcategory, account, project, member, merchant, note, trans_date=None, force=False):
+def add_transaction(type_, amount, category, subcategory, account, project, member, merchant, note, trans_date=None, force=False, from_account=None, to_account=None, ensure_accounts=True):
     """
     添加交易记录
     
     参数：
         force: 如果为 True，跳过重复检查直接插入
+        from_account: 转出账户
+        to_account: 转入账户
+        ensure_accounts: 是否自动创建不存在的账户
     """
     if trans_date is None:
         trans_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
+    # 确定账户字段
+    if not from_account and not to_account and account:
+        from_account = account
+        to_account = account
+    
+    # 自动创建账户
+    if ensure_accounts:
+        for acc in [from_account, to_account]:
+            if acc:
+                acc_type = _infer_account_type(acc)
+                ensure_account(acc, account_type=acc_type)
+    
     # 重复检查（除非 force=True）
     if not force:
-        duplicates = check_duplicate(type_, amount, category, account, trans_date)
+        duplicates = check_duplicate(type_, amount, category, account, trans_date, from_account, to_account)
         if duplicates:
             _safe_print(f"⚠️ 发现 {len(duplicates)} 条相似记录：")
             for d in duplicates:
-                _safe_print(f"  ID={d['id']}: {d['date']} | {d['type']} | {d['amount']:.2f} | {d['category']} | {d['account']} | {d['note']}")
+                _safe_print(f"  ID={d['id']}: {d['date']} | {d['type']} | {d['amount']:.2f} | {d['category']} | {d['from_account']}->{d['to_account']} | {d['note']}")
             _safe_print("如需强制插入，请添加 --confirm 参数")
             return None
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO transactions
-        (type, amount, category, subcategory, account, project, member, merchant, note, trans_date, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)''',
-        (type_, amount, category, subcategory, account, project, member, merchant, note, trans_date))
+        (type, amount, category, subcategory, account, from_account, to_account, project, member, merchant, note, trans_date, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)''',
+        (type_, amount, category, subcategory, account, from_account, to_account, project, member, merchant, note, trans_date))
     new_id = c.lastrowid
+    
+    # 重新计算涉及账户的余额
+    account_names = set()
+    if from_account:
+        account_names.add(from_account)
+    if to_account:
+        account_names.add(to_account)
+    if account:
+        account_names.add(account)
+    recalc_account_balances(conn, account_names)
+    
     conn.commit()
     conn.close()
-    _safe_print(f"✅ 已添加记录 ID={new_id}: {type_} {amount} 元 | {category} | {account}")
+    _safe_print(f"✅ 已添加记录 ID={new_id}: {type_} {amount} 元 | {category} | {from_account or account} -> {to_account or account or ''}")
     return new_id
 
 
-def list_transactions(limit=20, include_deleted=False):
+def list_transactions(limit=20, include_deleted=False, account=None, from_account=None, to_account=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    if include_deleted:
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note, is_deleted
-                     FROM transactions ORDER BY trans_date DESC LIMIT ?''', (limit,))
-    else:
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note
-                     FROM transactions WHERE is_deleted = 0 ORDER BY trans_date DESC LIMIT ?''', (limit,))
+    
+    where_clauses = ["1=1"]
+    params = []
+    
+    if not include_deleted:
+        where_clauses.append("is_deleted = 0")
+    
+    if account:
+        where_clauses.append("account = ?")
+        params.append(account)
+    if from_account:
+        where_clauses.append("from_account = ?")
+        params.append(from_account)
+    if to_account:
+        where_clauses.append("to_account = ?")
+        params.append(to_account)
+    
+    sql = f'''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note, is_deleted
+              FROM transactions 
+              WHERE {' AND '.join(where_clauses)}
+              ORDER BY trans_date DESC LIMIT ?'''
+    params.append(limit)
+    
+    c.execute(sql, params)
     rows = c.fetchall()
     conn.close()
+    
     for row in rows:
-        if len(row) == 8:
-            id_, date, typ, amt, cat, acc, note, deleted = row
-            status = " [已删除]" if deleted else ""
-            _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {acc} | {note}{status}")
+        id_, date, typ, amt, cat, acc, from_acc, to_acc, note, deleted = row
+        status = " [已删除]" if deleted else ""
+        if from_acc and to_acc and from_acc != to_acc:
+            display = f"{from_acc} -> {to_acc}"
         else:
-            id_, date, typ, amt, cat, acc, note = row
-            _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {acc} | {note}")
+            display = acc or from_acc or to_acc or ''
+        _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {display} | {note}{status}")
 
 
 def summary(year=None, month=None):
@@ -147,7 +226,7 @@ def summary(year=None, month=None):
 
 
 def update_transaction(tid, field, value):
-    allowed_fields = ['amount', 'category', 'subcategory', 'account', 'project', 'member', 'merchant', 'note', 'trans_date']
+    allowed_fields = ['amount', 'category', 'subcategory', 'account', 'project', 'member', 'merchant', 'note', 'trans_date', 'from_account', 'to_account']
     if field not in allowed_fields:
         _safe_print(f"❌ 不支持的字段: {field}")
         return
@@ -155,9 +234,28 @@ def update_transaction(tid, field, value):
         value = float(value)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # 如果更新账户相关字段，重新计算余额
+    account_names = set()
+    if field in ('account', 'from_account', 'to_account'):
+        c.execute("SELECT from_account, to_account, account FROM transactions WHERE id = ? AND is_deleted = 0", (tid,))
+        old = c.fetchone()
+        if old:
+            for acc in old:
+                if acc:
+                    account_names.add(acc)
+    
     c.execute(f'UPDATE transactions SET {field} = ? WHERE id = ? AND is_deleted = 0', (value, tid))
     conn.commit()
     affected = c.rowcount
+    
+    if affected and field in ('account', 'from_account', 'to_account'):
+        if value:
+            account_names.add(value)
+        if account_names:
+            recalc_account_balances(conn, account_names)
+            conn.commit()
+    
     conn.close()
     if affected:
         _safe_print(f"✅ 已更新 ID={tid} 的 {field} 为 {value}")
@@ -168,9 +266,24 @@ def update_transaction(tid, field, value):
 def soft_delete_transaction(tid):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # 获取交易涉及的账户
+    c.execute("SELECT from_account, to_account, account FROM transactions WHERE id = ? AND is_deleted = 0", (tid,))
+    row = c.fetchone()
+    account_names = set()
+    if row:
+        for acc in row:
+            if acc:
+                account_names.add(acc)
+    
     c.execute('UPDATE transactions SET is_deleted = 1 WHERE id = ? AND is_deleted = 0', (tid,))
     conn.commit()
     affected = c.rowcount
+    
+    if affected and account_names:
+        recalc_account_balances(conn, account_names)
+        conn.commit()
+    
     conn.close()
     if affected:
         _safe_print(f"✅ 已软删除 ID={tid} 的交易（可恢复）")
@@ -181,9 +294,24 @@ def soft_delete_transaction(tid):
 def restore_transaction(tid):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # 获取交易涉及的账户
+    c.execute("SELECT from_account, to_account, account FROM transactions WHERE id = ? AND is_deleted = 1", (tid,))
+    row = c.fetchone()
+    account_names = set()
+    if row:
+        for acc in row:
+            if acc:
+                account_names.add(acc)
+    
     c.execute('UPDATE transactions SET is_deleted = 0 WHERE id = ? AND is_deleted = 1', (tid,))
     conn.commit()
     affected = c.rowcount
+    
+    if affected and account_names:
+        recalc_account_balances(conn, account_names)
+        conn.commit()
+    
     conn.close()
     if affected:
         _safe_print(f"✅ 已恢复 ID={tid} 的交易")
@@ -197,9 +325,24 @@ def hard_delete_transaction(tid, confirm=False):
         return
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # 获取交易涉及的账户
+    c.execute("SELECT from_account, to_account, account FROM transactions WHERE id = ?", (tid,))
+    row = c.fetchone()
+    account_names = set()
+    if row:
+        for acc in row:
+            if acc:
+                account_names.add(acc)
+    
     c.execute('DELETE FROM transactions WHERE id = ?', (tid,))
     conn.commit()
     affected = c.rowcount
+    
+    if affected and account_names:
+        recalc_account_balances(conn, account_names)
+        conn.commit()
+    
     conn.close()
     if affected:
         _safe_print(f"✅ 已物理删除 ID={tid} 的交易")
@@ -233,26 +376,27 @@ def search_transactions(keyword, search_type='all', limit=50):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if search_type == 'all':
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note
+        c.execute('''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note
                      FROM transactions
                      WHERE is_deleted = 0 AND (
                          note LIKE ? OR category LIKE ? OR subcategory LIKE ? OR
-                         merchant LIKE ? OR account LIKE ? OR project LIKE ? OR member LIKE ?
+                         merchant LIKE ? OR account LIKE ? OR from_account LIKE ? OR to_account LIKE ? OR
+                         project LIKE ? OR member LIKE ?
                      )
                      ORDER BY trans_date DESC LIMIT ?''',
-                  (f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', limit))
+                  (f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', f'%{keyword}%', limit))
     elif search_type == 'note':
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note
+        c.execute('''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note
                      FROM transactions
                      WHERE is_deleted = 0 AND note LIKE ?
                      ORDER BY trans_date DESC LIMIT ?''', (f'%{keyword}%', limit))
     elif search_type == 'category':
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note
+        c.execute('''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note
                      FROM transactions
                      WHERE is_deleted = 0 AND (category LIKE ? OR subcategory LIKE ?)
                      ORDER BY trans_date DESC LIMIT ?''', (f'%{keyword}%', f'%{keyword}%', limit))
     elif search_type == 'merchant':
-        c.execute('''SELECT id, trans_date, type, amount, category, account, note
+        c.execute('''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note
                      FROM transactions
                      WHERE is_deleted = 0 AND merchant LIKE ?
                      ORDER BY trans_date DESC LIMIT ?''', (f'%{keyword}%', limit))
@@ -263,11 +407,15 @@ def search_transactions(keyword, search_type='all', limit=50):
         return
     _safe_print(f"找到 {len(rows)} 条相关记录：")
     for row in rows:
-        id_, date, typ, amt, cat, acc, note = row
-        _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {acc} | {note}")
+        id_, date, typ, amt, cat, acc, from_acc, to_acc, note = row
+        if from_acc and to_acc and from_acc != to_acc:
+            display = f"{from_acc} -> {to_acc}"
+        else:
+            display = acc or from_acc or to_acc or ''
+        _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {display} | {note}")
 
 
-def filter_transactions(category=None, account=None, member=None, merchant=None, project=None, start_date=None, end_date=None, limit=50):
+def filter_transactions(category=None, account=None, member=None, merchant=None, project=None, start_date=None, end_date=None, limit=50, from_account=None, to_account=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     where_clauses = ["is_deleted = 0"]
@@ -278,6 +426,12 @@ def filter_transactions(category=None, account=None, member=None, merchant=None,
     if account:
         where_clauses.append("account = ?")
         params.append(account)
+    if from_account:
+        where_clauses.append("from_account = ?")
+        params.append(from_account)
+    if to_account:
+        where_clauses.append("to_account = ?")
+        params.append(to_account)
     if member:
         where_clauses.append("member = ?")
         params.append(member)
@@ -294,7 +448,7 @@ def filter_transactions(category=None, account=None, member=None, merchant=None,
         where_clauses.append("trans_date <= ?")
         params.append(end_date)
     where_sql = " AND ".join(where_clauses)
-    c.execute(f'''SELECT id, trans_date, type, amount, category, account, note FROM transactions WHERE {where_sql} ORDER BY trans_date DESC LIMIT ?''', params + [limit])
+    c.execute(f'''SELECT id, trans_date, type, amount, category, account, from_account, to_account, note FROM transactions WHERE {where_sql} ORDER BY trans_date DESC LIMIT ?''', params + [limit])
     rows = c.fetchall()
     conn.close()
     if not rows:
@@ -302,8 +456,12 @@ def filter_transactions(category=None, account=None, member=None, merchant=None,
         return
     _safe_print(f"找到 {len(rows)} 条记录：")
     for row in rows:
-        id_, date, typ, amt, cat, acc, note = row
-        _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {acc} | {note}")
+        id_, date, typ, amt, cat, acc, from_acc, to_acc, note = row
+        if from_acc and to_acc and from_acc != to_acc:
+            display = f"{from_acc} -> {to_acc}"
+        else:
+            display = acc or from_acc or to_acc or ''
+        _safe_print(f"{id_}: {date} | {typ} | {amt:.2f} | {cat} | {display} | {note}")
 
 
 def export_transactions(output_file, format_type='csv', category=None, start_date=None, end_date=None):
@@ -321,7 +479,7 @@ def export_transactions(output_file, format_type='csv', category=None, start_dat
         where_clauses.append("trans_date <= ?")
         params.append(end_date)
     where_sql = " AND ".join(where_clauses)
-    c.execute(f'''SELECT id, trans_date, type, amount, category, subcategory, account, project, member, merchant, note FROM transactions WHERE {where_sql} ORDER BY trans_date DESC''', params)
+    c.execute(f'''SELECT id, trans_date, type, amount, category, subcategory, account, from_account, to_account, project, member, merchant, note FROM transactions WHERE {where_sql} ORDER BY trans_date DESC''', params)
     rows = c.fetchall()
     conn.close()
     if not rows:
@@ -330,7 +488,7 @@ def export_transactions(output_file, format_type='csv', category=None, start_dat
     if format_type == 'csv':
         with open(output_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['ID', '日期', '类型', '金额', '类别', '子类别', '账户', '项目', '成员', '商家', '备注'])
+            writer.writerow(['ID', '日期', '类型', '金额', '类别', '子类别', '账户', '转出账户', '转入账户', '项目', '成员', '商家', '备注'])
             for row in rows:
                 writer.writerow(row)
         _safe_print(f"已导出 {len(rows)} 条记录到 {output_file}")
@@ -346,10 +504,12 @@ def export_transactions(output_file, format_type='csv', category=None, start_dat
                 'category': row[4],
                 'subcategory': row[5],
                 'account': row[6],
-                'project': row[7],
-                'member': row[8],
-                'merchant': row[9],
-                'note': row[10]
+                'from_account': row[7],
+                'to_account': row[8],
+                'project': row[9],
+                'member': row[10],
+                'merchant': row[11],
+                'note': row[12]
             })
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -376,7 +536,11 @@ def get_statistics(year=None, month=None, group_by='category'):
     if group_by == 'category':
         c.execute(f'''SELECT category, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY category, type ORDER BY SUM(amount) DESC''', params)
     elif group_by == 'account':
-        c.execute(f'''SELECT account, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY account, type ORDER BY SUM(amount) DESC''', params)
+        c.execute(f'''SELECT COALESCE(account, from_account, to_account) as acc, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY acc, type ORDER BY SUM(amount) DESC''', params)
+    elif group_by == 'from_account':
+        c.execute(f'''SELECT from_account, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY from_account, type ORDER BY SUM(amount) DESC''', params)
+    elif group_by == 'to_account':
+        c.execute(f'''SELECT to_account, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY to_account, type ORDER BY SUM(amount) DESC''', params)
     elif group_by == 'month':
         c.execute(f'''SELECT strftime('%Y-%m', trans_date) as month, type, SUM(amount), COUNT(*) FROM transactions WHERE {where_sql} GROUP BY month, type ORDER BY month DESC''', params)
     else:
@@ -415,17 +579,21 @@ def get_statistics(year=None, month=None, group_by='category'):
 
 
 def list_accounts():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT DISTINCT account FROM transactions WHERE is_deleted = 0 AND account != '' ORDER BY account")
-    rows = c.fetchall()
-    conn.close()
-    if not rows:
+    """列出所有账户，包含余额"""
+    accounts = get_account_balances_with_type()
+    if not accounts:
         _safe_print("暂无账户数据")
         return
-    _safe_print(f"所有账户 ({len(rows)} 个)：")
-    for row in rows:
-        _safe_print(f"  - {row[0]}")
+    
+    _safe_print(f"所有账户 ({len(accounts)} 个)：")
+    for acc in accounts:
+        type_label = {
+            'self': '我的账户',
+            'claims': '债权',
+            'liability': '负债',
+            'counterparty': '对手方'
+        }.get(acc['account_type'], acc['account_type'])
+        _safe_print(f"  - {acc['name']} ({type_label}): 余额 {acc['balance']:.2f} 元")
 
 
 def list_categories():
@@ -494,21 +662,21 @@ def analyze_data():
     for typ, count, amount in rows:
         output.append(f"  {typ}: {count}笔 {amount:.2f}元")
     
-    # 3. 账户列表（钱从哪里扣/收到哪里）
-    c.execute('''SELECT account, COUNT(*), SUM(amount) 
-                 FROM transactions WHERE is_deleted=0 AND account != '' 
-                 GROUP BY account ORDER BY COUNT(*) DESC''')
+    # 3. 账户列表（双账户视角）
+    output.append("\n【账户】（转出账户 -> 转入账户）")
+    c.execute('''SELECT from_account, to_account, COUNT(*), SUM(amount) 
+                 FROM transactions WHERE is_deleted=0 
+                 GROUP BY from_account, to_account ORDER BY COUNT(*) DESC''')
     rows = c.fetchall()
-    output.append("\n【账户】（= 付款方式/资金来源，钱从哪里扣或收到哪里）")
-    for account, count, amount in rows:
-        output.append(f"  {account}: {count}笔 {amount:.2f}元")
+    for from_acc, to_acc, count, amount in rows:
+        output.append(f"  {from_acc or ''} -> {to_acc or ''}: {count}笔 {amount:.2f}元")
     
-    # 4. 商家列表（在哪里花的钱）
+    # 4. 商家列表
     c.execute('''SELECT merchant, COUNT(*), SUM(amount) 
                  FROM transactions WHERE is_deleted=0 AND merchant != '' 
                  GROUP BY merchant ORDER BY COUNT(*) DESC''')
     rows = c.fetchall()
-    output.append("\n【商家】（= 消费场所/平台，在哪里花的钱）")
+    output.append("\n【商家】（在哪里花的钱）")
     for merchant, count, amount in rows:
         output.append(f"  {merchant}: {count}笔 {amount:.2f}元")
     
@@ -518,73 +686,33 @@ def analyze_data():
                  GROUP BY category, subcategory 
                  ORDER BY category, COUNT(*) DESC''')
     rows = c.fetchall()
-    output.append("\n【类别→子类别】（= 花在什么类型的东西上）")
+    output.append("\n【类别→子类别】")
     current_cat = None
     for cat, subcat, count, amount in rows:
         if cat != current_cat:
             current_cat = cat
-            output.append(f"  {cat}:")
+            output.append(f"\n  {cat}:")
         if subcat:
             output.append(f"    - {subcat} ({count}笔 {amount:.2f}元)")
         else:
             output.append(f"    - [无子类别] ({count}笔 {amount:.2f}元)")
     
-    # 6. 成员列表
-    c.execute('''SELECT member, COUNT(*), SUM(amount) 
-                 FROM transactions WHERE is_deleted=0 AND member != '' 
-                 GROUP BY member ORDER BY COUNT(*) DESC''')
-    rows = c.fetchall()
-    output.append("\n【成员】（= 谁花了这笔钱/谁收到这笔钱）")
-    for member, count, amount in rows:
-        output.append(f"  {member}: {count}笔 {amount:.2f}元")
+    # 6. 账户余额
+    output.append("\n【账户余额】")
+    balances = get_account_balances_with_type()
+    for b in balances:
+        output.append(f"  {b['name']} ({b['account_type']}): 余额 {b['balance']:.2f} 元")
     
-    # 7. 项目列表
-    c.execute('''SELECT project, COUNT(*), SUM(amount) 
-                 FROM transactions WHERE is_deleted=0 AND project != '' 
-                 GROUP BY project ORDER BY COUNT(*) DESC''')
-    rows = c.fetchall()
-    output.append("\n【项目】（= 归属的长期项目/生意）")
-    for project, count, amount in rows:
-        output.append(f"  {project}: {count}笔 {amount:.2f}元")
+    # 净资产
+    net = get_net_worth()
+    output.append(f"\n净资产：{net:.2f} 元")
     
-    # 8. 交叉分析：商家→类别（判断商家该填哪里）
-    c.execute('''SELECT merchant, category, COUNT(*) 
-                 FROM transactions WHERE is_deleted=0 AND merchant != '' 
-                 GROUP BY merchant, category 
-                 HAVING COUNT(*) >= 3
-                 ORDER BY merchant, COUNT(*) DESC''')
-    rows = c.fetchall()
-    if rows:
-        output.append("\n【商家→类别关联】（商家常出现在哪些类别）")
-        current_merchant = None
-        for merchant, category, count in rows:
-            if merchant != current_merchant:
-                current_merchant = merchant
-                output.append(f"  {merchant}:")
-            output.append(f"    - {category} ({count}笔)")
-    
-    # 9. 交叉分析：账户→商家（判断账户和商家的区别）
-    c.execute('''SELECT account, merchant, COUNT(*) 
-                 FROM transactions WHERE is_deleted=0 AND account != '' AND merchant != '' 
-                 GROUP BY account, merchant 
-                 HAVING COUNT(*) >= 3
-                 ORDER BY account, COUNT(*) DESC''')
-    rows = c.fetchall()
-    if rows:
-        output.append("\n【账户→商家关联】（账户用于哪些商家的支付）")
-        current_account = None
-        for account, merchant, count in rows:
-            if account != current_account:
-                current_account = account
-                output.append(f"  {account}:")
-            output.append(f"    - {merchant} ({count}笔)")
-    
-    # 10. 字段空值率
+    # 7. 字段空值率
     c.execute("SELECT COUNT(*) FROM transactions WHERE is_deleted=0")
     total = c.fetchone()[0] or 1
     
-    fields_to_check = ['account', 'merchant', 'project', 'member', 'subcategory', 'note']
-    output.append("\n【字段使用率】（哪些字段经常填，哪些经常空）")
+    fields_to_check = ['account', 'from_account', 'to_account', 'merchant', 'project', 'member', 'subcategory', 'note']
+    output.append("\n【字段使用率】")
     for field in fields_to_check:
         c.execute(f"SELECT COUNT(*) FROM transactions WHERE is_deleted=0 AND {field} != '' AND {field} IS NOT NULL")
         filled = c.fetchone()[0]

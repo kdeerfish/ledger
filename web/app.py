@@ -366,6 +366,8 @@ def list_transactions():
     category_filter = request.args.get('category', '')
     subcategory_filter = request.args.get('subcategory', '')
     account_filter = request.args.get('account', '')
+    from_account_filter = request.args.get('from_account', '')
+    to_account_filter = request.args.get('to_account', '')
     project_filter = request.args.get('project', '')
     member_filter = request.args.get('member', '')
     merchant_filter = request.args.get('merchant', '')
@@ -393,6 +395,12 @@ def list_transactions():
     if account_filter:
         where_clauses.append("t.account = ?")
         params.append(account_filter)
+    if from_account_filter:
+        where_clauses.append("t.from_account = ?")
+        params.append(from_account_filter)
+    if to_account_filter:
+        where_clauses.append("t.to_account = ?")
+        params.append(to_account_filter)
     if project_filter:
         where_clauses.append("t.project = ?")
         params.append(project_filter)
@@ -403,9 +411,9 @@ def list_transactions():
         where_clauses.append("t.merchant = ?")
         params.append(merchant_filter)
     if keyword:
-        where_clauses.append("(t.note LIKE ? OR t.category LIKE ? OR t.subcategory LIKE ? OR t.merchant LIKE ? OR t.account LIKE ?)")
+        where_clauses.append("(t.note LIKE ? OR t.category LIKE ? OR t.subcategory LIKE ? OR t.merchant LIKE ? OR t.account LIKE ? OR t.from_account LIKE ? OR t.to_account LIKE ?)")
         kw = f'%{keyword}%'
-        params.extend([kw, kw, kw, kw, kw])
+        params.extend([kw, kw, kw, kw, kw, kw, kw])
 
     # 时间筛选
     time_clauses = build_time_where(params, 't.trans_date')
@@ -424,7 +432,7 @@ def list_transactions():
     # 排序
     sort_by = request.args.get('sort_by', 'trans_date')
     sort_order = request.args.get('sort_order', 'DESC').upper()
-    allowed_sorts = {'trans_date', 'amount', 'type', 'category', 'account', 'merchant'}
+    allowed_sorts = {'trans_date', 'amount', 'type', 'category', 'account', 'from_account', 'to_account', 'merchant'}
     if sort_by not in allowed_sorts:
         sort_by = 'trans_date'
     if sort_order not in ('ASC', 'DESC'):
@@ -436,7 +444,7 @@ def list_transactions():
     total = c.fetchone()[0]
 
     c.execute(f'''SELECT t.id, t.trans_date, t.type, t.amount, t.category, t.subcategory,
-                        t.account, t.project, t.member, t.merchant, t.note
+                        t.account, t.from_account, t.to_account, t.project, t.member, t.merchant, t.note
                  FROM transactions t
                  WHERE {where_sql}
                  ORDER BY {sort_col} {sort_order} LIMIT ? OFFSET ?''', params + [limit, offset])
@@ -447,7 +455,8 @@ def list_transactions():
         t = {
             'id': row[0], 'date': row[1], 'type': row[2], 'amount': row[3],
             'category': row[4], 'subcategory': row[5], 'account': row[6],
-            'project': row[7], 'member': row[8], 'merchant': row[9], 'note': row[10],
+            'from_account': row[7], 'to_account': row[8],
+            'project': row[9], 'member': row[10], 'merchant': row[11], 'note': row[12],
         }
         # 获取标签
         t['tags'] = db_module.get_transaction_tags(t['id'])
@@ -497,6 +506,8 @@ def add_transaction(data):
     category = data.get('category', '')
     subcategory = data.get('subcategory', '')
     account = data.get('account', '')
+    from_account = data.get('from_account', '')
+    to_account = data.get('to_account', '')
     project = data.get('project', '')
     member = data.get('member', '')
     merchant = data.get('merchant', '')
@@ -511,6 +522,7 @@ def add_transaction(data):
             type_, amount, category, subcategory,
             account, project, member, merchant,
             note, trans_date, force=force,
+            from_account=from_account, to_account=to_account,
         )
         if new_id is None:
             return api_error('发现重复记录，请确认后重试（设置 force=true 强制添加）')
@@ -533,7 +545,8 @@ def update_transaction(data, tid):
         field = data.get('field')
         value = data.get('value')
         allowed_fields = ['amount', 'category', 'subcategory', 'account',
-                          'project', 'member', 'merchant', 'note', 'trans_date']
+                          'project', 'member', 'merchant', 'note', 'trans_date',
+                          'from_account', 'to_account']
         if field not in allowed_fields:
             return api_error(f'不支持的字段: {field}')
         try:
@@ -546,6 +559,7 @@ def update_transaction(data, tid):
         # 全字段更新
         update_fields = {}
         for f in ['type', 'amount', 'category', 'subcategory', 'account',
+                  'from_account', 'to_account',
                   'project', 'member', 'merchant', 'note', 'trans_date']:
             if f in data:
                 update_fields[f] = data[f]
@@ -1155,6 +1169,116 @@ def get_accounts():
     rows = c.fetchall()
     conn.close()
     return api_success([{'name': r[0], 'count': r[1], 'amount': r[2]} for r in rows])
+
+
+@app.route('/api/accounts/managed', methods=['GET'])
+def get_managed_accounts():
+    """获取账户管理页的账户列表，包含余额和类型"""
+    sync_db_path()
+    accounts = tx_module.get_account_balances_with_type()
+    return api_success(accounts)
+
+
+@app.route('/api/accounts', methods=['POST'])
+def create_account():
+    """创建账户"""
+    sync_db_path()
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    if not name:
+        return api_error('账户名称不能为空')
+    account_type = data.get('account_type', 'self')
+    owner = data.get('owner', '')
+    parent_account = data.get('parent_account', '')
+    opening_balance = data.get('opening_balance', 0)
+    color = data.get('color', '#6366f1')
+    
+    try:
+        opening_balance = float(opening_balance)
+    except (ValueError, TypeError):
+        opening_balance = 0
+    
+    account_id = db_module.create_account(name, account_type, owner, parent_account, opening_balance, color)
+    if account_id:
+        return api_success({'id': account_id}, '账户创建成功')
+    return api_error('创建账户失败')
+
+
+@app.route('/api/accounts/<int:account_id>', methods=['PUT'])
+def update_account(account_id):
+    """更新账户"""
+    sync_db_path()
+    data = request.get_json(silent=True) or {}
+    allowed = {'name', 'account_type', 'owner', 'parent_account', 'opening_balance', 'color'}
+    update_data = {k: v for k, v in data.items() if k in allowed}
+    
+    if 'opening_balance' in update_data:
+        try:
+            update_data['opening_balance'] = float(update_data['opening_balance'])
+        except (ValueError, TypeError):
+            update_data['opening_balance'] = 0
+    
+    if db_module.update_account(account_id, **update_data):
+        return api_success(message='账户更新成功')
+    return api_error('账户不存在或更新失败')
+
+
+@app.route('/api/accounts/<int:account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    """删除账户"""
+    sync_db_path()
+    if db_module.delete_account(account_id):
+        return api_success(message='账户已删除')
+    return api_error('账户不存在或删除失败')
+
+
+@app.route('/api/accounts/balances', methods=['GET'])
+def get_account_balances():
+    """获取所有账户余额"""
+    sync_db_path()
+    balances = tx_module.get_account_balances_with_type()
+    net_worth = tx_module.get_net_worth()
+    return api_success({
+        'balances': balances,
+        'net_worth': net_worth,
+    })
+
+
+@app.route('/api/accounts/<account_name>/balance', methods=['PUT'])
+def adjust_account_balance(account_name):
+    """手动调整账户余额"""
+    sync_db_path()
+    data = request.get_json(silent=True) or {}
+    new_balance = data.get('balance')
+    if new_balance is None:
+        return api_error('余额不能为空')
+    
+    try:
+        new_balance = float(new_balance)
+    except (ValueError, TypeError):
+        return api_error('余额格式不正确')
+    
+    current_balance = tx_module.get_account_balance(account_name)
+    diff = new_balance - current_balance
+    
+    if abs(diff) < 0.01:
+        return api_success({'balance': current_balance}, '余额无需调整')
+    
+    # 生成余额调整记录
+    tx_module.add_transaction(
+        type_='余额变更',
+        amount=abs(diff),
+        category='余额调整',
+        subcategory='',
+        account=account_name,
+        project='',
+        member='',
+        merchant='',
+        note=f'手动调整余额：{current_balance:.2f} -> {new_balance:.2f}',
+        ensure_accounts=False,
+    )
+    
+    return api_success({'balance': new_balance}, f'余额已调整为 {new_balance:.2f}')
 
 
 @app.route('/api/members', methods=['GET'])

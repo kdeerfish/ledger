@@ -7,6 +7,8 @@
 - 值标准化（基于用户现有数据 + synonyms 别名配置）
 - 预览模式（返回映射建议 + 样本数据 + 标签建议）
 - 执行模式（映射 → 转换 → 去重检测 → 入库 → 打标签）
+- 双账户映射（from_account / to_account）
+- 随手记互补对自动合并
 - extra_data 存储映射不了的列值
 """
 
@@ -17,19 +19,23 @@ import os
 import re
 import sqlite3
 from datetime import datetime
+from collections import defaultdict
 
 try:
     import chardet
 except ImportError:
     chardet = None
 
-from .db import DB_PATH
+from .db import DB_PATH, recalc_account_balances, ensure_account
 from .transaction_types import (
     TYPE_ALIASES,
     EXPENSE,
     INCOME,
     RECONCILIATION,
     TRANSFER,
+    BALANCE_ADJUST,
+    LIABILITY_CHANGE,
+    CLAIMS_CHANGE,
     normalize_raw_type,
 )
 
@@ -42,6 +48,8 @@ FIELD_PATTERNS = {
     'category': ['类别', '分类', '交易分类', 'category', '一级分类', '交易类别'],
     'subcategory': ['子类别', '子分类', '二级分类', 'subcategory'],
     'account': ['账户', '支付方式', '资金渠道', '付款方式', 'account', '收/付款方式', '资金账户'],
+    'from_account': ['转出账户', '付款账户', '支出账户', 'from_account', '转出'],
+    'to_account': ['转入账户', '收款账户', '收入账户', 'to_account', '转入'],
     'merchant': ['商家', '交易对方', '对方', '商户', 'merchant', '交易商户', '对方名称', '商户名称'],
     'member': ['成员', '交易人', 'member', '记账人', '操作人'],
     'project': ['项目', 'project'],
@@ -50,7 +58,7 @@ FIELD_PATTERNS = {
 
 # 字段的重要性：必填字段如果匹配不到要提醒用户
 REQUIRED_FIELDS = {'type', 'amount', 'date'}
-OPTIONAL_FIELDS = {'category', 'subcategory', 'account', 'merchant', 'member', 'project', 'note'}
+OPTIONAL_FIELDS = {'category', 'subcategory', 'account', 'from_account', 'to_account', 'merchant', 'member', 'project', 'note'}
 
 # 日期格式尝试顺序
 DATE_FORMATS = [
@@ -201,6 +209,8 @@ def get_existing_values(field):
         'category': 'category',
         'subcategory': 'subcategory',
         'account': 'account',
+        'from_account': 'from_account',
+        'to_account': 'to_account',
         'merchant': 'merchant',
         'member': 'member',
         'project': 'project',
@@ -346,7 +356,7 @@ def detect_source(headers, filename=''):
         return '微信'
 
     # 随手记特征
-    if '交易类型' in header_set and '子类别' in header_set:
+    if '交易类型' in header_set and ('类别' in header_set or '子类别' in header_set):
         return '随手记'
 
     # 银行特征
@@ -374,9 +384,171 @@ def suggest_tags(source, rows):
     return tags
 
 
+def _infer_account_type(name):
+    """根据账户名简单推断账户类型"""
+    if not name:
+        return 'self'
+    name_lower = name.lower()
+    liability_keywords = ['信用卡', '信用ka', '银行ka', '借记卡', '欠款', '负债']
+    claims_keywords = ['借出', '应收', '债权', '借款']
+    for kw in liability_keywords:
+        if kw in name:
+            return 'liability'
+    for kw in claims_keywords:
+        if kw in name:
+            return 'claims'
+    return 'self'
+
+
+# ─── 随手记互补对合并 ──────────────────────────────────────────
+
+def _is_complementary(type1, type2):
+    """判断两个类型是否互补"""
+    complementary_pairs = [
+        (EXPENSE, INCOME),
+        (TRANSFER, TRANSFER),
+        (LIABILITY_CHANGE, LIABILITY_CHANGE),
+        (CLAIMS_CHANGE, CLAIMS_CHANGE),
+        (BALANCE_ADJUST, BALANCE_ADJUST),
+    ]
+    for pair in complementary_pairs:
+        if (type1 == pair[0] and type2 == pair[1]) or (type1 == pair[1] and type2 == pair[0]):
+            return True
+    return False
+
+
+def _classify_pair(row1, row2):
+    """
+    对互补对进行分类，返回 (type, from_account, to_account)
+    """
+    type1 = row1.get('type')
+    type2 = row2.get('type')
+    acc1 = row1.get('account', '') or ''
+    acc2 = row2.get('account', '') or ''
+    cat1 = row1.get('category', '') or ''
+    cat2 = row2.get('category', '') or ''
+    
+    # 判断哪个是资金账户，哪个是对方账户
+    # 资金账户通常在 account 字段，或者名称更短、更像真实账户
+    self_keywords = ['微信', '支付宝', '银行卡', '银行', '现金', '信用卡', '信用ka']
+    
+    def is_self_account(name):
+        for kw in self_keywords:
+            if kw in name:
+                return True
+        return False
+    
+    # 默认：第一个是 from，第二个是 to
+    from_acc, to_acc = acc1, acc2
+    from_cat, to_cat = cat1, cat2
+    
+    # 如果只有一个账户是资金账户，那个应该是 from_account（支出侧）
+    if is_self_account(acc1) and not is_self_account(acc2):
+        from_acc, to_acc = acc1, acc2
+    elif not is_self_account(acc1) and is_self_account(acc2):
+        from_acc, to_acc = acc2, acc1
+    else:
+        # 两个都是或都不是，按类型判断
+        if type1 == EXPENSE or type1 == LIABILITY_CHANGE:
+            from_acc, to_acc = acc1, acc2
+        elif type2 == EXPENSE or type2 == LIABILITY_CHANGE:
+            from_acc, to_acc = acc2, acc1
+    
+    # 确定最终类型
+    if type1 == EXPENSE and type2 == INCOME:
+        # 可能是借出/借入
+        if '借' in cat1 or '借' in cat2:
+            final_type = CLAIMS_CHANGE
+        else:
+            final_type = EXPENSE
+    elif type1 == LIABILITY_CHANGE and type2 == LIABILITY_CHANGE:
+        final_type = LIABILITY_CHANGE
+    elif type1 == TRANSFER and type2 == TRANSFER:
+        final_type = TRANSFER
+    else:
+        final_type = type1 or type2
+    
+    return final_type, from_acc, to_acc
+
+
+def pair_suishouji_rows(rows):
+    """
+    将随手记导出的互补记录合并成单条双账户记录
+    
+    规则：
+    1. 按日期分组
+    2. 组内按金额分组
+    3. 金额组内查找互补对
+    4. 合并成一条记录，设置 from_account/to_account
+    """
+    # 过滤无效行
+    valid_rows = []
+    for i, row in enumerate(rows):
+        if row.get('type') and row.get('amount') is not None and row.get('date'):
+            row['_row_index'] = i
+            valid_rows.append(row)
+    
+    # 按日期+金额分组
+    groups = defaultdict(list)
+    for row in valid_rows:
+        date_part = row['date'].split(' ')[0] if ' ' in row['date'] else row['date']
+        key = (date_part, row['amount'])
+        groups[key].append(row)
+    
+    merged = []
+    paired_indices = set()
+    
+    for (date_part, amount), group in groups.items():
+        if len(group) == 1:
+            # 单条，直接保留
+            merged.append(group[0])
+            continue
+        
+        # 尝试配对
+        used = [False] * len(group)
+        for i in range(len(group)):
+            if used[i]:
+                continue
+            for j in range(i + 1, len(group)):
+                if used[j]:
+                    continue
+                row1 = group[i]
+                row2 = group[j]
+                if _is_complementary(row1.get('type'), row2.get('type')):
+                    # 合并这一对
+                    final_type, from_acc, to_acc = _classify_pair(row1, row2)
+                    merged_row = {
+                        'type': final_type,
+                        'amount': amount,
+                        'category': row1.get('category', '') or row2.get('category', ''),
+                        'subcategory': row1.get('subcategory', '') or row2.get('subcategory', ''),
+                        'account': from_acc,
+                        'from_account': from_acc,
+                        'to_account': to_acc,
+                        'project': row1.get('project', '') or row2.get('project', ''),
+                        'member': row1.get('member', '') or row2.get('member', ''),
+                        'merchant': row1.get('merchant', '') or row2.get('merchant', ''),
+                        'note': row1.get('note', '') or row2.get('note', ''),
+                        'date': row1.get('date') or row2.get('date'),
+                        '_row_index': row1['_row_index'],
+                        '_paired': True,
+                    }
+                    merged.append(merged_row)
+                    used[i] = True
+                    used[j] = True
+                    break
+        
+        # 未配对的单独保留
+        for i in range(len(group)):
+            if not used[i]:
+                merged.append(group[i])
+    
+    return merged
+
+
 # ─── 预览与执行 ──────────────────────────────────────────────
 
-def preview_import(file_bytes, user_mapping=None, filename=''):
+def preview_import(file_bytes, user_mapping=None, filename='', auto_pair=True):
     """
     预览导入：解析 CSV，推断映射，返回预览数据
 
@@ -421,29 +593,35 @@ def preview_import(file_bytes, user_mapping=None, filename=''):
 
     # 获取已有数据用于值标准化
     existing = {}
-    for field in ('account', 'category', 'subcategory', 'merchant', 'member', 'project'):
+    for field in ('account', 'category', 'subcategory', 'merchant', 'member', 'project', 'from_account', 'to_account'):
         existing[field] = get_existing_values(field)
     synonyms = load_synonyms()
 
-    # 转换前5行做预览
-    preview_rows = []
-    for row in rows[:5]:
+    # 转换行数据
+    converted_rows = []
+    for row in rows:
         converted, extra = _convert_row(row, mapping, existing, synonyms)
-        preview_rows.append(converted)
+        if converted:
+            converted_rows.append(converted)
+    
+    # 随手记互补对自动合并
+    if auto_pair and source == '随手记':
+        converted_rows = pair_suishouji_rows(converted_rows)
 
     # 统计未映射列
     unmapped = [h for h, info in mapping.items() if not info.get('target')]
 
     # 标签建议
     sample_with_normalized = []
-    for row in rows[:100]:
-        converted, _ = _convert_row(row, mapping, existing, synonyms)
-        row['_normalized'] = converted
+    for row in converted_rows[:100]:
         sample_with_normalized.append(row)
     suggested_tags = suggest_tags(source, sample_with_normalized)
 
     # 重复估算
-    duplicate_estimate = _estimate_duplicates(rows, mapping, existing, synonyms)
+    duplicate_estimate = _estimate_duplicates(converted_rows)
+
+    # 预览前5行
+    preview_rows = converted_rows[:5]
 
     return {
         'detected_source': source,
@@ -452,14 +630,14 @@ def preview_import(file_bytes, user_mapping=None, filename=''):
         'mapping': mapping,
         'unmapped_columns': unmapped,
         'preview_rows': preview_rows,
-        'total_rows': len(rows),
+        'total_rows': len(converted_rows),
         'suggested_tags': suggested_tags,
         'duplicate_estimate': duplicate_estimate,
     }
 
 
 def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
-                   filename='', batch_source=None):
+                   filename='', batch_source=None, auto_pair=True):
     """
     执行导入
 
@@ -470,6 +648,7 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
         skip_duplicates: 是否跳过重复记录
         filename: 原始文件名
         batch_source: 数据来源（不传则自动检测）
+        auto_pair: 是否自动合并随手记互补对
 
     返回:
     {
@@ -501,7 +680,7 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
 
     # 获取已有数据
     existing = {}
-    for field in ('account', 'category', 'subcategory', 'merchant', 'member', 'project'):
+    for field in ('account', 'category', 'subcategory', 'merchant', 'member', 'project', 'from_account', 'to_account'):
         existing[field] = get_existing_values(field)
     synonyms = load_synonyms()
 
@@ -517,6 +696,10 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
                 converted_rows.append(converted)
         except Exception as e:
             errors.append(f'第 {i+1} 行: {str(e)}')
+
+    # 随手记互补对自动合并
+    if auto_pair and batch_source == '随手记':
+        converted_rows = pair_suishouji_rows(converted_rows)
 
     # 从备注/extra_data 中提取 #xxx# 形式的自动标签
     for row in converted_rows:
@@ -540,23 +723,34 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
             continue
         valid_rows.append(row)
 
-    # 去重检测
+    # 去重检测（同时检查数据库和本批次内重复）
     duplicates_found = 0
     final_rows = []
+    seen_in_batch = set()
     if skip_duplicates:
         for row in valid_rows:
-            dupes = _check_duplicate(row['type'], row['amount'],
+            dupes = _check_duplicate(row.get('type'), row.get('amount'),
                                      row.get('category', ''), row.get('account', ''),
-                                     row['date'])
-            if dupes:
+                                     row.get('date'), row.get('from_account'), row.get('to_account'))
+            batch_key = (
+                row.get('type', ''),
+                row.get('amount', 0),
+                (row.get('category') or '').strip(),
+                (row.get('account') or '').strip(),
+                (row.get('from_account') or '').strip(),
+                (row.get('to_account') or '').strip(),
+                row.get('date', ''),
+            )
+            if dupes or batch_key in seen_in_batch:
                 duplicates_found += 1
             else:
+                seen_in_batch.add(batch_key)
                 final_rows.append(row)
     else:
         final_rows = valid_rows
 
     # 按日期排序
-    final_rows.sort(key=lambda x: x['date'])
+    final_rows.sort(key=lambda x: x.get('date', ''))
 
     # 写入数据库
     conn = sqlite3.connect(DB_PATH)
@@ -572,21 +766,27 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
 
     # 插入交易记录
     imported = 0
+    account_names_to_recalc = set()
     for row in final_rows:
         extra_json = json.dumps(row['_extra_data'], ensure_ascii=False) if row.get('_extra_data') else None
         c.execute('''INSERT INTO transactions
-            (type, amount, category, subcategory, account, project, member, merchant,
+            (type, amount, category, subcategory, account, from_account, to_account, project, member, merchant,
              note, trans_date, is_deleted, extra_data, batch_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)''',
-            (row['type'], row['amount'],
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)''',
+            (row.get('type', ''), row.get('amount', 0),
              row.get('category', ''), row.get('subcategory', ''),
-             row.get('account', ''), row.get('project', ''),
-             row.get('member', ''), row.get('merchant', ''),
-             row.get('note', ''), row['date'],
+             row.get('account', ''), row.get('from_account', ''), row.get('to_account', ''),
+             row.get('project', ''), row.get('member', ''), row.get('merchant', ''),
+             row.get('note', ''), row.get('date', ''),
              extra_json, batch_id))
         tx_id = c.lastrowid
 
-        # 打标签
+        # 收集需要确保存在的账户
+        for acc in [row.get('from_account'), row.get('to_account'), row.get('account')]:
+            if acc:
+                account_names_to_recalc.add(acc)
+
+        # 打标签：用户传入标签
         if tags:
             for tag_name in tags:
                 tag_name = tag_name.strip()
@@ -604,7 +804,29 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
                 c.execute("INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
                           (tx_id, tag_id))
 
+        # 打标签：备注/附加信息中自动提取的标签
+        auto_tags = row.get('_auto_tags') or []
+        for tag_name in auto_tags:
+            tag_name = tag_name.strip()
+            if not tag_name:
+                continue
+            c.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+            tag_row = c.fetchone()
+            if tag_row:
+                tag_id = tag_row[0]
+            else:
+                c.execute("INSERT INTO tags (name) VALUES (?)", (tag_name,))
+                tag_id = c.lastrowid
+            c.execute("INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
+                      (tx_id, tag_id))
+
         imported += 1
+
+    # 确保账户存在并重新计算余额（使用同一连接避免 database locked）
+    for acc in account_names_to_recalc:
+        c.execute("INSERT OR IGNORE INTO accounts (name, account_type, owner, parent_account, opening_balance, color) VALUES (?, ?, '', '', 0, '#6366f1')", (acc, _infer_account_type(acc)))
+    if account_names_to_recalc:
+        recalc_account_balances(conn, account_names_to_recalc)
 
     conn.commit()
     conn.close()
@@ -654,7 +876,7 @@ def _convert_row(row, mapping, existing, synonyms):
             converted['amount'] = normalize_amount(value_str)
         elif target == 'date':
             converted['date'] = normalize_date(value_str)
-        elif target in ('category', 'subcategory', 'account', 'merchant', 'member', 'project'):
+        elif target in ('category', 'subcategory', 'account', 'from_account', 'to_account', 'merchant', 'member', 'project'):
             normalized, confidence, method = normalize_value(
                 target, value_str,
                 existing_values=existing.get(target, []),
@@ -664,20 +886,42 @@ def _convert_row(row, mapping, existing, synonyms):
         elif target == 'note':
             converted['note'] = value_str
 
+    # 如果没有 from_account/to_account，但有 account，则 account 作为 fallback
+    if not converted.get('from_account') and not converted.get('to_account') and converted.get('account'):
+        converted['from_account'] = converted['account']
+        converted['to_account'] = converted['account']
+
     return converted, extra if extra else None
 
 
-def _check_duplicate(type_, amount, category, account, trans_date):
+def _check_duplicate(type_, amount, category, account, trans_date, from_account=None, to_account=None):
     """检查是否存在重复记录"""
     date_part = trans_date.split(' ')[0] if ' ' in trans_date else trans_date
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('''SELECT id FROM transactions
-                     WHERE is_deleted = 0 AND type = ? AND amount = ?
-                       AND category = ?
-                       AND strftime('%Y-%m-%d', trans_date) = ?''',
-                  (type_, amount, category, date_part))
+        
+        conditions = ["is_deleted = 0", "type = ?", "amount = ?", "category = ?", "strftime('%Y-%m-%d', trans_date) = ?"]
+        params = [type_, amount, category, date_part]
+        
+        account_conditions = []
+        if from_account:
+            account_conditions.append("from_account = ?")
+            account_conditions.append("to_account = ?")
+            params.extend([from_account, from_account])
+        if to_account:
+            account_conditions.append("from_account = ?")
+            account_conditions.append("to_account = ?")
+            params.extend([to_account, to_account])
+        if account:
+            account_conditions.append("account = ?")
+            params.append(account)
+        
+        if account_conditions:
+            conditions.append(f"({' OR '.join(account_conditions)})")
+        
+        sql = f"SELECT id FROM transactions WHERE {' AND '.join(conditions)}"
+        c.execute(sql, params)
         rows = c.fetchall()
         conn.close()
         return rows
@@ -685,18 +929,17 @@ def _check_duplicate(type_, amount, category, account, trans_date):
         return []
 
 
-def _estimate_duplicates(rows, mapping, existing, synonyms):
+def _estimate_duplicates(rows):
     """估算重复记录数（采样前100条）"""
     count = 0
     sample = rows[:100]
     for row in sample:
-        converted, _ = _convert_row(row, mapping, existing, synonyms)
-        if not converted.get('type') or not converted.get('amount') or not converted.get('date'):
+        if not row.get('type') or row.get('amount') is None or not row.get('date'):
             continue
         dupes = _check_duplicate(
-            converted['type'], converted['amount'],
-            converted.get('category', ''), converted.get('account', ''),
-            converted['date']
+            row.get('type'), row.get('amount'),
+            row.get('category', ''), row.get('account', ''),
+            row.get('date'), row.get('from_account'), row.get('to_account')
         )
         if dupes:
             count += 1

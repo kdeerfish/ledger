@@ -8,7 +8,7 @@ from .config import get_db_path
 DB_PATH = get_db_path()
 
 # 数据库版本管理
-DB_VERSION = 3
+DB_VERSION = 4
 
 
 def _get_db_version(c):
@@ -48,6 +48,7 @@ def init_db():
         value TEXT NOT NULL
     )''')
 
+    # 交易记录表
     c.execute('''CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL,
@@ -55,45 +56,50 @@ def init_db():
         category TEXT,
         subcategory TEXT,
         account TEXT,
+        from_account TEXT,
+        to_account TEXT,
         project TEXT,
         member TEXT,
         merchant TEXT,
         note TEXT,
         trans_date TEXT NOT NULL,
-        is_deleted INTEGER DEFAULT 0
+        is_deleted INTEGER DEFAULT 0,
+        extra_data TEXT,
+        batch_id INTEGER
     )''')
 
-    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'")
-    if c.fetchone() is None:
-        c.execute('''CREATE TABLE budgets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT,
-            year INTEGER,
-            month INTEGER,
-            amount REAL,
-            dimension_type TEXT DEFAULT 'category',
-            dimension_value TEXT,
-            UNIQUE(category, year, month, dimension_type, dimension_value)
-        )''')
-    else:
-        c.execute("PRAGMA table_info(budgets)")
-        columns = [row[1] for row in c.fetchall()]
-        if 'dimension_type' not in columns or 'dimension_value' not in columns:
-            c.execute('ALTER TABLE budgets RENAME TO budgets_old')
-            c.execute('''CREATE TABLE budgets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                category TEXT,
-                year INTEGER,
-                month INTEGER,
-                amount REAL,
-                dimension_type TEXT DEFAULT 'category',
-                dimension_value TEXT,
-                UNIQUE(category, year, month, dimension_type, dimension_value)
-            )''')
-            c.execute("""INSERT INTO budgets (id, category, year, month, amount, dimension_type, dimension_value)
-                         SELECT id, category, year, month, amount, 'category', NULL FROM budgets_old""")
-            c.execute('DROP TABLE budgets_old')
+    # 账户表
+    c.execute('''CREATE TABLE IF NOT EXISTS accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        account_type TEXT NOT NULL DEFAULT 'self',
+        owner TEXT DEFAULT '',
+        parent_account TEXT DEFAULT '',
+        opening_balance REAL NOT NULL DEFAULT 0,
+        color TEXT DEFAULT '#6366f1',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )''')
 
+    # 账户余额快照表
+    c.execute('''CREATE TABLE IF NOT EXISTS account_balances (
+        account_name TEXT PRIMARY KEY,
+        balance REAL NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )''')
+
+    # 预算表
+    c.execute('''CREATE TABLE IF NOT EXISTS budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT,
+        year INTEGER,
+        month INTEGER,
+        amount REAL,
+        dimension_type TEXT DEFAULT 'category',
+        dimension_value TEXT,
+        UNIQUE(category, year, month, dimension_type, dimension_value)
+    )''')
+
+    # 预算模板表
     c.execute('''CREATE TABLE IF NOT EXISTS budget_templates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -123,16 +129,19 @@ def init_db():
         category TEXT,
         subcategory TEXT,
         account TEXT,
+        from_account TEXT,
+        to_account TEXT,
         project TEXT,
         member TEXT,
         merchant TEXT,
         note TEXT,
+        tags TEXT DEFAULT '',
         usage_count INTEGER DEFAULT 0,
         last_used_at TEXT,
         created_at TEXT NOT NULL
     )''')
 
-    # ── Tags 表 ──
+    # Tags 表
     c.execute('''CREATE TABLE IF NOT EXISTS tags (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -140,7 +149,7 @@ def init_db():
         created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     )''')
 
-    # ── 交易-Tag 关联表（多对多） ──
+    # 交易-Tag 关联表（多对多）
     c.execute('''CREATE TABLE IF NOT EXISTS transaction_tags (
         transaction_id INTEGER NOT NULL,
         tag_id INTEGER NOT NULL,
@@ -149,25 +158,18 @@ def init_db():
         FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
     )''')
 
-    # ── record_templates 扩展 tags 字段 ──
-    c.execute("PRAGMA table_info(record_templates)")
-    tmpl_columns = [row[1] for row in c.fetchall()]
-    if 'tags' not in tmpl_columns:
-        try:
-            c.execute('ALTER TABLE record_templates ADD COLUMN tags TEXT DEFAULT ""')
-        except Exception:
-            pass
+    # 导入批次追踪表
+    c.execute('''CREATE TABLE IF NOT EXISTS import_batches (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        source      TEXT NOT NULL,
+        filename    TEXT,
+        row_count   INTEGER DEFAULT 0,
+        mapping     TEXT,
+        tags        TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )''')
 
-    # ── 迁移：确保 is_deleted 列存在 ──
-    c.execute("PRAGMA table_info(transactions)")
-    tx_cols = [row[1] for row in c.fetchall()]
-    if 'is_deleted' not in tx_cols:
-        try:
-            c.execute('ALTER TABLE transactions ADD COLUMN is_deleted INTEGER DEFAULT 0')
-        except Exception:
-            pass
-
-    # ── AI Agent 多套配置 ──
+    # AI Agent 多套配置
     c.execute('''CREATE TABLE IF NOT EXISTS agent_configs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -185,55 +187,37 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_agent_configs_user ON agent_configs(user_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_agent_configs_default ON agent_configs(user_id, is_default)")
 
-    # ── 数据库迁移 ──
+    # 索引
+    c.execute("PRAGMA index_list(transactions)")
+    indexes = {row[2] for row in c.fetchall()}
+    if 'idx_trans_date' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_date ON transactions(trans_date)")
+    if 'idx_trans_category' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_category ON transactions(category)")
+    if 'idx_trans_type' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_type ON transactions(type)")
+    if 'idx_trans_merchant' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_merchant ON transactions(merchant)")
+    if 'idx_trans_account' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_account ON transactions(account)")
+    
+    # 仅在列存在时创建索引
+    tx_cols = {row[1] for row in c.execute("PRAGMA table_info(transactions)").fetchall()}
+    if 'from_account' in tx_cols and 'idx_trans_from_account' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_from_account ON transactions(from_account)")
+    if 'to_account' in tx_cols and 'idx_trans_to_account' not in indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_trans_to_account ON transactions(to_account)")
+    
+    # accounts 表索引
+    c.execute("PRAGMA index_list(accounts)")
+    account_indexes = {row[2] for row in c.fetchall()}
+    if 'idx_accounts_type' not in account_indexes:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(account_type)")
+
+    # 数据库版本迁移
     current_version = _get_db_version(c)
-    if current_version < 2:
-        # 迁移到 v2: 确保 transactions 表有必要索引
-        c.execute("PRAGMA index_list(transactions)")
-        indexes = [row[2] for row in c.fetchall()]
-        if 'idx_trans_date' not in indexes:
-            c.execute("CREATE INDEX idx_trans_date ON transactions(trans_date)")
-        if 'idx_trans_category' not in indexes:
-            c.execute("CREATE INDEX idx_trans_category ON transactions(category)")
-        if 'idx_trans_type' not in indexes:
-            c.execute("CREATE INDEX idx_trans_type ON transactions(type)")
-        c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('db_version', '2')")
-
-    if current_version < 3:
-        # 迁移到 v3: 导入批次追踪 + extra_data 兜底字段
-        c.execute('''CREATE TABLE IF NOT EXISTS import_batches (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            source      TEXT NOT NULL,
-            filename    TEXT,
-            row_count   INTEGER DEFAULT 0,
-            mapping     TEXT,
-            tags        TEXT,
-            created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
-        )''')
-
-        # transactions 新增列
-        c.execute("PRAGMA table_info(transactions)")
-        tx_cols = [row[1] for row in c.fetchall()]
-        if 'extra_data' not in tx_cols:
-            try:
-                c.execute('ALTER TABLE transactions ADD COLUMN extra_data TEXT')
-            except Exception:
-                pass
-        if 'batch_id' not in tx_cols:
-            try:
-                c.execute('ALTER TABLE transactions ADD COLUMN batch_id INTEGER')
-            except Exception:
-                pass
-
-        # 新索引
-        c.execute("PRAGMA index_list(transactions)")
-        indexes = [row[2] for row in c.fetchall()]
-        if 'idx_trans_merchant' not in indexes:
-            c.execute("CREATE INDEX idx_trans_merchant ON transactions(merchant)")
-        if 'idx_trans_account' not in indexes:
-            c.execute("CREATE INDEX idx_trans_account ON transactions(account)")
-
-        c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('db_version', '3')")
+    if current_version < 4:
+        c.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('db_version', '4')")
 
     conn.commit()
     conn.close()
@@ -311,9 +295,180 @@ def get_transactions_by_tag(tag_id, limit=50, offset=0):
     c.execute('''SELECT t.id, t.trans_date, t.type, t.amount, t.category, t.account, t.note
                  FROM transactions t
                  JOIN transaction_tags tt ON t.id = tt.transaction_id
-                 WHERE tt.tag_id = ? AND t.is_deleted = 0
+                 WHERE tt.transaction_id = ? AND t.is_deleted = 0
                  ORDER BY t.trans_date DESC LIMIT ? OFFSET ?''', (tag_id, limit, offset))
     rows = c.fetchall()
     conn.close()
     return [{'id': r[0], 'date': r[1], 'type': r[2], 'amount': r[3],
              'category': r[4], 'account': r[5], 'note': r[6]} for r in rows]
+
+
+# ─── 账户管理 ──────────────────────────────────────────────
+
+def get_all_accounts():
+    """获取所有账户"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, account_type, owner, parent_account, opening_balance, color, created_at FROM accounts ORDER BY account_type, name")
+    rows = c.fetchall()
+    conn.close()
+    return [{'id': r[0], 'name': r[1], 'account_type': r[2], 'owner': r[3], 'parent_account': r[4],
+             'opening_balance': r[5], 'color': r[6], 'created_at': r[7]} for r in rows]
+
+
+def create_account(name, account_type='self', owner='', parent_account='', opening_balance=0, color='#6366f1'):
+    """创建账户"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO accounts (name, account_type, owner, parent_account, opening_balance, color) VALUES (?, ?, ?, ?, ?, ?)",
+                  (name.strip(), account_type, owner.strip(), parent_account.strip(), opening_balance, color))
+        account_id = c.lastrowid
+        conn.commit()
+        return account_id
+    except sqlite3.IntegrityError:
+        c.execute("SELECT id FROM accounts WHERE name = ?", (name.strip(),))
+        row = c.fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def update_account(account_id, **kwargs):
+    """更新账户信息"""
+    allowed = {'name', 'account_type', 'owner', 'parent_account', 'opening_balance', 'color'}
+    fields = []
+    values = []
+    for k, v in kwargs.items():
+        if k in allowed:
+            fields.append(f"{k} = ?")
+            values.append(v)
+    if not fields:
+        return False
+    values.append(account_id)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(f"UPDATE accounts SET {', '.join(fields)} WHERE id = ?", values)
+    conn.commit()
+    affected = c.rowcount
+    conn.close()
+    return affected > 0
+
+
+def delete_account(account_id):
+    """删除账户"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+    conn.commit()
+    affected = c.rowcount
+    conn.close()
+    return affected > 0
+
+
+def get_account_by_name(name):
+    """根据名称获取账户"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, account_type, owner, parent_account, opening_balance, color, created_at FROM accounts WHERE name = ?", (name,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {'id': row[0], 'name': row[1], 'account_type': row[2], 'owner': row[3], 'parent_account': row[4],
+                'opening_balance': row[5], 'color': row[6], 'created_at': row[7]}
+    return None
+
+
+def ensure_account(name, account_type='self', owner='', parent_account='', opening_balance=0, color='#6366f1'):
+    """确保账户存在，不存在则创建"""
+    account = get_account_by_name(name)
+    if account:
+        return account['id']
+    return create_account(name, account_type, owner, parent_account, opening_balance, color)
+
+
+# ─── 账户余额计算 ──────────────────────────────────────────
+
+def get_account_balance(account_name):
+    """计算账户余额：到账 - 出账"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT 
+            COALESCE(SUM(CASE WHEN to_account = ? THEN amount ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN from_account = ? THEN amount ELSE 0 END), 0)
+        FROM transactions
+        WHERE is_deleted = 0
+          AND (to_account = ? OR from_account = ?)
+    """, (account_name, account_name, account_name, account_name))
+    balance = c.fetchone()[0]
+    conn.close()
+    return balance
+
+
+def get_account_balances_with_type():
+    """获取所有账户余额，包含账户类型信息"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT 
+            a.name,
+            a.account_type,
+            a.owner,
+            a.parent_account,
+            a.opening_balance,
+            COALESCE(SUM(CASE WHEN t.to_account = a.name THEN t.amount ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN t.from_account = a.name THEN t.amount ELSE 0 END), 0) as transaction_balance
+        FROM accounts a
+        LEFT JOIN transactions t ON t.is_deleted = 0 AND (t.to_account = a.name OR t.from_account = a.name)
+        GROUP BY a.name, a.account_type, a.owner, a.parent_account, a.opening_balance
+        ORDER BY a.account_type, a.name
+    """)
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        name, account_type, owner, parent_account, opening_balance, transaction_balance = r
+        balance = (opening_balance or 0) + (transaction_balance or 0)
+        result.append({
+            'name': name,
+            'account_type': account_type,
+            'owner': owner,
+            'parent_account': parent_account,
+            'opening_balance': opening_balance or 0,
+            'transaction_balance': transaction_balance or 0,
+            'balance': balance,
+        })
+    return result
+
+
+def get_net_worth():
+    """计算净资产：self + claims - liability"""
+    balances = get_account_balances_with_type()
+    net = 0
+    for b in balances:
+        if b['account_type'] in ('self', 'claims'):
+            net += b['balance']
+        elif b['account_type'] == 'liability':
+            net -= b['balance']
+    return net
+
+
+def recalc_account_balances(conn, account_names):
+    """重新计算指定账户的余额并写入 account_balances 表"""
+    c = conn.cursor()
+    for name in account_names:
+        c.execute("""
+            SELECT 
+                COALESCE(SUM(CASE WHEN to_account = ? THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN from_account = ? THEN amount ELSE 0 END), 0)
+            FROM transactions
+            WHERE is_deleted = 0
+              AND (to_account = ? OR from_account = ?)
+        """, (name, name, name, name))
+        balance = c.fetchone()[0] or 0
+        c.execute("""
+            INSERT INTO account_balances (account_name, balance, updated_at)
+            VALUES (?, ?, datetime('now', 'localtime'))
+            ON CONFLICT(account_name) DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at
+        """, (name, balance))
