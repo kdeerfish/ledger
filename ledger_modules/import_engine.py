@@ -618,6 +618,7 @@ def execute_import(file_bytes, mapping, tags=None, skip_duplicates=True,
         'skipped': skipped,
         'duplicates_found': duplicates_found,
         'tags_applied': tags or [],
+        'auto_tags': sorted({tag for row in final_rows for tag in row.get('_auto_tags', [])}) if final_rows else [],
         'errors': errors[:20],  # 最多返回20个错误
     }
 
