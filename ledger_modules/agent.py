@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Agent 模块 - 提供 AI Agent 对话功能
@@ -12,6 +12,22 @@ import httpx
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime
+
+
+def _load_providers_config():
+    """从配置文件加载 provider 配置"""
+    config_path = os.path.join(os.path.dirname(__file__), 'providers_config.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('providers', {})
+    except Exception as e:
+        print(f"[Agent] Failed to load providers config: {e}")
+        return {}
+
+
+# 从配置文件加载 provider 配置
+PROVIDERS_CONFIG = _load_providers_config()
 
 
 @dataclass
@@ -39,14 +55,17 @@ class AgentService:
                 "type": "function",
                 "function": {
                     "name": "query_transactions",
-                    "description": "查询交易记录",
+                    "description": "查询交易记录。支持按月份或日期范围查询。用户问花了多少、有哪些记录、这两天、最近几天时调用。",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "month": {"type": "string", "description": "月份，格式 YYYY-MM"},
-                            "category": {"type": "string", "description": "类别"},
-                            "type": {"type": "string", "enum": ["income", "expense"], "description": "类型"}
-                        }
+                            "month": {"type": "string", "description": "月份 YYYY-MM，如 2026-06。与 start_date/end_date 二选一。", "default": ""},
+                            "start_date": {"type": "string", "description": "开始日期 YYYY-MM-DD，如 2026-06-22。用于查询特定日期范围。", "default": ""},
+                            "end_date": {"type": "string", "description": "结束日期 YYYY-MM-DD，如 2026-06-24。用于查询特定日期范围。", "default": ""},
+                            "category": {"type": "string", "description": "类别（可选），如 食品酒水、交通", "default": ""},
+                            "type": {"type": "string", "enum": ["支出", "收入"], "description": "类型：支出=花费, 收入=进账", "default": ""}
+                        },
+                        "required": []
                     }
                 }
             },
@@ -54,15 +73,15 @@ class AgentService:
                 "type": "function",
                 "function": {
                     "name": "add_transaction",
-                    "description": "添加交易记录",
+                    "description": "添加一条交易记录（记账）。用户说记一笔、花了、买了时调用。",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "amount": {"type": "number", "description": "金额"},
-                            "type": {"type": "string", "enum": ["income", "expense"], "description": "类型"},
-                            "category": {"type": "string", "description": "类别"},
-                            "description": {"type": "string", "description": "描述"},
-                            "date": {"type": "string", "description": "日期 YYYY-MM-DD"}
+                            "amount": {"type": "number", "description": "金额（必填），数字"},
+                            "type": {"type": "string", "enum": ["支出", "收入"], "description": "类型：支出=花费, 收入=进账（必填）"},
+                            "category": {"type": "string", "description": "类别（必填），如 食品酒水、交通、购物"},
+                            "description": {"type": "string", "description": "备注描述（可选）", "default": ""},
+                            "date": {"type": "string", "description": "日期 YYYY-MM-DD（可选，默认为今天）", "default": ""}
                         },
                         "required": ["amount", "type", "category"]
                     }
@@ -72,11 +91,11 @@ class AgentService:
                 "type": "function",
                 "function": {
                     "name": "query_budgets",
-                    "description": "查询预算信息",
+                    "description": "查询指定月份的预算信息。用户问预算、还剩多少时调用。",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "month": {"type": "string", "description": "月份"}
+                            "month": {"type": "string", "description": "月份 YYYY-MM（可选，默认为本月）", "default": ""}
                         }
                     }
                 }
@@ -85,13 +104,14 @@ class AgentService:
                 "type": "function",
                 "function": {
                     "name": "get_statistics",
-                    "description": "获取统计数据",
+                    "description": "获取收支统计汇总。用户问统计、汇总、总共有多少时调用。",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "period": {"type": "string", "enum": ["month", "year"], "description": "统计周期"},
-                            "year": {"type": "integer", "description": "年份"},
-                            "month": {"type": "integer", "description": "月份"}
+                            "period": {"type": "string", "enum": ["month", "year"], "description": "统计周期：month=月度, year=年度（可选，默认月）", "default": "month"},
+                            "year": {"type": "integer", "description": "年份（可选，默认为今年）", "default": 0},
+                            "month": {"type": "integer", "description": "月份 1-12（可选，默认为本月）", "default": 0},
+                            "group_by": {"type": "string", "enum": ["category", "account", "month"], "description": "分组维度：category=按类别, account=按账户, month=按月", "default": "category"}
                         }
                     }
                 }
@@ -115,260 +135,27 @@ class AgentService:
             return False
     
     def get_provider_config(self) -> Dict[str, Any]:
-        """获取提供商配置信息"""
+        """获取提供商配置信息（从配置文件加载）"""
         provider = self.config.provider if self.config else 'openai'
         
-        # OpenAI 兼容 API 厂商配置
-        # 国内厂商优先，有国内/海外双版本的已分开
-        configs = {
-            # 国内厂商
-            'deepseek': {
-                'name': 'DeepSeek (深度求索)',
-                'default_base_url': 'https://api.deepseek.com/v1',
-                'default_model': 'deepseek-chat',
-                'models': ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner', 'deepseek-v3'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'qwen_cn': {
-                'name': '通义千问 Qwen-CN (阿里百炼-国内)',
-                'default_base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                'default_model': 'qwen-turbo',
-                'models': ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-long', 'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct', 'qwen2.5-14b-instruct', 'qwen2.5-7b-instruct'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'qwen_global': {
-                'name': '通义千问 Qwen-Global (阿里百炼-国际)',
-                'default_base_url': 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-                'default_model': 'qwen-turbo',
-                'models': ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'wenxin': {
-                'name': '文心一言 (百度千帆-国内)',
-                'default_base_url': 'https://qianfan.baidubce.com/v2',
-                'default_model': 'ernie-4.0-8k',
-                'models': ['ernie-4.0-8k', 'ernie-3.5-8k', 'ernie-3.5-128k', 'ernie-speed-8k', 'ernie-lite-8k', 'ernie-tiny-8k'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'glm_cn': {
-                'name': '智谱AI GLM-CN (国内)',
-                'default_base_url': 'https://open.bigmodel.cn/api/paas/v4',
-                'default_model': 'glm-4',
-                'models': ['glm-4', 'glm-4-plus', 'glm-4-0520', 'glm-4-air', 'glm-4-airx', 'glm-4-long', 'glm-4-flash', 'glm-3-turbo'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'glm_global': {
-                'name': '智谱AI GLM-Global (海外)',
-                'default_base_url': 'https://api.z.ai/api/paas/v4',
-                'default_model': 'glm-4.5',
-                'models': ['glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx', 'glm-4-plus', 'glm-4-air', 'glm-4-flash'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'moonshot_cn': {
-                'name': 'Kimi-CN (月之暗面-国内)',
-                'default_base_url': 'https://api.moonshot.cn/v1',
-                'default_model': 'moonshot-v1-8k',
-                'models': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto', 'kimi-k2-0905-preview', 'kimi-latest'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'moonshot_global': {
-                'name': 'Kimi-Global (月之暗面-海外)',
-                'default_base_url': 'https://api.moonshot.ai/v1',
-                'default_model': 'moonshot-v1-8k',
-                'models': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto', 'kimi-k2-0905-preview', 'kimi-latest'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'hunyuan': {
-                'name': '腾讯混元',
-                'default_base_url': 'https://api.hunyuan.cloud.tencent.com/v1',
-                'default_model': 'hunyuan-pro',
-                'models': ['hunyuan-pro', 'hunyuan-standard', 'hunyuan-lite', 'hunyuan-turbo', 'hunyuan-code', 'hunyuan-role'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'spark': {
-                'name': '讯飞星火',
-                'default_base_url': 'https://spark-api-open.xf-yun.com/v1',
-                'default_model': 'general',
-                'models': ['general', 'generalv3', 'generalv3.5', 'pro-128k', 'max-32k', 'lite'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'doubao': {
-                'name': '豆包 (字节火山引擎-国内)',
-                'default_base_url': 'https://ark.cn-beijing.volces.com/api/v3',
-                'default_model': 'doubao-pro-32k',
-                'models': ['doubao-pro-32k', 'doubao-pro-128k', 'doubao-lite-4k', 'doubao-lite-32k', 'doubao-lite-128k'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'minimax': {
-                'name': 'MiniMax (稀宇科技)',
-                'default_base_url': 'https://api.MiniMax.chat/v1',
-                'default_model': 'MiniMax-text-01',
-                'models': ['MiniMax-text-01', 'MiniMax-VL-01', 'MiniMax-Text-02', 'MiniMax-Reasoning-01'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'mimo': {
-                'name': '小米 MiMo',
-                'default_base_url': 'https://api.mimo.ai/v1',
-                'default_model': 'mimo-v2.5-pro',
-                'models': ['mimo-v2.5-pro', 'mimo-v2.5-flash', 'mimo-v2.5-plus'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'stepfun': {
-                'name': '阶跃星辰 StepFun',
-                'default_base_url': 'https://api.stepfun.com/v1',
-                'default_model': 'step-1-8k',
-                'models': ['step-1-8k', 'step-1-32k', 'step-1-200k', 'step-1-flash', 'step-1-plus', 'step-1-pro', 'step-2-16k'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'yi': {
-                'name': '零一万物 Yi',
-                'default_base_url': 'https://api.lingyiwanwu.com/v1',
-                'default_model': 'yi-large',
-                'models': ['yi-large', 'yi-medium', 'yi-spark', 'yi-large-turbo', 'yi-medium-200k', 'yi-lightning'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'baichuan': {
-                'name': '百川智能 Baichuan',
-                'default_base_url': 'https://api.baichuan-ai.com/v1',
-                'default_model': 'Baichuan4',
-                'models': ['Baichuan4', 'Baichuan3-Turbo', 'Baichuan3-Turbo-128k', 'Baichuan2-Turbo', 'Baichuan2-Turbo-192k'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'siliconflow': {
-                'name': '硅基流动 SiliconFlow',
-                'default_base_url': 'https://api.siliconflow.cn/v1',
-                'default_model': 'Qwen/Qwen2.5-7B-Instruct',
-                'models': ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V2.5', '01ai/Yi-1.5-9B-Chat', 'THUDM/glm-4-9b-chat'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'dashscope': {
-                'name': '阿里云百炼 (多模型聚合)',
-                'default_base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                'default_model': 'qwen-plus',
-                'models': ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen2.5-72b-instruct', 'deepseek-v3', 'glm-4-9b', 'kimi-k2.7-code', 'minimax/MiniMax-M2.7', 'mimo-v2.5-pro'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            # 国际厂商
-            'openai': {
-                'name': 'OpenAI',
-                'default_base_url': 'https://api.openai.com/v1',
-                'default_model': 'gpt-3.5-turbo',
-                'models': ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'claude': {
-                'name': 'Claude (Anthropic)',
-                'default_base_url': 'https://api.anthropic.com/v1',
-                'default_model': 'claude-3-5-sonnet-20241022',
-                'models': ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
-                'api_style': 'claude',
-                'auth_header': 'x-api-key',
-                'auth_prefix': ''
-            },
-            'ollama': {
-                'name': 'Ollama (本地部署)',
-                'default_base_url': 'http://localhost:11434/v1',
-                'default_model': 'llama3',
-                'models': ['llama3', 'qwen2', 'mistral', 'gemma2', 'phi3', 'codellama'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'groq': {
-                'name': 'Groq (高速推理)',
-                'default_base_url': 'https://api.groq.com/openai/v1',
-                'default_model': 'llama-3.1-8b-instant',
-                'models': ['llama-3.1-8b-instant', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'together': {
-                'name': 'Together AI (开源模型聚合)',
-                'default_base_url': 'https://api.together.xyz/v1',
-                'default_model': 'meta-llama/Llama-3-8b-chat-hf',
-                'models': ['meta-llama/Llama-3-8b-chat-hf', 'meta-llama/Llama-3-70b-chat-hf', 'mistralai/Mixtral-8x7B-Instruct-v0.1', 'Qwen/Qwen2-72B-Instruct'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'mistral': {
-                'name': 'Mistral AI',
-                'default_base_url': 'https://api.mistral.ai/v1',
-                'default_model': 'mistral-large-latest',
-                'models': ['mistral-large-latest', 'mistral-small-latest', 'open-mixtral-8x22b', 'open-mixtral-8x7b', 'codestral-latest'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'cohere': {
-                'name': 'Cohere',
-                'default_base_url': 'https://api.cohere.com/v2',
-                'default_model': 'command-r-plus',
-                'models': ['command-r-plus', 'command-r', 'command-light', 'command'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'jina': {
-                'name': 'Jina AI (多模态/Embedding)',
-                'default_base_url': 'https://api.jina.ai/v1',
-                'default_model': 'jina-ai/jina-embeddings-v3',
-                'models': ['jina-ai/jina-embeddings-v3', 'jina-ai/deepseek-pro', 'jina-ai/jina-reranker-v2'],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            },
-            'custom': {
-                'name': '自定义 (OpenAI兼容)',
-                'default_base_url': '',
-                'default_model': '',
-                'models': [],
-                'api_style': 'openai',
-                'auth_header': 'Authorization',
-                'auth_prefix': 'Bearer '
-            }
-        }
+        # 从配置文件加载的 PROVIDERS_CONFIG
+        if PROVIDERS_CONFIG:
+            config = PROVIDERS_CONFIG.get(provider, PROVIDERS_CONFIG.get('openai', {}))
+            # 添加 default_model 字段（使用 models 列表的第一个作为默认）
+            if 'default_model' not in config and config.get('models'):
+                config['default_model'] = config['models'][0]
+            return config
         
-        return configs.get(provider, configs['openai'])
+        # 备用：如果配置文件加载失败，返回基本配置
+        return {
+            'name': provider,
+            'default_base_url': 'https://api.openai.com/v1',
+            'default_model': 'gpt-3.5-turbo',
+            'models': [],
+            'api_style': 'openai',
+            'auth_header': 'Authorization',
+            'auth_prefix': 'Bearer '
+        }
     
     def get_default_base_url(self) -> str:
         """获取默认 base_url"""
@@ -502,7 +289,7 @@ class AgentService:
                         continue
     
     async def chat_stream(self, messages: List[Dict]):
-        """流式聊天，返回思考过程和内容"""
+        """流式聊天，返回思考过程和内容，支持工具调用循环"""
         if not self.config:
             raise ValueError("未配置 LLM")
         
@@ -510,168 +297,341 @@ class AgentService:
         headers = self.build_headers()
         provider_config = self.get_provider_config()
         
-        print(f"[Agent Stream] Calling API: provider={self.config.provider}, model={self.config.model}")
+        # 工具调用循环（最多3轮）
+        current_messages = list(messages)
+        max_tool_rounds = 3
+        full_content = ""
         
-        payload = {
-            "model": self.config.model,
-            "messages": messages,
-            "temperature": self.config.temperature,
-            "max_tokens": self.config.max_tokens,
-            "stream": True
-        }
-        
-        # 添加工具定义（OpenAI兼容模式）
-        if self.tools and provider_config['api_style'] != 'claude':
-            payload["tools"] = self.tools
-            payload["tool_choice"] = "auto"
-        
-        # Claude 特殊处理
-        if provider_config['api_style'] == 'claude':
-            system_msg = None
-            conv_messages = []
-            for msg in messages:
-                if msg['role'] == 'system':
-                    system_msg = msg['content']
-                else:
-                    conv_messages.append(msg)
+        for round_idx in range(max_tool_rounds):
+            print(f"[Agent Stream] Round {round_idx + 1}: provider={self.config.provider}, model={self.config.model}")
             
-            claude_payload = {
+            payload = {
                 "model": self.config.model,
-                "messages": conv_messages,
-                "max_tokens": self.config.max_tokens,
+                "messages": current_messages,
                 "temperature": self.config.temperature,
+                "max_tokens": self.config.max_tokens,
                 "stream": True
             }
-            if system_msg:
-                claude_payload['system'] = system_msg
             
-            url = f"{base_url.rstrip('/')}/messages"
-            payload = claude_payload
-        else:
-            url = f"{base_url.rstrip('/')}/chat/completions"
-        
-        print(f"[Agent Stream] Request URL: {url}")
-        
-        async with httpx.AsyncClient() as client:
-            async with client.stream(
-                "POST",
-                url,
-                headers=headers,
-                json=payload,
-                timeout=120.0
-            ) as response:
-                response.raise_for_status()
+            # 添加工具定义
+            if self.tools and provider_config['api_style'] != 'claude':
+                payload["tools"] = self.tools
+                payload["tool_choice"] = "auto"
+            
+            # Claude 特殊处理
+            if provider_config['api_style'] == 'claude':
+                system_msg = None
+                conv_messages = []
+                for msg in current_messages:
+                    if msg['role'] == 'system':
+                        system_msg = msg['content']
+                    else:
+                        conv_messages.append(msg)
                 
-                full_content = ""
-                tool_calls = []
-                current_tool_call = None
+                claude_payload = {
+                    "model": self.config.model,
+                    "messages": conv_messages,
+                    "max_tokens": self.config.max_tokens,
+                    "temperature": self.config.temperature,
+                    "stream": True
+                }
+                if system_msg:
+                    claude_payload['system'] = system_msg
                 
-                async for line in response.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
+                url = f"{base_url.rstrip('/')}/messages"
+                payload = claude_payload
+            else:
+                url = f"{base_url.rstrip('/')}/chat/completions"
+            
+            print(f"[Agent Stream] Request URL: {url}")
+            
+            tool_calls = []
+            
+            async with httpx.AsyncClient() as client:
+                async with client.stream(
+                    "POST",
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=120.0
+                ) as response:
+                    response.raise_for_status()
                     
-                    data = line[6:]
-                    if data.strip() == "[DONE]":
-                        break
+                    full_content = ""
+                    current_tool_call = None
+                    in_think_block = False
+                    think_buffer = ""
                     
-                    try:
-                        chunk = json.loads(data)
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
                         
-                        # OpenAI 格式
-                        if provider_config['api_style'] != 'claude':
-                            if not chunk.get("choices"):
-                                continue
-                            
-                            delta = chunk["choices"][0].get("delta", {})
-                            
-                            # 内容增量
-                            if delta.get("content"):
-                                full_content += delta["content"]
-                                yield {"type": "content", "content": delta["content"]}
-                            
-                            # 工具调用
-                            if delta.get("tool_calls"):
-                                for tc in delta["tool_calls"]:
-                                    if tc.get("index") is not None:
-                                        idx = tc["index"]
-                                        while len(tool_calls) <= idx:
-                                            tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
-                                        
-                                        if tc.get("id"):
-                                            tool_calls[idx]["id"] = tc["id"]
-                                        if tc.get("function", {}).get("name"):
-                                            tool_calls[idx]["function"]["name"] = tc["function"]["name"]
-                                        if tc.get("function", {}).get("arguments"):
-                                            tool_calls[idx]["function"]["arguments"] += tc["function"]["arguments"]
+                        data = line[6:]
+                        if data.strip() == "[DONE]":
+                            break
                         
-                        # Claude 格式
-                        else:
-                            if chunk.get("type") == "content_block_start":
-                                block = chunk.get("content_block", {})
-                                if block.get("type") == "tool_use":
-                                    current_tool_call = {
-                                        "id": block.get("id", ""),
-                                        "type": "function",
-                                        "function": {
-                                            "name": block.get("name", ""),
-                                            "arguments": ""
-                                        }
-                                    }
-                            elif chunk.get("type") == "content_block_delta":
-                                delta = chunk.get("delta", {})
-                                if delta.get("type") == "text_delta":
-                                    full_content += delta.get("text", "")
-                                    yield {"type": "content", "content": delta.get("text", "")}
-                                elif delta.get("type") == "input_json_delta" and current_tool_call:
-                                    current_tool_call["function"]["arguments"] += delta.get("partial_json", "")
-                            elif chunk.get("type") == "content_block_stop":
-                                if current_tool_call:
-                                    tool_calls.append(current_tool_call)
-                                    current_tool_call = None
-                    
-                    except json.JSONDecodeError:
-                        continue
-                
-                # 发送工具调用
-                if tool_calls:
-                    for tc in tool_calls:
-                        yield {"type": "tool_call", "tool_call": tc}
-                        
-                        # 执行工具调用
                         try:
-                            args = json.loads(tc["function"]["arguments"])
-                            result = self.execute_tool(tc["function"]["name"], args)
-                            yield {"type": "tool_result", "tool_call": tc, "result": result}
-                        except Exception as e:
-                            yield {"type": "tool_result", "tool_call": tc, "result": f"工具执行失败: {str(e)}"}
+                            chunk = json.loads(data)
+                            
+                            # OpenAI 格式
+                            if provider_config['api_style'] != 'claude':
+                                if not chunk.get("choices"):
+                                    continue
+                                
+                                delta = chunk["choices"][0].get("delta", {})
+                                
+                                # 内容增量 - 处理 <think> 标签
+                                if delta.get("content"):
+                                    content_piece = delta["content"]
+                                    while content_piece:
+                                        if not in_think_block:
+                                            think_start = content_piece.find("<think>")
+                                            if think_start >= 0:
+                                                before = content_piece[:think_start]
+                                                if before:
+                                                    full_content += before
+                                                    yield {"type": "content", "content": before}
+                                                in_think_block = True
+                                                think_buffer = ""
+                                                content_piece = content_piece[think_start + len("<think>"):]
+                                            else:
+                                                full_content += content_piece
+                                                yield {"type": "content", "content": content_piece}
+                                                content_piece = ""
+                                        else:
+                                            think_end = content_piece.find("</think>")
+                                            if think_end >= 0:
+                                                think_buffer += content_piece[:think_end]
+                                                yield {"type": "thinking", "content": think_buffer}
+                                                think_buffer = ""
+                                                in_think_block = False
+                                                content_piece = content_piece[think_end + len("</think>"):]
+                                            else:
+                                                think_buffer += content_piece
+                                                content_piece = ""
+                                
+                                # reasoning_content 字段
+                                if delta.get("reasoning_content"):
+                                    yield {"type": "thinking", "content": delta["reasoning_content"]}
+                                
+                                # 工具调用
+                                if delta.get("tool_calls"):
+                                    for tc in delta["tool_calls"]:
+                                        if tc.get("index") is not None:
+                                            idx = tc["index"]
+                                            while len(tool_calls) <= idx:
+                                                tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                                            
+                                            if tc.get("id"):
+                                                tool_calls[idx]["id"] = tc["id"]
+                                            if tc.get("function", {}).get("name"):
+                                                tool_calls[idx]["function"]["name"] = tc["function"]["name"]
+                                            if tc.get("function", {}).get("arguments"):
+                                                tool_calls[idx]["function"]["arguments"] += tc["function"]["arguments"]
+                            
+                            # Claude 格式
+                            else:
+                                if chunk.get("type") == "content_block_start":
+                                    block = chunk.get("content_block", {})
+                                    if block.get("type") == "tool_use":
+                                        current_tool_call = {
+                                            "id": block.get("id", ""),
+                                            "type": "function",
+                                            "function": {
+                                                "name": block.get("name", ""),
+                                                "arguments": ""
+                                            }
+                                        }
+                                elif chunk.get("type") == "content_block_delta":
+                                    delta = chunk.get("delta", {})
+                                    if delta.get("type") == "thinking_delta":
+                                        yield {"type": "thinking", "content": delta.get("thinking", "")}
+                                    elif delta.get("type") == "text_delta":
+                                        text = delta.get("text", "")
+                                        content_piece = text
+                                        while content_piece:
+                                            if not in_think_block:
+                                                think_start = content_piece.find("<think>")
+                                                if think_start >= 0:
+                                                    before = content_piece[:think_start]
+                                                    if before:
+                                                        full_content += before
+                                                        yield {"type": "content", "content": before}
+                                                    in_think_block = True
+                                                    think_buffer = ""
+                                                    content_piece = content_piece[think_start + len("<think>"):]
+                                                else:
+                                                    full_content += content_piece
+                                                    yield {"type": "content", "content": content_piece}
+                                                    content_piece = ""
+                                            else:
+                                                think_end = content_piece.find("</think>")
+                                                if think_end >= 0:
+                                                    think_buffer += content_piece[:think_end]
+                                                    yield {"type": "thinking", "content": think_buffer}
+                                                    think_buffer = ""
+                                                    in_think_block = False
+                                                    content_piece = content_piece[think_end + len("</think>"):]
+                                                else:
+                                                    think_buffer += content_piece
+                                                    content_piece = ""
+                                    elif delta.get("type") == "input_json_delta" and current_tool_call:
+                                        current_tool_call["function"]["arguments"] += delta.get("partial_json", "")
+                                elif chunk.get("type") == "content_block_stop":
+                                    if current_tool_call:
+                                        tool_calls.append(current_tool_call)
+                                        current_tool_call = None
+                        
+                        except json.JSONDecodeError:
+                            continue
                 
+                # 处理未闭合的思考块
+                if think_buffer:
+                    yield {"type": "thinking", "content": think_buffer}
+            
+            # 没有工具调用，本轮结束
+            if not tool_calls:
                 yield {"type": "done", "full_content": full_content}
+                return
+            
+            # 有工具调用，执行并继续
+            # 构建 assistant 消息（含工具调用）
+            assistant_msg = {"role": "assistant", "content": full_content or None}
+            if provider_config['api_style'] == 'claude':
+                assistant_msg["content"] = [{"type": "text", "text": full_content}] if full_content else []
+                for tc in tool_calls:
+                    assistant_msg["content"].append({
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "input": json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
+                    })
+            else:
+                assistant_msg["tool_calls"] = tool_calls
+            current_messages.append(assistant_msg)
+            
+            # 执行工具并收集结果
+            for tc in tool_calls:
+                yield {"type": "tool_call", "tool_call": tc}
+                try:
+                    args = json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
+                    result = self.execute_tool(tc["function"]["name"], args)
+                    yield {"type": "tool_result", "tool_call": tc, "result": result}
+                except Exception as e:
+                    result = f"工具执行失败: {str(e)}"
+                    yield {"type": "tool_result", "tool_call": tc, "result": result}
+                
+                # 添加工具结果消息
+                if provider_config['api_style'] == 'claude':
+                    current_messages.append({
+                        "role": "user",
+                        "content": [{"type": "tool_result", "tool_use_id": tc["id"], "content": result}]
+                    })
+                else:
+                    current_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": result
+                    })
+            
+            # 继续下一轮（让 LLM 根据工具结果生成回复）
+            print(f"[Agent Stream] Tool calls executed, starting round {round_idx + 2}")
+        
+        # 超过最大轮数
+        yield {"type": "done", "full_content": full_content}
     
     def execute_tool(self, tool_name: str, arguments: Dict) -> str:
         """执行工具调用"""
         import ledger_modules.transactions as tx_module
-        import ledger_modules.budgets as budget_module
-        from datetime import datetime, timedelta
+        from datetime import datetime
+        import sqlite3
+        from ledger_modules.config import get_db_path
         
         try:
             if tool_name == "query_transactions":
-                month = arguments.get('month', datetime.now().strftime('%Y-%m'))
+                month = arguments.get('month', '')
+                start_date_arg = arguments.get('start_date', '')
+                end_date_arg = arguments.get('end_date', '')
                 category = arguments.get('category')
                 type_ = arguments.get('type')
                 
-                # 查询交易记录
-                result = tx_module.search_transactions(
-                    start_date=f"{month}-01",
-                    end_date=f"{month}-31",
-                    category=category,
-                    type_=type_
-                )
+                # 调试日志
+                print(f"[Tool] query_transactions: month={month}, start_date={start_date_arg}, end_date={end_date_arg}, category={category}, type={type_}")
                 
-                if not result:
-                    return f"{month} 没有找到交易记录"
+                # 确定查询日期范围
+                if start_date_arg and end_date_arg:
+                    # 验证日期格式和顺序
+                    from datetime import datetime, timedelta
+                    try:
+                        start_dt = datetime.strptime(start_date_arg, '%Y-%m-%d')
+                        end_dt = datetime.strptime(end_date_arg, '%Y-%m-%d')
+                        # 如果日期顺序反了，自动交换
+                        if start_dt > end_dt:
+                            start_dt, end_dt = end_dt, start_dt
+                            start_date_arg = start_dt.strftime('%Y-%m-%d')
+                            end_date_arg = end_dt.strftime('%Y-%m-%d')
+                        # end_date 需要包含当天，所以用下一天
+                        end_date = (end_dt + timedelta(days=1)).strftime('%Y-%m-%d')
+                        start_date = start_date_arg
+                    except ValueError:
+                        return "日期格式错误，请使用 YYYY-MM-DD 格式"
+                elif month:
+                    # 使用月份
+                    year_str, m_str = month.split('-')
+                    year_int, m_int = int(year_str), int(m_str)
+                    start_date = f"{year_int}-{m_int:02d}-01"
+                    if m_int == 12:
+                        end_date = f"{year_int+1}-01-01"
+                    else:
+                        end_date = f"{year_int}-{m_int+1:02d}-01"
+                else:
+                    # 默认本月
+                    now = datetime.now()
+                    start_date = f"{now.year}-{now.month:02d}-01"
+                    if now.month == 12:
+                        end_date = f"{now.year+1}-01-01"
+                    else:
+                        end_date = f"{now.year}-{now.month+1:02d}-01"
                 
-                total = sum(t.get('amount', 0) for t in result)
-                return f"{month} 共 {len(result)} 笔交易，总计 {total:.2f} 元"
+                # 直接查询数据库
+                conn = sqlite3.connect(get_db_path())
+                c = conn.cursor()
+                sql = '''SELECT id, trans_date, type, amount, category, account, note 
+                         FROM transactions 
+                         WHERE is_deleted = 0 AND trans_date >= ? AND trans_date < ?'''
+                params = [start_date, end_date]
+                if category:
+                    sql += ' AND (category = ? OR subcategory = ?)'
+                    params.extend([category, category])
+                # 类型过滤：直接使用中文值
+                if type_:
+                    sql += ' AND type = ?'
+                    params.append(type_)
+                sql += ' ORDER BY trans_date DESC LIMIT 200'
+                c.execute(sql, params)
+                rows = c.fetchall()
+                conn.close()
+                
+                # 构建查询描述
+                if start_date_arg and end_date_arg:
+                    query_desc = f"{start_date_arg} 至 {end_date_arg}"
+                elif month:
+                    query_desc = month
+                else:
+                    query_desc = "本月"
+                
+                if not rows:
+                    return f"{query_desc} 没有找到交易记录"
+                
+                total = sum(row[3] for row in rows)
+                # 返回详细记录
+                lines = [f"{query_desc} 共 {len(rows)} 笔交易，总计 {total:.2f} 元：\n"]
+                for row in rows[:20]:  # 最多显示20条
+                    id_, date, typ, amt, cat, acc, note = row
+                    lines.append(f"  {date[:10]} | {typ} | {amt:.2f} | {cat} | {note or ''}")
+                if len(rows) > 20:
+                    lines.append(f"  ... 还有 {len(rows) - 20} 条记录")
+                return "\n".join(lines)
             
             elif tool_name == "add_transaction":
                 amount = arguments.get('amount')
@@ -683,30 +643,44 @@ class AgentService:
                 if not all([amount, type_, category]):
                     return "缺少必要参数：amount, type, category"
                 
-                # 添加交易
+                # 添加交易（匹配实际函数签名）
+                # add_transaction(type_, amount, category, subcategory, account, project, member, merchant, note, trans_date=None, force=False)
                 tx_id = tx_module.add_transaction(
-                    amount=amount,
                     type_=type_,
+                    amount=amount,
                     category=category,
-                    description=description,
-                    date=date
+                    subcategory='',
+                    account='',
+                    project='',
+                    member='',
+                    merchant='',
+                    note=description,
+                    trans_date=date,
+                    force=True
                 )
                 
+                if tx_id is None:
+                    return f"添加失败：检测到重复记录"
                 return f"已添加交易：{type_} {amount} 元，类别：{category}，ID：{tx_id}"
             
             elif tool_name == "query_budgets":
                 month = arguments.get('month', datetime.now().strftime('%Y-%m'))
+                year_str, m_str = month.split('-')
+                year_int, m_int = int(year_str), int(m_str)
                 
-                # 查询预算
-                budgets = budget_module.get_budgets(month=month)
+                # 直接查询数据库
+                conn = sqlite3.connect(get_db_path())
+                c = conn.cursor()
+                c.execute('''SELECT category, amount FROM budgets WHERE year=? AND month=?''', (year_int, m_int))
+                budgets = c.fetchall()
+                conn.close()
                 
                 if not budgets:
                     return f"{month} 没有设置预算"
                 
                 result = []
-                for b in budgets:
-                    result.append(f"{b.get('category', '未知')}: 预算 {b.get('budget', 0):.2f} 元，已用 {b.get('used', 0):.2f} 元")
-                
+                for cat, budget_amount in budgets:
+                    result.append(f"{cat}: 预算 {budget_amount:.2f} 元")
                 return "\n".join(result)
             
             elif tool_name == "get_statistics":
@@ -716,7 +690,10 @@ class AgentService:
                 group_by = arguments.get('group_by', 'category')
                 
                 # 获取统计数据
-                stats = tx_module.get_statistics(year=year, month=month, group_by=group_by)
+                if period == 'year':
+                    stats = tx_module.get_statistics(year=year, group_by=group_by)
+                else:
+                    stats = tx_module.get_statistics(year=year, month=month, group_by=group_by)
                 
                 if not stats:
                     if period == 'year':

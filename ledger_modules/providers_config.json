@@ -1,0 +1,325 @@
+{
+  "providers": {
+    "deepseek": {
+      "name": "DeepSeek (深度求索)",
+      "api_style": "openai",
+      "default_base_url": "https://api.deepseek.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-coder", "deepseek-v3"]
+    },
+    "qwen_cn": {
+      "name": "通义千问 Qwen-CN (阿里百炼-国内)",
+      "api_style": "openai",
+      "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "qwen-max", "qwen-plus", "qwen-turbo", "qwen-long",
+        "qwen3-max", "qwen3-plus", "qwen3-235b-a22b",
+        "qwen2.5-72b-instruct", "qwen2.5-32b-instruct", "qwen2.5-14b-instruct", "qwen2.5-7b-instruct",
+        "qwen-coder-plus", "qwen-vl-max", "qwen-vl-plus"
+      ]
+    },
+    "qwen_global": {
+      "name": "通义千问 Qwen-Global (阿里百炼-国际)",
+      "api_style": "openai",
+      "default_base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "qwen-max", "qwen-plus", "qwen-turbo", "qwen-long",
+        "qwen3-max", "qwen3-plus", "qwen3-235b-a22b",
+        "qwen2.5-72b-instruct", "qwen2.5-32b-instruct",
+        "qwen-coder-plus", "qwen-vl-max", "qwen-vl-plus"
+      ]
+    },
+    "wenxin": {
+      "name": "文心一言 (百度千帆-国内)",
+      "api_style": "openai",
+      "default_base_url": "https://qianfan.baidubce.com/v2",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "ernie-4.5-8k", "ernie-4.5-turbo-128k", "ernie-4.0-turbo-8k", "ernie-4.0-8k",
+        "ernie-3.5-8k", "ernie-3.5-128k", "ernie-speed-pro-128k",
+        "ernie-lite-8k", "ernie-tiny-8k"
+      ]
+    },
+    "glm_cn": {
+      "name": "智谱AI GLM-CN (国内)",
+      "api_style": "openai",
+      "default_base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "glm-4-plus", "glm-4-0520", "glm-4-air", "glm-4-airx", "glm-4-long",
+        "glm-4-flash", "glm-4-flashx", "glm-zero-preview", "glm-3-turbo"
+      ]
+    },
+    "glm_global": {
+      "name": "智谱AI GLM-Global (海外)",
+      "api_style": "openai",
+      "default_base_url": "https://api.z.ai/api/paas/v4",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "glm-4.5", "glm-4.5-air", "glm-4.5-x", "glm-4.5-airx",
+        "glm-4-plus", "glm-4-air", "glm-4-flash"
+      ]
+    },
+    "moonshot_cn": {
+      "name": "Kimi-CN (月之暗面-国内)",
+      "api_style": "openai",
+      "default_base_url": "https://api.moonshot.cn/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k", "moonshot-v1-auto",
+        "kimi-k2-0905-preview", "kimi-latest"
+      ]
+    },
+    "moonshot_global": {
+      "name": "Kimi-Global (月之暗面-海外)",
+      "api_style": "openai",
+      "default_base_url": "https://api.moonshot.ai/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k", "moonshot-v1-auto",
+        "kimi-k2-0905-preview", "kimi-latest"
+      ]
+    },
+    "hunyuan": {
+      "name": "腾讯混元",
+      "api_style": "openai",
+      "default_base_url": "https://api.hunyuan.cloud.tencent.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "hunyuan-turbo", "hunyuan-turbos", "hunyuan-pro", "hunyuan-standard",
+        "hunyuan-standard-256k", "hunyuan-lite", "hunyuan-code", "hunyuan-role", "hunyuan-vision"
+      ]
+    },
+    "spark": {
+      "name": "讯飞星火",
+      "api_style": "openai",
+      "default_base_url": "https://spark-api-open.xf-yun.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "generalv3.5", "generalv3", "pro-128k", "max-32k", "lite",
+        "spark-3.0-ultra", "spark-v3.5"
+      ]
+    },
+    "doubao": {
+      "name": "豆包 (字节火山引擎-国内)",
+      "api_style": "openai",
+      "default_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "doubao-pro-32k", "doubao-pro-256k", "doubao-lite-4k", "doubao-lite-32k", "doubao-lite-128k",
+        "doubao-1-5-pro-32k", "doubao-1-5-pro-256k"
+      ]
+    },
+    "minimax": {
+      "name": "MiniMax (稀宇科技)",
+      "api_style": "openai",
+      "default_base_url": "https://api.MiniMax.chat/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": ["MiniMax-Text-01", "MiniMax-VL-01", "MiniMax-Text-02", "MiniMax-Reasoning-01"]
+    },
+    "mimo": {
+      "name": "小米 MiMo",
+      "api_style": "openai",
+      "default_base_url": "https://api.mimo.ai/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": ["mimo-v2.5-pro", "mimo-v2.5-flash", "mimo-v2.5-plus"]
+    },
+    "stepfun": {
+      "name": "阶跃星辰 StepFun",
+      "api_style": "openai",
+      "default_base_url": "https://api.stepfun.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "step-1-200k", "step-1-32k", "step-1-8k", "step-2-16k",
+        "step-2-16k-chat", "step-1-flash", "step-1-plus", "step-1-pro"
+      ]
+    },
+    "yi": {
+      "name": "零一万物 Yi",
+      "api_style": "openai",
+      "default_base_url": "https://api.lingyiwanwu.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "yi-large", "yi-medium", "yi-spark", "yi-large-turbo",
+        "yi-medium-200k", "yi-lightning"
+      ]
+    },
+    "baichuan": {
+      "name": "百川智能 Baichuan",
+      "api_style": "openai",
+      "default_base_url": "https://api.baichuan-ai.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "Baichuan4", "Baichuan3-Turbo", "Baichuan3-Turbo-128k",
+        "Baichuan2-Turbo", "Baichuan2-Turbo-192k"
+      ]
+    },
+    "siliconflow": {
+      "name": "硅基流动 SiliconFlow",
+      "api_style": "openai",
+      "default_base_url": "https://api.siliconflow.cn/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-72B-Instruct",
+        "deepseek-ai/DeepSeek-V2.5", "01ai/Yi-1.5-9B-Chat",
+        "THUDM/glm-4-9b-chat", "THUDM/glm-4-72b-chat"
+      ]
+    },
+    "dashscope": {
+      "name": "阿里云百炼 (多模型聚合)",
+      "api_style": "openai",
+      "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "qwen-plus", "qwen-max", "qwen-turbo", "qwen-long",
+        "qwen2.5-72b-instruct", "qwen2.5-32b-instruct",
+        "deepseek-v3", "glm-4-9b", "kimi-k2.7-code",
+        "minimax/MiniMax-M2.7", "mimo-v2.5-pro"
+      ]
+    },
+    "openai": {
+      "name": "OpenAI",
+      "api_style": "openai",
+      "default_base_url": "https://api.openai.com/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+        "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o3-pro", "o4-mini",
+        "gpt-4-turbo", "gpt-3.5-turbo"
+      ]
+    },
+    "claude": {
+      "name": "Claude (Anthropic)",
+      "api_style": "claude",
+      "default_base_url": "https://api.anthropic.com",
+      "models_url": "/v1/models",
+      "auth_header": "x-api-key",
+      "auth_prefix": "",
+      "models": [
+        "claude-sonnet-4-5", "claude-sonnet-4-20250514", "claude-3-7-sonnet-20250219",
+        "claude-opus-4-1-20250805", "claude-opus-4-20250514",
+        "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"
+      ]
+    },
+    "ollama": {
+      "name": "Ollama (本地部署)",
+      "api_style": "openai",
+      "default_base_url": "http://localhost:11434/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "llama3.3", "llama3.2", "qwen2.5", "qwen2.5-coder", "mistral", "mixtral",
+        "gemma2", "phi3", "codellama", "deepseek-coder-v2"
+      ]
+    },
+    "groq": {
+      "name": "Groq (高速推理)",
+      "api_style": "openai",
+      "default_base_url": "https://api.groq.com/openai/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768",
+        "gemma2-9b-it", "llama3-groq-8b-8192-tool-use-preview"
+      ]
+    },
+    "together": {
+      "name": "Together AI (开源模型聚合)",
+      "api_style": "openai",
+      "default_base_url": "https://api.together.xyz/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo", "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+        "deepseek-ai/DeepSeek-R1", "Qwen/Qwen2.5-72B-Instruct-Turbo"
+      ]
+    },
+    "mistral": {
+      "name": "Mistral AI",
+      "api_style": "openai",
+      "default_base_url": "https://api.mistral.ai/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "mistral-large-latest", "mistral-small-latest", "open-mixtral-8x22b",
+        "open-mixtral-8x7b", "codestral-latest", "pixtral-large-latest"
+      ]
+    },
+    "cohere": {
+      "name": "Cohere",
+      "api_style": "openai",
+      "default_base_url": "https://api.cohere.com/v2",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "command-r-plus", "command-r", "command-light", "command"
+      ]
+    },
+    "jina": {
+      "name": "Jina AI (多模态/Embedding)",
+      "api_style": "openai",
+      "default_base_url": "https://api.jina.ai/v1",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": [
+        "jina-ai/jina-clip-1", "jina-ai/jina-embeddings-v3",
+        "jina-ai/deepseek-pro", "jina-ai/jina-reranker-v2"
+      ]
+    },
+    "custom": {
+      "name": "自定义 (OpenAI 兼容)",
+      "api_style": "openai",
+      "default_base_url": "",
+      "models_url": "/models",
+      "auth_header": "Authorization",
+      "auth_prefix": "Bearer ",
+      "models": []
+    }
+  }
+}

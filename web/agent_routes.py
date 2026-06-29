@@ -9,264 +9,20 @@ from flask import request, jsonify
 import httpx
 
 
-# Provider configuration - latest models
-# 中国厂商优先，分组顺序：国内 → 国际 → 自定义
-# 有国内/海外双版本的厂商已分开：
-#   - 智谱AI (国内) / Z.AI (海外 GLM)
-#   - 通义千问 (国内百炼) / Qwen (国际 ModelScope/DashScope Intl)
-#   - 文心一言 (国内千帆) / 暂不分离
-#   - 豆包 (国内火山引擎) / 暂不分离
-PROVIDERS_CONFIG = {
-    # ===== 国内厂商 =====
-    'deepseek': {
-        'name': 'DeepSeek (深度求索)', 'api_style': 'openai',
-        'default_base_url': 'https://api.deepseek.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder', 'deepseek-v3']
-    },
-    'qwen_cn': {
-        'name': '通义千问 Qwen-CN (阿里百炼-国内)', 'api_style': 'openai',
-        'default_base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long',
-            'qwen3-max', 'qwen3-plus', 'qwen3-235b-a22b',
-            'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct', 'qwen2.5-14b-instruct', 'qwen2.5-7b-instruct',
-            'qwen-coder-plus', 'qwen-vl-max', 'qwen-vl-plus'
-        ]
-    },
-    'qwen_global': {
-        'name': '通义千问 Qwen-Global (阿里百炼-国际)', 'api_style': 'openai',
-        'default_base_url': 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long',
-            'qwen3-max', 'qwen3-plus', 'qwen3-235b-a22b',
-            'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct',
-            'qwen-coder-plus', 'qwen-vl-max', 'qwen-vl-plus'
-        ]
-    },
-    'wenxin': {
-        'name': '文心一言 (百度千帆-国内)', 'api_style': 'openai',
-        'default_base_url': 'https://qianfan.baidubce.com/v2', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'ernie-4.5-8k', 'ernie-4.5-turbo-128k', 'ernie-4.0-turbo-8k', 'ernie-4.0-8k',
-            'ernie-3.5-8k', 'ernie-3.5-128k', 'ernie-speed-pro-128k',
-            'ernie-lite-8k', 'ernie-tiny-8k'
-        ]
-    },
-    'glm_cn': {
-        'name': '智谱AI GLM-CN (国内)', 'api_style': 'openai',
-        'default_base_url': 'https://open.bigmodel.cn/api/paas/v4', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'glm-4-plus', 'glm-4-0520', 'glm-4-air', 'glm-4-airx', 'glm-4-long',
-            'glm-4-flash', 'glm-4-flashx', 'glm-zero-preview', 'glm-3-turbo'
-        ]
-    },
-    'glm_global': {
-        'name': '智谱AI GLM-Global (海外)', 'api_style': 'openai',
-        'default_base_url': 'https://api.z.ai/api/paas/v4', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'glm-4.5', 'glm-4.5-air', 'glm-4.5-x', 'glm-4.5-airx',
-            'glm-4-plus', 'glm-4-air', 'glm-4-flash'
-        ]
-    },
-    'moonshot_cn': {
-        'name': 'Kimi-CN (月之暗面-国内)', 'api_style': 'openai',
-        'default_base_url': 'https://api.moonshot.cn/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto',
-            'kimi-k2-0905-preview', 'kimi-latest'
-        ]
-    },
-    'moonshot_global': {
-        'name': 'Kimi-Global (月之暗面-海外)', 'api_style': 'openai',
-        'default_base_url': 'https://api.moonshot.ai/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto',
-            'kimi-k2-0905-preview', 'kimi-latest'
-        ]
-    },
-    'hunyuan': {
-        'name': '腾讯混元', 'api_style': 'openai',
-        'default_base_url': 'https://api.hunyuan.cloud.tencent.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'hunyuan-turbo', 'hunyuan-turbos', 'hunyuan-pro', 'hunyuan-standard',
-            'hunyuan-standard-256k', 'hunyuan-lite', 'hunyuan-code', 'hunyuan-role', 'hunyuan-vision'
-        ]
-    },
-    'spark': {
-        'name': '讯飞星火', 'api_style': 'openai',
-        'default_base_url': 'https://spark-api-open.xf-yun.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'generalv3.5', 'generalv3', 'pro-128k', 'max-32k', 'lite',
-            'spark-3.0-ultra', 'spark-v3.5'
-        ]
-    },
-    'doubao': {
-        'name': '豆包 (字节火山引擎-国内)', 'api_style': 'openai',
-        'default_base_url': 'https://ark.cn-beijing.volces.com/api/v3', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'doubao-pro-32k', 'doubao-pro-256k', 'doubao-lite-4k', 'doubao-lite-32k', 'doubao-lite-128k',
-            'doubao-1-5-pro-32k', 'doubao-1-5-pro-256k'
-        ]
-    },
-    'minimax': {
-        'name': 'MiniMax (稀宇科技)', 'api_style': 'openai',
-        'default_base_url': 'https://api.MiniMax.chat/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': ['MiniMax-Text-01', 'MiniMax-VL-01', 'MiniMax-Text-02', 'MiniMax-Reasoning-01']
-    },
-    'mimo': {
-        'name': '小米 MiMo', 'api_style': 'openai',
-        'default_base_url': 'https://api.mimo.ai/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': ['mimo-v2.5-pro', 'mimo-v2.5-flash', 'mimo-v2.5-plus']
-    },
-    'stepfun': {
-        'name': '阶跃星辰 StepFun', 'api_style': 'openai',
-        'default_base_url': 'https://api.stepfun.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'step-1-200k', 'step-1-32k', 'step-1-8k', 'step-2-16k',
-            'step-2-16k-chat', 'step-1-flash', 'step-1-plus', 'step-1-pro'
-        ]
-    },
-    'yi': {
-        'name': '零一万物 Yi', 'api_style': 'openai',
-        'default_base_url': 'https://api.lingyiwanwu.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'yi-large', 'yi-medium', 'yi-spark', 'yi-large-turbo',
-            'yi-medium-200k', 'yi-lightning'
-        ]
-    },
-    'baichuan': {
-        'name': '百川智能 Baichuan', 'api_style': 'openai',
-        'default_base_url': 'https://api.baichuan-ai.com/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'Baichuan4', 'Baichuan3-Turbo', 'Baichuan3-Turbo-128k',
-            'Baichuan2-Turbo', 'Baichuan2-Turbo-192k'
-        ]
-    },
-    'siliconflow': {
-        'name': '硅基流动 SiliconFlow', 'api_style': 'openai',
-        'default_base_url': 'https://api.siliconflow.cn/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-72B-Instruct',
-            'deepseek-ai/DeepSeek-V2.5', '01ai/Yi-1.5-9B-Chat',
-            'THUDM/glm-4-9b-chat', 'THUDM/glm-4-72b-chat'
-        ]
-    },
-    'dashscope': {
-        'name': '阿里云百炼 (多模型聚合)', 'api_style': 'openai',
-        'default_base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long',
-            'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct',
-            'deepseek-v3', 'glm-4-9b', 'kimi-k2.7-code',
-            'minimax/MiniMax-M2.7', 'mimo-v2.5-pro'
-        ]
-    },
-    # ===== 国际厂商 =====
-    'openai': {
-        'name': 'OpenAI',
-        'api_style': 'openai',
-        'default_base_url': 'https://api.openai.com/v1',
-        'models_url': '/models',
-        'auth_header': 'Authorization',
-        'auth_prefix': 'Bearer ',
-        'models': [
-            'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-            'o1', 'o1-mini', 'o1-pro', 'o3', 'o3-mini', 'o3-pro', 'o4-mini',
-            'gpt-4-turbo', 'gpt-3.5-turbo'
-        ]
-    },
-    'claude': {
-        'name': 'Claude (Anthropic)',
-        'api_style': 'claude',
-        'default_base_url': 'https://api.anthropic.com',
-        'models_url': '/v1/models',
-        'auth_header': 'x-api-key',
-        'auth_prefix': '',
-        'models': [
-            'claude-sonnet-4-5', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219',
-            'claude-opus-4-1-20250805', 'claude-opus-4-20250514',
-            'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'
-        ]
-    },
-    'ollama': {
-        'name': 'Ollama (本地部署)', 'api_style': 'openai',
-        'default_base_url': 'http://localhost:11434/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'llama3.3', 'llama3.2', 'qwen2.5', 'qwen2.5-coder', 'mistral', 'mixtral',
-            'gemma2', 'phi3', 'codellama', 'deepseek-coder-v2'
-        ]
-    },
-    'groq': {
-        'name': 'Groq (高速推理)', 'api_style': 'openai',
-        'default_base_url': 'https://api.groq.com/openai/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768',
-            'gemma2-9b-it', 'llama3-groq-8b-8192-tool-use-preview'
-        ]
-    },
-    'together': {
-        'name': 'Together AI (开源模型聚合)', 'api_style': 'openai',
-        'default_base_url': 'https://api.together.xyz/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'meta-llama/Llama-3.3-70B-Instruct-Turbo', 'meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo',
-            'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-72B-Instruct-Turbo'
-        ]
-    },
-    'mistral': {
-        'name': 'Mistral AI', 'api_style': 'openai',
-        'default_base_url': 'https://api.mistral.ai/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'mistral-large-latest', 'mistral-small-latest', 'open-mixtral-8x22b',
-            'open-mixtral-8x7b', 'codestral-latest', 'pixtral-large-latest'
-        ]
-    },
-    'cohere': {
-        'name': 'Cohere', 'api_style': 'openai',
-        'default_base_url': 'https://api.cohere.com/v2', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'command-r-plus', 'command-r', 'command-light', 'command'
-        ]
-    },
-    'jina': {
-        'name': 'Jina AI (多模态/Embedding)', 'api_style': 'openai',
-        'default_base_url': 'https://api.jina.ai/v1', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': [
-            'jina-ai/jina-clip-1', 'jina-ai/jina-embeddings-v3',
-            'jina-ai/deepseek-pro', 'jina-ai/jina-reranker-v2'
-        ]
-    },
-    # ===== 自定义 =====
-    'custom': {
-        'name': '自定义 (OpenAI 兼容)', 'api_style': 'openai',
-        'default_base_url': '', 'models_url': '/models',
-        'auth_header': 'Authorization', 'auth_prefix': 'Bearer ',
-        'models': []
-    }
-}
+def _load_providers_config():
+    """从配置文件加载 provider 配置，如果文件不存在则返回空字典"""
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ledger_modules', 'providers_config.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('providers', {})
+    except Exception as e:
+        print(f"[Agent] Failed to load providers config: {e}")
+        return {}
+
+
+# 从配置文件加载 provider 配置
+PROVIDERS_CONFIG = _load_providers_config()
 
 
 def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
@@ -455,26 +211,70 @@ def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
         # 加载Skills文档
         skills_content = load_skills_content()
         
-        system_prompt = f"""你是 Ledger AI 助手，由 {provider_names.get(provider, provider)} 驱动。
+        system_prompt = f"""你是 Ledger 记账助手，专注于个人财务管理。
 
-## 你的能力
+## 核心职责
 
-你可以帮助用户进行个人记账管理。你有两个工具可以使用：
+你只回答与记账相关的问题。包括：
+- **记账**：记录收入、支出
+- **查账**：查询交易记录、搜索商家/类别
+- **统计**：收支汇总、类别分析、趋势图表
+- **预算**：设置预算、查看预算执行情况
+- **导入导出**：CSV数据导入导出
+- **帮助**：使用指南、功能说明
+
+## 意图识别规则
+
+1. **识别意图**：首先判断用户问题是否与记账相关
+2. **相关问题**：执行相应操作，使用工具或API
+3. **无关问题**：礼貌拒绝，说明你只负责记账
+
+## 无关问题回复模板
+
+当用户问与记账无关的问题时，回复：
+"抱歉，我是记账助手，只负责帮您管理个人财务。您可以：
+- 记一笔账：如「午餐30元」
+- 查看账单：如「这个月花了多少」
+- 统计分析：如「各类别支出占比」
+- 预算管理：如「设置本月预算」"
+
+## 可用工具
+
 1. **内置工具**：query_transactions, add_transaction, query_budgets, get_statistics
 2. **HTTP API**：通过 curl 调用 Ledger REST API（详见下方 Skills 文档）
 
-## Skills 文档
+## 查询交易记录重要说明
 
-以下是你可以使用的完整 API 文档，请根据用户需求选择合适的 API 调用：
+query_transactions 工具支持两种查询方式：
+1. **按月查询**：传 month 参数（如 "2026-06"）
+2. **按日期范围查询**：传 start_date 和 end_date 参数（如 "2026-06-22", "2026-06-24"）
+
+当用户问「这两天」「最近几天」「6月22到24号」等具体日期时，**必须使用 start_date/end_date 参数**，不要用 month 参数！
+
+示例：
+- 用户问「这两天花了多少」→ start_date="2026-06-22", end_date="2026-06-24"
+- 用户问「这个月花了多少」→ month="2026-06"
+- 用户问「上周五到周日」→ 计算具体日期后用 start_date/end_date
+
+## 类型参数说明
+
+type 参数只能是以下两个值：
+- **支出**：表示花费、消费
+- **收入**：表示进账、收款
+
+不要使用英文（expense/income），必须使用中文！
+
+## Skills 文档
 
 {skills_content if skills_content else "（未找到 Skills 文档，请使用内置工具）"}
 
-## 重要提示
+## 调用规范
 
-1. 当用户要求记账、查账、统计、预算等操作时，优先使用 Skills 文档中的 HTTP API
+1. 记账、查账、统计、预算操作时，优先使用 Skills 文档中的 HTTP API
 2. 使用 curl 调用 API 时，BASE_URL 默认为 http://127.0.0.1:5800
 3. 所有 API 返回 JSON 格式：{{"success": true, "data": {{...}}}} 或 {{"success": false, "error": "..."}}
-4. 回复请使用中文，简洁明了
+4. 回复使用中文，简洁明了
+5. 不确定是否记账相关时，默认按记账相关处理
 
 ## 当前日期
 
@@ -568,26 +368,70 @@ def register_agent_routes(app, api_error, api_success, sync_db_path, db_module):
         # 加载Skills文档
         skills_content = load_skills_content()
         
-        system_prompt = f"""你是 Ledger AI 助手，由 {provider_names.get(provider, provider)} 驱动。
+        system_prompt = f"""你是 Ledger 记账助手，专注于个人财务管理。
 
-## 你的能力
+## 核心职责
 
-你可以帮助用户进行个人记账管理。你有两个工具可以使用：
+你只回答与记账相关的问题。包括：
+- **记账**：记录收入、支出
+- **查账**：查询交易记录、搜索商家/类别
+- **统计**：收支汇总、类别分析、趋势图表
+- **预算**：设置预算、查看预算执行情况
+- **导入导出**：CSV数据导入导出
+- **帮助**：使用指南、功能说明
+
+## 意图识别规则
+
+1. **识别意图**：首先判断用户问题是否与记账相关
+2. **相关问题**：执行相应操作，使用工具或API
+3. **无关问题**：礼貌拒绝，说明你只负责记账
+
+## 无关问题回复模板
+
+当用户问与记账无关的问题时，回复：
+"抱歉，我是记账助手，只负责帮您管理个人财务。您可以：
+- 记一笔账：如「午餐30元」
+- 查看账单：如「这个月花了多少」
+- 统计分析：如「各类别支出占比」
+- 预算管理：如「设置本月预算」"
+
+## 可用工具
+
 1. **内置工具**：query_transactions, add_transaction, query_budgets, get_statistics
 2. **HTTP API**：通过 curl 调用 Ledger REST API（详见下方 Skills 文档）
 
-## Skills 文档
+## 查询交易记录重要说明
 
-以下是你可以使用的完整 API 文档，请根据用户需求选择合适的 API 调用：
+query_transactions 工具支持两种查询方式：
+1. **按月查询**：传 month 参数（如 "2026-06"）
+2. **按日期范围查询**：传 start_date 和 end_date 参数（如 "2026-06-22", "2026-06-24"）
+
+当用户问「这两天」「最近几天」「6月22到24号」等具体日期时，**必须使用 start_date/end_date 参数**，不要用 month 参数！
+
+示例：
+- 用户问「这两天花了多少」→ start_date="2026-06-22", end_date="2026-06-24"
+- 用户问「这个月花了多少」→ month="2026-06"
+- 用户问「上周五到周日」→ 计算具体日期后用 start_date/end_date
+
+## 类型参数说明
+
+type 参数只能是以下两个值：
+- **支出**：表示花费、消费
+- **收入**：表示进账、收款
+
+不要使用英文（expense/income），必须使用中文！
+
+## Skills 文档
 
 {skills_content if skills_content else "（未找到 Skills 文档，请使用内置工具）"}
 
-## 重要提示
+## 调用规范
 
-1. 当用户要求记账、查账、统计、预算等操作时，优先使用 Skills 文档中的 HTTP API
+1. 记账、查账、统计、预算操作时，优先使用 Skills 文档中的 HTTP API
 2. 使用 curl 调用 API 时，BASE_URL 默认为 http://127.0.0.1:5800
 3. 所有 API 返回 JSON 格式：{{"success": true, "data": {{...}}}} 或 {{"success": false, "error": "..."}}
-4. 回复请使用中文，简洁明了
+4. 回复使用中文，简洁明了
+5. 不确定是否记账相关时，默认按记账相关处理
 
 ## 当前日期
 
