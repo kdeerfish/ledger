@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 const PROVIDERS_GROUPS = {
   '国内': ['deepseek', 'qwen_cn', 'qwen_global', 'wenxin', 'glm_cn', 'glm_global', 'moonshot_cn', 'moonshot_global', 'hunyuan', 'spark', 'doubao', 'minimax', 'mimo', 'stepfun', 'yi', 'baichuan', 'siliconflow', 'dashscope'],
@@ -57,28 +57,16 @@ export default function AgentChat() {
   
   const messagesEndRef = useRef(null);
 
-  // CSS动画
+  // CSS动画 - 只保留必要的
   useEffect(() => {
     const styles = `
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
       @keyframes blink {
         0%, 100% { opacity: 1; }
         50% { opacity: 0; }
       }
-      @keyframes bounce {
-        0%, 80%, 100% { transform: scale(0); }
-        40% { transform: scale(1); }
-      }
       @keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
-      }
-      @keyframes slideIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
       }
     `;
     const styleElement = document.createElement('style');
@@ -87,9 +75,20 @@ export default function AgentChat() {
     return () => document.head.removeChild(styleElement);
   }, []);
 
-  // 自动滚动
+  // 自动滚动 - 使用防抖避免频繁滚动
+  const scrollTimeoutRef = useRef(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 100);
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [messages]);
 
   // 初始化
@@ -254,9 +253,14 @@ export default function AgentChat() {
     setIsOpen(!isOpen);
   };
 
-  // 思考过程组件
+  // 思考过程组件 - 紧凑版，默认折叠（完成状态）
   const ThinkingProcess = ({ thinking, toolCalls, isStreaming, elapsedTime }) => {
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(isStreaming);
+    
+    // 流式时自动展开，完成后自动折叠
+    useEffect(() => {
+      if (isStreaming) setExpanded(true);
+    }, [isStreaming]);
     
     if (!thinking && (!toolCalls || toolCalls.length === 0)) {
       return null;
@@ -271,140 +275,93 @@ export default function AgentChat() {
     
     return (
       <div style={{
-        marginBottom: '12px',
-        borderRadius: '12px',
+        marginBottom: '6px',
+        borderRadius: '8px',
         overflow: 'hidden',
-        background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-        border: '1px solid #e0d4fd',
-        boxShadow: '0 2px 8px rgba(139, 92, 246, 0.08)',
-        animation: 'slideIn 0.3s ease'
+        background: '#f8f7ff',
+        border: '1px solid #e9e5fd',
       }}>
         <button
           onClick={() => setExpanded(!expanded)}
           style={{
             width: '100%',
-            padding: '10px 14px',
+            padding: '6px 10px',
             background: 'transparent',
             border: 'none',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '6px',
             cursor: 'pointer',
-            fontSize: '13px',
+            fontSize: '12px',
             color: '#6d28d9',
             fontWeight: 500
           }}
         >
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontSize: '12px'
-          }}>
-            <i className="bi bi-lightbulb-fill"></i>
-          </div>
+          <i className="bi bi-lightning-charge-fill" style={{ fontSize: '11px' }}></i>
           
           <div style={{ flex: 1, textAlign: 'left' }}>
             {isStreaming ? (
               <span>
-                <span style={{ marginRight: '8px' }}>思考中</span>
-                <span style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
-                  {[0, 0.2, 0.4].map((delay, i) => (
-                    <span key={i} style={{
-                      width: '4px',
-                      height: '4px',
-                      borderRadius: '50%',
-                      background: '#8b5cf6',
-                      animation: `pulse 1.2s ease-in-out infinite ${delay}s`
-                    }}></span>
-                  ))}
-                </span>
+                思考中 {formatTime(elapsedTime || 0)}
               </span>
             ) : (
               <span>已思考 {formatTime(elapsedTime || 0)}</span>
             )}
           </div>
           
-          {isStreaming && (
-            <span style={{ fontSize: '12px', color: '#a78bfa', marginRight: '8px' }}>
-              {formatTime(elapsedTime || 0)}
-            </span>
-          )}
-          
-          <i className={`bi bi-chevron-${expanded ? 'up' : 'down'}`} 
-             style={{ fontSize: '12px', color: '#a78bfa' }}></i>
+          <i className={`bi bi-chevron-${expanded ? 'up' : 'down'}`} style={{ fontSize: '10px' }}></i>
         </button>
         
         {expanded && (
-          <div style={{ padding: '0 14px 14px', fontSize: '13px', lineHeight: '1.6' }}>
+          <div style={{ padding: '0 10px 8px', fontSize: '12px', lineHeight: '1.5' }}>
             {thinking && (
               <div style={{ 
-                marginBottom: '10px',
-                padding: '12px',
-                background: 'rgba(255, 255, 255, 0.7)',
-                borderRadius: '8px',
-                border: '1px solid #e0d4fd'
+                padding: '6px 8px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                borderRadius: '4px',
+                color: '#4c1d95',
+                whiteSpace: 'pre-wrap',
+                opacity: 0.9,
+                marginBottom: toolCalls?.length ? '6px' : 0
               }}>
-                <div style={{ color: '#4c1d95', whiteSpace: 'pre-wrap', fontStyle: 'italic', opacity: 0.9 }}>
-                  {thinking}
-                </div>
+                {thinking}
               </div>
             )}
             
             {toolCalls && toolCalls.length > 0 && (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {toolCalls.map((tc, idx) => (
                   <div key={idx} style={{
-                    marginBottom: '8px',
-                    padding: '10px 12px',
-                    background: 'rgba(255, 255, 255, 0.7)',
-                    borderRadius: '8px',
-                    border: '1px solid #e0d4fd'
+                    padding: '6px 8px',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: '4px',
+                    fontSize: '11px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                       <span style={{
-                        padding: '3px 8px',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                        padding: '1px 6px',
+                        background: '#8b5cf6',
                         color: 'white',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
+                        borderRadius: '3px',
+                        fontSize: '10px',
+                        fontWeight: 600
                       }}>
-                        <i className="bi bi-gear-fill"></i>
                         {tc.function?.name || 'unknown'}
                       </span>
-                      <span style={{ color: '#a78bfa', fontSize: '11px', marginLeft: 'auto' }}>
-                        #{idx + 1}
-                      </span>
-                    </div>
-                    
-                    <div style={{ 
-                      fontSize: '11px', color: '#5b21b6',
-                      fontFamily: '"SF Mono", monospace',
-                      background: 'rgba(139, 92, 246, 0.08)',
-                      padding: '6px 8px', borderRadius: '6px',
-                      marginBottom: '6px', wordBreak: 'break-all'
-                    }}>
-                      {tc.function?.arguments || '{}'}
+                      {tc.result && (
+                        <i className="bi bi-check-circle-fill" style={{ color: '#059669', fontSize: '10px' }}></i>
+                      )}
                     </div>
                     
                     {tc.result && (
                       <div style={{
-                        fontSize: '11px', color: '#059669',
-                        background: 'rgba(16, 185, 129, 0.08)',
-                        padding: '6px 8px', borderRadius: '6px',
-                        display: 'flex', alignItems: 'flex-start', gap: '6px'
+                        color: '#374151',
+                        background: 'rgba(16, 185, 129, 0.06)',
+                        padding: '4px 6px',
+                        borderRadius: '3px',
+                        whiteSpace: 'pre-wrap'
                       }}>
-                        <i className="bi bi-check-circle-fill" style={{ marginTop: '2px' }}></i>
-                        <span>{tc.result}</span>
+                        {tc.result}
                       </div>
                     )}
                   </div>
@@ -440,6 +397,7 @@ export default function AgentChat() {
     setProgressStatus('connecting');
     
     const thinkingMsgId = Date.now() + 2;
+    const startTime = Date.now();
     const thinkingMsg = { 
       id: thinkingMsgId, 
       role: 'thinking', 
@@ -447,19 +405,20 @@ export default function AgentChat() {
       thinkingContent: '',
       toolCalls: [],
       isStreaming: true,
-      startTime: Date.now(),
+      startTime: startTime,
       elapsedTime: 0
     };
     setMessages(prev => [...prev, thinkingMsg]);
     
-    // 计时器
+    // 计时器 - 每2秒更新一次，减少重渲染
     const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setMessages(prev => prev.map(m => 
         m.id === thinkingMsgId 
-          ? { ...m, elapsedTime: Math.floor((Date.now() - m.startTime) / 1000) }
+          ? { ...m, elapsedTime: elapsed }
           : m
       ));
-    }, 1000);
+    }, 2000);
     
     try {
       setProgressStatus('thinking');
@@ -808,33 +767,38 @@ export default function AgentChat() {
 
   // 渲染消息
   const renderMessage = (msg) => {
+    // 清理内容：去除首尾空白，但保留内部换行
+    const cleanContent = typeof msg.content === 'string' 
+      ? msg.content.replace(/^\s+/, '').replace(/\s+$/, '')
+      : msg.content;
+    
     if (msg.role === 'thinking') {
       return (
-        <div key={msg.id} style={{ maxWidth: '95%', alignSelf: 'flex-start', animation: 'slideIn 0.3s ease' }}>
+        <div key={msg.id} style={{ maxWidth: '95%', alignSelf: 'flex-start' }}>
           <ThinkingProcess 
-            thinking={msg.thinkingContent || ''}
+            thinking={(msg.thinkingContent || '').replace(/^\s+/, '')}
             toolCalls={msg.toolCalls || []}
             isStreaming={msg.isStreaming}
             elapsedTime={msg.elapsedTime || 0}
           />
-          {msg.content && (
+          {cleanContent && (
             <div style={{
-              padding: '10px 14px',
+              padding: '8px 12px',
               background: 'white',
-              borderRadius: '14px 14px 14px 4px',
+              borderRadius: '8px',
               border: '1px solid #e5e7eb',
-              marginTop: '8px',
+              marginTop: '4px',
               fontSize: '14px',
-              lineHeight: '1.45',
+              lineHeight: '1.5',
               wordWrap: 'break-word',
               whiteSpace: 'pre-wrap'
             }}>
-              {msg.content}
+              {cleanContent}
               {msg.isStreaming && (
                 <span style={{ 
                   display: 'inline-block',
                   width: '2px',
-                  height: '14px',
+                  height: '12px',
                   background: '#8b5cf6',
                   marginLeft: '2px',
                   animation: 'blink 1s infinite'
@@ -851,11 +815,11 @@ export default function AgentChat() {
         key={msg.id}
         style={{
           maxWidth: '85%',
-          padding: '10px 14px',
-          borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : 
-                       msg.role === 'assistant' ? '14px 14px 14px 4px' : '8px',
+          padding: msg.role === 'system' ? '6px 12px' : '8px 12px',
+          borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : 
+                       msg.role === 'assistant' ? '12px 12px 12px 2px' : '6px',
           fontSize: msg.role === 'system' ? '12px' : '14px',
-          lineHeight: '1.45',
+          lineHeight: '1.5',
           wordWrap: 'break-word',
           whiteSpace: 'pre-wrap',
           alignSelf: msg.role === 'user' ? 'flex-end' : 
@@ -866,10 +830,9 @@ export default function AgentChat() {
                  msg.role === 'system' ? '#92400e' : '#1f2937',
           border: msg.role === 'assistant' ? '1px solid #e5e7eb' : 'none',
           textAlign: msg.role === 'system' ? 'center' : 'left',
-          animation: 'slideIn 0.3s ease'
         }}
       >
-        {msg.content}
+        {cleanContent}
       </div>
     );
   };
@@ -1223,11 +1186,11 @@ export default function AgentChat() {
             <div style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '16px',
+              padding: '12px',
               background: '#f9fafb',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '8px'
             }}>
               {messages.length === 0 && (
                 <div style={{
@@ -1238,9 +1201,9 @@ export default function AgentChat() {
                   justifyContent: 'center',
                   color: '#9ca3af'
                 }}>
-                  <i className="bi bi-chat-dots" style={{ fontSize: '48px', marginBottom: '16px' }}></i>
-                  <div style={{ fontSize: '14px' }}>试试说：记一笔午餐30元</div>
-                  <div style={{ fontSize: '14px', marginTop: '4px' }}>或者查看本月支出</div>
+                  <i className="bi bi-chat-dots" style={{ fontSize: '40px', marginBottom: '12px' }}></i>
+                  <div style={{ fontSize: '13px' }}>试试说：记一笔午餐30元</div>
+                  <div style={{ fontSize: '13px', marginTop: '2px' }}>或者查看本月支出</div>
                 </div>
               )}
               {messages.map(msg => renderMessage(msg))}
@@ -1259,7 +1222,6 @@ export default function AgentChat() {
                   borderRadius: '14px',
                   fontSize: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                  animation: 'slideIn 0.2s ease',
                   zIndex: 5,
                   pointerEvents: 'none'
                 }}>
@@ -1270,7 +1232,7 @@ export default function AgentChat() {
 
             {/* Input */}
             <div style={{
-              padding: '12px',
+              padding: '8px 12px',
               borderTop: '1px solid #e5e7eb',
               background: 'white',
               display: 'flex',
@@ -1285,9 +1247,9 @@ export default function AgentChat() {
                 disabled={loading}
                 style={{
                   flex: 1,
-                  padding: '10px 14px',
+                  padding: '8px 12px',
                   border: '1px solid #d1d5db',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   fontSize: '14px',
                   outline: 'none',
                   opacity: loading ? 0.7 : 1
@@ -1297,12 +1259,12 @@ export default function AgentChat() {
                 onClick={sendMessage}
                 disabled={loading || !inputValue.trim()}
                 style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '36px',
+                  height: '36px',
                   background: loading || !inputValue.trim() ? '#9ca3af' : '#4f46e5',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   cursor: loading || !inputValue.trim() ? 'not-allowed' : 'pointer'
                 }}
               >
@@ -1643,27 +1605,6 @@ export default function AgentChat() {
                             />
                             启用
                           </label>
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-                            System Prompt 覆盖 (可选)
-                          </label>
-                          <textarea
-                            value={configSystemPrompt}
-                            onChange={(e) => setConfigSystemPrompt(e.target.value)}
-                            placeholder="留空则使用默认 Ledger AI 提示词"
-                            rows={4}
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              boxSizing: 'border-box',
-                              fontFamily: 'inherit',
-                              resize: 'vertical'
-                            }}
-                          />
                         </div>
                       </div>
                     )}
